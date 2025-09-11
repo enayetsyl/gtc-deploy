@@ -25,6 +25,7 @@ model User {
   gtcPointId   String? // for GTC_POINT
   sector       Sector?   @relation("SectorUsers", fields: [sectorId], references: [id])
   gtcPoint     GtcPoint? @relation("PointUsers", fields: [gtcPointId], references: [id])
+  notifications Notification[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
@@ -87,4 +88,27 @@ enum ServiceStatus {
   ENABLED
   DISABLED
   PENDING_REQUEST
+}
+
+enum NotificationType {
+  LEAD_NEW
+  CONVENTION_UPLOADED
+  CONVENTION_STATUS
+  SERVICE_REQUEST
+  SERVICE_STATUS
+  GENERIC
+}
+
+model Notification {
+  id         String            @id @default(cuid())
+  userId     String
+  type       NotificationType  @default(GENERIC)
+  subject    String
+  contentHtml String?
+  read       Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, read, createdAt])
 }

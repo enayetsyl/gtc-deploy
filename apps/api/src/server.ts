@@ -10,7 +10,8 @@ import { authRouter } from "./routes/auth";
 import { meRouter } from "./routes/me";
 import { adminSectors } from "./routes/admin.sectors";
 import { adminPoints } from "./routes/admin.points";
-import { adminServices } from "./routes/admin.services";
+import { adminServices } from "./routes/admin.services";import { meNotifications } from "./routes/notifications.me";
+
 
 export const app = express();
 
@@ -28,7 +29,7 @@ app.use("/api/me", meRouter);
 app.use("/api/admin/sectors", adminSectors);
 app.use("/api/admin/points", adminPoints);
 app.use("/api/admin/services", adminServices);
-
+app.use("/api/me/notifications", meNotifications);
 
 
 app.use(errorHandler);

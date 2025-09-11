@@ -113,6 +113,7 @@ model User {
   gtcPointId   String? // for GTC_POINT
   sector       Sector?   @relation("SectorUsers", fields: [sectorId], references: [id])
   gtcPoint     GtcPoint? @relation("PointUsers", fields: [gtcPointId], references: [id])
+  notifications Notification[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }
@@ -144,7 +145,7 @@ model GtcPoint {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   services  GtcPointService[]
-  users     User[]            @relation("PointUsers")
+  users     User[]            @relation("PointUsers") 
 }
 
 model Service {
@@ -175,6 +176,29 @@ enum ServiceStatus {
   ENABLED
   DISABLED
   PENDING_REQUEST
+}
+
+enum NotificationType {
+  LEAD_NEW
+  CONVENTION_UPLOADED
+  CONVENTION_STATUS
+  SERVICE_REQUEST
+  SERVICE_STATUS
+  GENERIC
+}
+
+model Notification {
+  id         String            @id @default(cuid())
+  userId     String
+  type       NotificationType  @default(GENERIC)
+  subject    String
+  contentHtml String?
+  read       Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, read, createdAt])
 }
 
 ```
@@ -382,6 +406,69 @@ import { Redis } from "ioredis";
 export const redis = new Redis(process.env.REDIS_URL!);
 ```
 
+# c:/EForgeIT/gtc/apps/api/src/lib/mailer.ts
+```
+import nodemailer from "nodemailer";
+
+export const mailer = nodemailer.createTransport({
+  host: process.env.MAIL_HOST || "127.0.0.1",
+  port: Number(process.env.MAIL_PORT || 1025),
+  secure: false,
+});
+
+```
+
+# c:/EForgeIT/gtc/apps/api/src/queues/email.ts
+```
+import { Queue } from "bullmq";
+
+export type EmailJob = {
+  to: string | string[];
+  subject: string;
+  html?: string;
+  text?: string;
+};
+
+export const emailQueue = new Queue<EmailJob>("emails", {
+  connection: { url: process.env.REDIS_URL! },
+});
+
+export async function enqueueEmail(data: EmailJob) {
+  return emailQueue.add("send", data, {
+    attempts: 3,
+    backoff: { type: "exponential", delay: 2000 },
+    removeOnComplete: 100,
+    removeOnFail: 100,
+  });
+}
+```
+
+# c:/EForgeIT/gtc/apps/api/src/queues/worker.ts
+```
+import { Worker, Job } from "bullmq";
+import { mailer } from "../lib/mailer";
+import type { EmailJob } from "./email";
+
+const worker = new Worker<EmailJob>(
+  "emails",
+  async (job: Job<EmailJob>) => {
+    const { to, subject, html, text } = job.data;
+    await mailer.sendMail({
+      from: process.env.MAIL_FROM || "GTC <noreply@gtc.local>",
+      to,
+      subject,
+      html,
+      text: html ? undefined : text ?? " ",
+    });
+  },
+  { connection: { url: process.env.REDIS_URL! } }
+);
+
+worker.on("completed", (job) => console.log("[email] sent", job.id));
+worker.on("failed", (job, err) => console.error("[email] failed", job?.id, err));
+
+```
+
 # c:/EForgeIT/gtc/apps/api/src/middleware/auth.ts
 
 ```typescript
@@ -576,6 +663,166 @@ meRouter.get("/", requireAuth, async (req, res) => {
 });
 ```
 
+# c:/EForgeIT/gtc/apps/api/src/routes/notifications.me.ts
+```
+import { Router } from "express";
+import { prisma } from "../lib/prisma";
+import { requireAuth } from "../middleware/auth";
+import { z } from "zod";
+
+export const meNotifications = Router();
+meNotifications.use(requireAuth);
+
+// cursor pagination
+meNotifications.get("/", async (req, res) => {
+  const take = Math.min(50, Math.max(1, Number(req.query.take ?? 20)));
+  const cursor = (req.query.cursor as string | undefined) || undefined;
+
+  const items = await prisma.notification.findMany({
+    where: { userId: req.user!.id },
+    orderBy: { createdAt: "desc" },
+    take: take + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+  });
+
+  const hasMore = items.length > take;
+  const sliced = hasMore ? items.slice(0, take) : items;
+  const nextCursor = hasMore ? sliced[sliced.length - 1].id : null;
+
+  res.json({ items: sliced, nextCursor });
+});
+
+meNotifications.get("/unread-count", async (req, res) => {
+  const count = await prisma.notification.count({
+    where: { userId: req.user!.id, read: false },
+  });
+  res.json({ unread: count });
+});
+
+meNotifications.post("/:id/read", async (req, res) => {
+  const { id } = z.object({ id: z.string().min(1) }).parse(req.params);
+  const notif = await prisma.notification.update({
+    where: { id },
+    data: { read: true },
+  });
+  res.json(notif);
+});
+
+```
+# c:/EForgeIT/gtc/apps/api/src/services/notification.ts
+```
+import { prisma, } from "../lib/prisma";
+import { emitToUser } from "../sockets/io";
+import { enqueueEmail } from "../queues/email";
+
+type NotifyInput = {
+  userId: string;
+  type?: "LEAD_NEW" | "CONVENTION_UPLOADED" | "CONVENTION_STATUS" | "SERVICE_REQUEST" | "SERVICE_STATUS" | "GENERIC";
+  subject: string;
+  contentHtml?: string;
+  email?: { to?: string; subject?: string; html?: string; text?: string } | false; // false disables email
+};
+
+/**
+ * Creates a Notification row, emits socket events, and optionally enqueues an email.
+ * Returns the created Notification.
+ */
+export async function notifyUser(input: NotifyInput) {
+  const notif = await prisma.notification.create({
+    data: {
+      userId: input.userId,
+      type: (input.type ?? "GENERIC") as any,
+      subject: input.subject,
+      contentHtml: input.contentHtml,
+    },
+  });
+
+  // realtime: push to user room + badge update
+  emitToUser(input.userId, "notify:new", notif);
+  const unread = await prisma.notification.count({
+    where: { userId: input.userId, read: false },
+  });
+  emitToUser(input.userId, "badge:update", { unread });
+
+  // optional email
+  if (input.email !== false) {
+    const user = await prisma.user.findUnique({
+      where: { id: input.userId },
+      select: { email: true },
+    });
+    if (user?.email) {
+      await enqueueEmail({
+        to: input.email?.to ?? user.email,
+        subject: input.email?.subject ?? input.subject,
+        html: input.email?.html ?? input.contentHtml,
+        text: input.email?.text,
+      });
+    }
+  }
+
+  return notif;
+}
+
+export async function notifyUsers(
+  userIds: string[],
+  data: Omit<NotifyInput, "userId">
+) {
+  return Promise.all(userIds.map((userId) => notifyUser({ ...data, userId })));
+}
+
+```
+
+# c:/EForgeIT/gtc/apps/api/src/sockets/index.ts
+```
+import type { Server } from "socket.io";
+import { verifyAccessToken } from "../lib/jwt";
+
+export function initSockets(io: Server) {
+  // JWT auth via handshake
+  io.use((socket, next) => {
+    const token =
+      (socket.handshake.auth as any)?.token ||
+      (socket.handshake.query?.token as string | undefined);
+    if (!token) return next(new Error("unauthorized"));
+    try {
+      const payload = verifyAccessToken(token);
+      (socket.data as any).userId = payload.sub;
+      next();
+    } catch {
+      next(new Error("unauthorized"));
+    }
+  });
+
+  io.on("connection", (socket) => {
+    const userId = (socket.data as any).userId as string;
+    socket.join(`user:${userId}`);
+    socket.emit("hello", { message: "connected" });
+  });
+}
+
+```
+
+# c:/EForgeIT/gtc/apps/api/src/sockets/io.ts
+```
+import type { Server } from "socket.io";
+let ioRef: Server | null = null;
+
+export function setIO(io: Server) {
+  ioRef = io;
+}
+export function getIO(): Server {
+  if (!ioRef) throw new Error("Socket.io not initialized");
+  return ioRef;
+}
+
+export function emitToUser(userId: string, event: string, payload: any) {
+  getIO().to(`user:${userId}`).emit(event, payload);
+}
+
+```
+
+
+
 # c:/EForgeIT/gtc/apps/api/src/sockets/index.ts
 
 ```typescript
@@ -613,13 +860,17 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { initSockets } from "./sockets";
 import { app } from "./server";
+import { setIO } from "./sockets/io";
 
 const server = createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server, { cors: { origin: ["http://localhost:3000"] } });
+setIO(io);
 initSockets(io);
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => console.log(`API listening on :${PORT}`));
+
+
 ```
 
 # c:/EForgeIT/gtc/apps/api/src/server.ts
@@ -637,16 +888,15 @@ import { authRouter } from "./routes/auth";
 import { meRouter } from "./routes/me";
 import { adminSectors } from "./routes/admin.sectors";
 import { adminPoints } from "./routes/admin.points";
-import { adminServices } from "./routes/admin.services";
+import { adminServices } from "./routes/admin.services";import { meNotifications } from "./routes/notifications.me";
+
 
 export const app = express();
 
-app.use(
-  cors({
-    origin: ["http://localhost:3000"],
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: ["http://localhost:3000"],
+  credentials: true,
+}));
 app.use(cookieParser());
 app.use(express.json());
 
@@ -657,6 +907,8 @@ app.use("/api/me", meRouter);
 app.use("/api/admin/sectors", adminSectors);
 app.use("/api/admin/points", adminPoints);
 app.use("/api/admin/services", adminServices);
+app.use("/api/me/notifications", meNotifications);
+
 
 app.use(errorHandler);
 ```
@@ -746,6 +998,7 @@ CMD ["npm", "run", "dev"]
     "express": "^4.21.2",
     "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^7.0.6",
     "socket.io": "^4.8.1",
     "uuid": "^13.0.0",
     "zod": "^3.25.76"
@@ -757,6 +1010,7 @@ CMD ["npm", "run", "dev"]
     "@types/express": "^4.17.23",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.19.13",
+    "@types/nodemailer": "^7.0.1",
     "prisma": "^5.22.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
@@ -764,6 +1018,7 @@ CMD ["npm", "run", "dev"]
     "typescript": "^5.9.2"
   }
 }
+
 ```
 
 # c:/EForgeIT/gtc/apps/api/tsconfig.json
@@ -1353,7 +1608,6 @@ export default function LoginPage() {
 ```
 
 # c:/EForgeIT/gtc/apps/web/src/app/(protected)/dashboard/page.tsx
-
 ```tsx
 "use client";
 
@@ -1361,18 +1615,12 @@ import Protected from "@/components/protected";
 import { useAuth } from "@/providers/auth-provider";
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   return (
     <Protected>
       <main className="p-6 space-y-6">
         <header className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Dashboard</h1>
-          <button
-            onClick={logout}
-            className="rounded-md border px-3 py-1.5 hover:bg-gray-50"
-          >
-            Logout
-          </button>
         </header>
 
         <section className="rounded-xl border p-6">
@@ -1387,6 +1635,745 @@ export default function Dashboard() {
     </Protected>
   );
 }
+
+```
+
+# c:/EForgeIT/gtc/apps/api/src/routes/admin.sectors.ts
+```typescript
+import { Router } from "express";
+import { z } from "zod";
+import { prisma } from "../lib/prisma";
+import { requireAuth, requireRole } from "../middleware/auth";
+
+export const adminSectors = Router();
+adminSectors.use(requireAuth, requireRole("ADMIN"));
+
+// list with basic pagination
+adminSectors.get("/", async (req, res) => {
+  const page = Math.max(1, Number(req.query.page ?? 1));
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 20)));
+  const [items, total] = await Promise.all([
+    prisma.sector.findMany({
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.sector.count(),
+  ]);
+  res.json({ items, total, page, pageSize });
+});
+
+const createSchema = z.object({ name: z.string().min(2).max(100) });
+
+adminSectors.post("/", async (req, res) => {
+  const parsed = createSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
+  const sector = await prisma.sector.create({ data: parsed.data });
+  res.status(201).json(sector);
+});
+
+const idParam = z.object({ id: z.string().min(1) });
+const updateSchema = z.object({ name: z.string().min(2).max(100) });
+
+adminSectors.get("/:id", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const sector = await prisma.sector.findUnique({ where: { id } });
+  if (!sector) return res.status(404).json({ error: "Not found" });
+  res.json(sector);
+});
+
+adminSectors.patch("/:id", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const body = updateSchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
+  const sector = await prisma.sector.update({ where: { id }, data: body.data });
+  res.json(sector);
+});
+
+adminSectors.delete("/:id", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  // optional safety: prevent delete if points exist
+  const count = await prisma.gtcPoint.count({ where: { sectorId: id } });
+  if (count > 0) return res.status(409).json({ error: "Sector has points; move or delete them first." });
+  await prisma.sector.delete({ where: { id } });
+  res.json({ ok: true });
+});
+
+```
+
+# c:/EForgeIT/gtc/apps/api/src/routes/admin.points.ts
+```typescript
+import { Router } from "express";
+import { z } from "zod";
+import { prisma } from "../lib/prisma";
+import { requireAuth, requireRole } from "../middleware/auth";
+
+export const adminPoints = Router();
+adminPoints.use(requireAuth, requireRole("ADMIN"));
+
+adminPoints.get("/", async (req, res) => {
+  const page = Math.max(1, Number(req.query.page ?? 1));
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 20)));
+  const [items, total] = await Promise.all([
+    prisma.gtcPoint.findMany({
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      orderBy: { createdAt: "desc" },
+      include: { sector: true },
+    }),
+    prisma.gtcPoint.count(),
+  ]);
+  res.json({ items, total, page, pageSize });
+});
+
+const createSchema = z.object({
+  name: z.string().min(2).max(200),
+  email: z.string().email(),
+  sectorId: z.string().min(1),
+});
+
+adminPoints.post("/", async (req, res) => {
+  const parsed = createSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
+  const point = await prisma.gtcPoint.create({ data: parsed.data });
+  res.status(201).json(point);
+});
+
+const idParam = z.object({ id: z.string().min(1) });
+const updateSchema = z.object({
+  name: z.string().min(2).max(200).optional(),
+  email: z.string().email().optional(),
+  sectorId: z.string().min(1).optional(),
+});
+
+adminPoints.get("/:id", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const point = await prisma.gtcPoint.findUnique({ where: { id }, include: { sector: true, services: true } });
+  if (!point) return res.status(404).json({ error: "Not found" });
+  res.json(point);
+});
+
+adminPoints.patch("/:id", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const body = updateSchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
+  const point = await prisma.gtcPoint.update({ where: { id }, data: body.data });
+  res.json(point);
+});
+
+adminPoints.delete("/:id", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const svcCount = await prisma.gtcPointService.count({ where: { gtcPointId: id } });
+  if (svcCount > 0) return res.status(409).json({ error: "Point has service links; remove them first." });
+  await prisma.gtcPoint.delete({ where: { id } });
+  res.json({ ok: true });
+});
+
+```
+
+# c:/EForgeIT/gtc/apps/api/src/routes/admin.services.ts
+```typescript
+import { Router } from "express";
+import { z } from "zod";
+import { prisma } from "../lib/prisma";
+import { requireAuth, requireRole } from "../middleware/auth";
+
+export const adminServices = Router();
+adminServices.use(requireAuth, requireRole("ADMIN"));
+
+adminServices.get("/", async (req, res) => {
+  const items = await prisma.service.findMany({ orderBy: { createdAt: "desc" } });
+  res.json(items);
+});
+
+const createSchema = z.object({
+  code: z.string().min(2).max(50).regex(/^[A-Z0-9_]+$/),
+  name: z.string().min(2).max(200),
+  active: z.boolean().optional().default(true),
+});
+
+adminServices.post("/", async (req, res) => {
+  const parsed = createSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
+  const service = await prisma.service.create({ data: parsed.data });
+  res.status(201).json(service);
+});
+
+const idParam = z.object({ id: z.string().min(1) });
+const updateSchema = z.object({
+  code: z.string().min(2).max(50).regex(/^[A-Z0-9_]+$/).optional(),
+  name: z.string().min(2).max(200).optional(),
+  active: z.boolean().optional(),
+});
+
+adminServices.get("/:id", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const service = await prisma.service.findUnique({ where: { id } });
+  if (!service) return res.status(404).json({ error: "Not found" });
+  res.json(service);
+});
+
+adminServices.patch("/:id", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const body = updateSchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
+  const service = await prisma.service.update({ where: { id }, data: body.data });
+  res.json(service);
+});
+
+adminServices.delete("/:id", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const links = await prisma.gtcPointService.count({ where: { serviceId: id } });
+  if (links > 0) return res.status(409).json({ error: "Service is linked to points; unlink first." });
+  await prisma.service.delete({ where: { id } });
+  res.json({ ok: true });
+});
+
+```
+
+# c:/EForgeIT/gtc/apps/web/src/lib/admin-api.ts
+```typescript
+import { api } from "./axios";
+
+export type Sector = { id: string; name: string; createdAt: string; updatedAt: string };
+export type Point = { id: string; name: string; email: string; sectorId: string; createdAt: string; updatedAt: string; sector?: Sector };
+export type Service = { id: string; code: string; name: string; active: boolean; createdAt: string; updatedAt: string };
+
+export type Paged<T> = { items: T[]; total: number; page: number; pageSize: number };
+
+export async function listSectors(page = 1, pageSize = 50) {
+  const { data } = await api.get<Paged<Sector>>(`/api/admin/sectors`, { params: { page, pageSize } });
+  return data;
+}
+export async function createSector(payload: { name: string }) {
+  const { data } = await api.post<Sector>(`/api/admin/sectors`, payload);
+  return data;
+}
+export async function updateSector(id: string, payload: { name: string }) {
+  const { data } = await api.patch<Sector>(`/api/admin/sectors/${id}`, payload);
+  return data;
+}
+export async function deleteSector(id: string) {
+  const { data } = await api.delete(`/api/admin/sectors/${id}`);
+  return data;
+}
+
+export async function listPoints(page = 1, pageSize = 50) {
+  const { data } = await api.get<Paged<Point>>(`/api/admin/points`, { params: { page, pageSize } });
+  return data;
+}
+export async function createPoint(payload: { name: string; email: string; sectorId: string }) {
+  const { data } = await api.post<Point>(`/api/admin/points`, payload);
+  return data;
+}
+export async function updatePoint(id: string, payload: Partial<{ name: string; email: string; sectorId: string }>) {
+  const { data } = await api.patch<Point>(`/api/admin/points/${id}`, payload);
+  return data;
+}
+export async function deletePoint(id: string) {
+  const { data } = await api.delete(`/api/admin/points/${id}`);
+  return data;
+}
+
+export async function listServices() {
+  const { data } = await api.get<Service>(`/api/admin/services`);
+  return data;
+}
+export async function createService(payload: { code: string; name: string; active?: boolean }) {
+  const { data } = await api.post<Service>(`/api/admin/services`, payload);
+  return data;
+}
+export async function updateService(id: string, payload: Partial<{ code: string; name: string; active: boolean }>) {
+  const { data } = await api.patch<Service>(`/api/admin/services/${id}`, payload);
+  return data;
+}
+export async function deleteService(id: string) {
+  const { data } = await api.delete(`/api/admin/services/${id}`);
+  return data;
+}
+
+```
+
+# c:/EForgeIT/gtc/apps/web/src/app/(protected)/layout.tsx
+```tsx
+import AdminNav from "@/components/admin-nav";
+import Protected from "@/components/protected";
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Protected>
+      <div className="p-6 space-y-6">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Admin</h1>
+          <AdminNav />
+        </header>
+        {children}
+      </div>
+    </Protected>
+  );
+}
+
+```
+
+# c:/EForgeIT/gtc/apps/web/src/app/(protected)/page.tsx
+```tsx
+export default function AdminHome() {
+  return (
+    <main className="rounded-xl border p-6">
+      <p className="text-gray-700">
+        Choose a section: Sectors, GTC Points, or Services.
+      </p>
+    </main>
+  );
+}
+
+```
+
+# c:/EForgeIT/gtc/apps/web/src/components/admin-nav.tsx
+```tsx
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/providers/auth-provider";
+
+const items = [
+  { href: "/admin/sectors", label: "Sectors" },
+  { href: "/admin/points", label: "GTC Points" },
+  { href: "/admin/services", label: "Services" },
+];
+
+export default function AdminNav() {
+  const pathname = usePathname();
+  const { logout } = useAuth();
+  return (
+    <nav className="flex gap-2">
+      {items.map((it) => {
+        const active = pathname?.startsWith(it.href);
+        return (
+          <Link
+            key={it.href}
+            href={it.href}
+            className={cn(
+              "rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50",
+              active && "bg-black text-white hover:bg-black"
+            )}
+          >
+            {it.label}
+          </Link>
+        );
+      })}
+      <button
+        onClick={logout}
+        className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
+      >
+        Logout
+      </button>
+    </nav>
+  );
+}
+
+```
+
+# c:/EForgeIT/gtc/apps/web/src/app/(protected)/admin/sectors/page.tsx
+```tsx
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createSector, deleteSector, listSectors, updateSector, type Sector } from "@/lib/admin-api";
+import { useState } from "react";
+import { z } from "zod";
+
+const sectorSchema = z.object({ name: z.string().min(2).max(100) });
+
+export default function SectorsPage() {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [editing, setEditing] = useState<null | Sector>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const q = useQuery({ queryKey: ["admin", "sectors"], queryFn: () => listSectors(1, 100) });
+
+  const createMut = useMutation({
+    mutationFn: (payload: { name: string }) => createSector(payload),
+    onSuccess: () => {
+      setName("");
+      qc.invalidateQueries({ queryKey: ["admin", "sectors"] });
+    },
+    onError: () => setErr("Failed to create sector"),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: (p: { id: string; name: string }) => updateSector(p.id, { name: p.name }),
+    onSuccess: () => {
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["admin", "sectors"] });
+    },
+    onError: () => setErr("Failed to update"),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteSector(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "sectors"] }),
+    onError: () => setErr("Delete failed (maybe sector has points)"),
+  });
+
+  return (
+    <main className="space-y-6">
+      <section className="rounded-xl border p-6 space-y-4">
+        <h2 className="text-lg font-semibold">Create sector</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setErr(null);
+            const parsed = sectorSchema.safeParse({ name });
+            if (!parsed.success) return setErr(parsed.error.issues[0]?.message ?? "Validation error");
+            createMut.mutate(parsed.data);
+          }}
+          className="flex gap-2"
+        >
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="rounded-md border px-3 py-2"
+            placeholder="e.g., Training"
+          />
+          <button className="rounded-md bg-black text-white px-3 py-2" disabled={createMut.isPending}>
+            {createMut.isPending ? "Creating..." : "Create"}
+          </button>
+        </form>
+        {err && <p className="text-sm text-red-600">{err}</p>}
+      </section>
+
+      <section className="rounded-xl border p-6">
+        <h2 className="text-lg font-semibold mb-4">Sectors</h2>
+        {q.isLoading ? (
+          <p>Loading…</p>
+        ) : (
+          <div className="divide-y">
+            {q.data?.items.map((s) => (
+              <div key={s.id} className="py-3 flex items-center justify-between gap-4">
+                {editing?.id === s.id ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const parsed = sectorSchema.safeParse({ name: editing.name });
+                      if (!parsed.success) return;
+                      updateMut.mutate({ id: s.id, name: parsed.data.name });
+                    }}
+                    className="flex-1 flex gap-2"
+                  >
+                    <input
+                      className="rounded-md border px-3 py-2 flex-1"
+                      value={editing.name}
+                      onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                    />
+                    <button className="rounded-md border px-3 py-2" type="button" onClick={() => setEditing(null)}>
+                      Cancel
+                    </button>
+                    <button className="rounded-md bg-black text-white px-3 py-2">
+                      {updateMut.isPending ? "Saving..." : "Save"}
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <div className="flex-1">
+                      <div className="font-medium">{s.name}</div>
+                      <div className="text-xs text-gray-500">{s.id}</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="rounded-md border px-3 py-1.5" onClick={() => setEditing(s)}>
+                        Edit
+                      </button>
+                      <button
+                        className="rounded-md border px-3 py-1.5"
+                        onClick={() => deleteMut.mutate(s.id)}
+                        disabled={deleteMut.isPending}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+```
+
+# c:/EForgeIT/gtc/apps/web/src/app/(protected)/admin/points/page.tsx
+```tsx
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createPoint, listPoints, listSectors, type Point } from "@/lib/admin-api";
+import { useMemo, useState } from "react";
+import { z } from "zod";
+
+const schema = z.object({
+  name: z.string().min(2).max(200),
+  email: z.string().email(),
+  sectorId: z.string().min(1),
+});
+
+export default function PointsPage() {
+  const qc = useQueryClient();
+  const [form, setForm] = useState({ name: "", email: "", sectorId: "" });
+  const [err, setErr] = useState<string | null>(null);
+
+  const sectorsQ = useQuery({ queryKey: ["admin", "sectors"], queryFn: () => listSectors(1, 100) });
+  const pointsQ = useQuery({ queryKey: ["admin", "points"], queryFn: () => listPoints(1, 100) });
+
+  const sectorOptions = useMemo(() => sectorsQ.data?.items ?? [], [sectorsQ.data]);
+
+  const createMut = useMutation({
+    mutationFn: (payload: { name: string; email: string; sectorId: string }) => createPoint(payload),
+    onSuccess: () => {
+      setForm({ name: "", email: "", sectorId: "" });
+      qc.invalidateQueries({ queryKey: ["admin", "points"] });
+    },
+    onError: () => setErr("Failed to create point (check sector)"),
+  });
+
+  return (
+    <main className="space-y-6">
+      <section className="rounded-xl border p-6 space-y-4">
+        <h2 className="text-lg font-semibold">Create GTC Point</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setErr(null);
+            const parsed = schema.safeParse(form);
+            if (!parsed.success) {
+              return setErr(parsed.error.issues[0]?.message ?? "Validation error");
+            }
+            createMut.mutate(parsed.data);
+          }}
+          className="grid gap-3 sm:grid-cols-2"
+        >
+          <div className="sm:col-span-1">
+            <label className="block text-sm mb-1">Name</label>
+            <input
+              className="w-full rounded-md border px-3 py-2"
+              value={form.name}
+              onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+            />
+          </div>
+          <div className="sm:col-span-1">
+            <label className="block text-sm mb-1">Email</label>
+            <input
+              className="w-full rounded-md border px-3 py-2"
+              value={form.email}
+              onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-sm mb-1">Sector</label>
+            <select
+              className="w-full rounded-md border px-3 py-2"
+              value={form.sectorId}
+              onChange={(e) => setForm((s) => ({ ...s, sectorId: e.target.value }))}
+              disabled={sectorsQ.isLoading}
+            >
+              <option value="">Select a sector…</option>
+              {sectorOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">A valid sector is required (avoids foreign key errors).</p>
+          </div>
+
+          <div className="sm:col-span-2">
+            <button className="rounded-md bg-black text-white px-3 py-2" disabled={createMut.isPending}>
+              {createMut.isPending ? "Creating..." : "Create"}
+            </button>
+            {err && <span className="ml-3 text-sm text-red-600">{err}</span>}
+          </div>
+        </form>
+      </section>
+
+      <section className="rounded-xl border p-6">
+        <h2 className="text-lg font-semibold mb-4">GTC Points</h2>
+        {pointsQ.isLoading ? (
+          <p>Loading…</p>
+        ) : (
+          <div className="divide-y">
+            {pointsQ.data?.items.map((p: Point) => (
+              <div key={p.id} className="py-3 flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="font-medium">{p.name}</div>
+                  <div className="text-xs text-gray-600">{p.email}</div>
+                  <div className="text-xs text-gray-500 mt-1">Sector: {p.sector?.name ?? p.sectorId}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+```
+
+# c:/EForgeIT/gtc/apps/web/src/app/(protected)/admin/services/page.tsx
+```tsx
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createService, deleteService, listServices, updateService, type Service } from "@/lib/admin-api";
+import { useState } from "react";
+import { z } from "zod";
+
+const schema = z.object({
+  code: z.string().min(2).max(50).regex(/^[A-Z0-9_]+$/),
+  name: z.string().min(2).max(200),
+});
+
+export default function ServicesPage() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["admin", "services"], queryFn: () => listServices() });
+
+  const [form, setForm] = useState({ code: "", name: "" });
+  const [err, setErr] = useState<string | null>(null);
+
+  const createMut = useMutation({
+    mutationFn: (payload: { code: string; name: string }) => createService(payload),
+    onSuccess: () => {
+      setForm({ code: "", name: "" });
+      qc.invalidateQueries({ queryKey: ["admin", "services"] });
+    },
+    onError: () => setErr("Failed to create service"),
+  });
+
+  const toggleMut = useMutation({
+    mutationFn: (svc: Service) => updateService(svc.id, { active: !svc.active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "services"] }),
+  });
+
+  const delMut = useMutation({
+    mutationFn: (id: string) => deleteService(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "services"] }),
+    onError: () => setErr("Delete failed (service linked to points)"),
+  });
+
+  return (
+    <main className="space-y-6">
+      <section className="rounded-xl border p-6 space-y-4">
+        <h2 className="text-lg font-semibold">Create service</h2>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setErr(null);
+            const parsed = schema.safeParse(form);
+            if (!parsed.success) return setErr(parsed.error.issues[0]?.message ?? "Validation error");
+            createMut.mutate(parsed.data);
+          }}
+          className="grid gap-3 sm:grid-cols-2"
+        >
+          <div>
+            <label className="block text-sm mb-1">Code (UPPER_SNAKE)</label>
+            <input
+              className="w-full rounded-md border px-3 py-2"
+              value={form.code}
+              onChange={(e) => setForm((s) => ({ ...s, code: e.target.value.toUpperCase() }))}
+              placeholder="DOC_SIGN"
+            />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Name</label>
+            <input
+              className="w-full rounded-md border px-3 py-2"
+              value={form.name}
+              onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+              placeholder="Document Signing"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <button className="rounded-md bg-black text-white px-3 py-2" disabled={createMut.isPending}>
+              {createMut.isPending ? "Creating..." : "Create"}
+            </button>
+            {err && <span className="ml-3 text-sm text-red-600">{err}</span>}
+          </div>
+        </form>
+      </section>
+
+      <section className="rounded-xl border p-6">
+        <h2 className="text-lg font-semibold mb-4">Services</h2>
+        {q.isLoading ? (
+          <p>Loading…</p>
+        ) : (
+          <div className="divide-y">
+            {q.data?.map((svc) => (
+              <div key={svc.id} className="py-3 flex items-center justify-between">
+                <div>
+                  <div className="font-medium">{svc.name}</div>
+                  <div className="text-xs text-gray-600">{svc.code}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="rounded-md border px-3 py-1.5"
+                    onClick={() => toggleMut.mutate(svc)}
+                    disabled={toggleMut.isPending}
+                  >
+                    {svc.active ? "Disable" : "Enable"}
+                  </button>
+                  <button
+                    className="rounded-md border px-3 py-1.5"
+                    onClick={() => delMut.mutate(svc.id)}
+                    disabled={delMut.isPending}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+```
+
+# c:/EForgeIT/gtc/apps/web/src/components/protected.tsx
+```tsx
+"use client";
+
+import Protected from "@/components/protected";
+import { useAuth } from "@/providers/auth-provider";
+
+export default function Dashboard() {
+  const { user } = useAuth();
+  return (
+    <Protected>
+      <main className="p-6 space-y-6">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Dashboard</h1>
+        </header>
+
+        <section className="rounded-xl border p-6">
+          <p className="text-lg">
+            Welcome, <span className="font-semibold">{user?.name}</span>.
+          </p>
+          <p className="text-gray-600 mt-2">
+            Your role: <span className="font-mono">{user?.role}</span>
+          </p>
+        </section>
+      </main>
+    </Protected>
+  );
+}
+
 ```
 
 # c:/EForgeIT/gtc/apps/web/src/components/protected.tsx
@@ -1450,6 +2437,7 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
 ```
 
 # c:/EForgeIT/gtc/apps/web/src/providers/auth-provider.tsx
@@ -1535,6 +2523,7 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
   return ctx;
 }
+
 ```
 
 # c:/EForgeIT/gtc/apps/web/src/providers/query-provider.tsx
@@ -1558,7 +2547,5 @@ export default function QueryProvider({ children }: PropsWithChildren) {
 
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
-```
 
-admin@gtc.local
-admin123
+```
