@@ -1,0 +1,10 @@
+{
+  "name": "gtc",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "npm run dev -w @gtc/api & npm run dev -w @gtc/web",
+    "build": "npm run build -w @gtc/api && npm run build -w @gtc/web",
+    "start": "npm run start -w @gtc/api & npm run start -w @gtc/web"
+  }
+}

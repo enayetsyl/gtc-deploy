@@ -1,0 +1,5 @@
+# apps/api/.dockerignore
+node_modules
+dist
+npm-debug.log
+uploads

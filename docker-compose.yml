@@ -1,0 +1,52 @@
+services:
+  mysql:
+    image: mysql:8.0.37
+    container_name: gtc-mysql
+    environment:
+      MYSQL_DATABASE: gtc_local
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app_pw
+      MYSQL_ROOT_PASSWORD: root_pw
+    ports: ["3307:3306"]
+    volumes: [mysql_data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot_pw || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7
+    container_name: gtc-redis
+    ports: ["6379:6379"]
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: gtc-mailpit
+    ports: ["1025:1025", "8025:8025"]
+
+  api:
+    build: ./apps/api
+    container_name: gtc-api
+    env_file: ./apps/api/.env.docker
+    ports: ["4000:4000"]
+    volumes: 
+      - ./apps/api:/app
+      - /app/node_modules
+    depends_on:
+      - mysql
+      - redis
+
+  web:
+    build: ./apps/web
+    container_name: gtc-web
+    env_file: ./apps/web/.env.local
+    ports: ["3000:3000"]
+    volumes: 
+      - ./apps/web:/app
+      - /app/node_modules
+    depends_on:
+      - api
+
+volumes:
+  mysql_data:
