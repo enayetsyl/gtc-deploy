@@ -11,7 +11,7 @@ import { meRouter } from "./routes/me";
 import { adminSectors } from "./routes/admin.sectors";
 import { adminPoints } from "./routes/admin.points";
 import { adminServices } from "./routes/admin.services";import { meNotifications } from "./routes/notifications.me";
-
+import { devNotify } from "./routes/dev";
 
 export const app = express();
 
@@ -30,6 +30,8 @@ app.use("/api/admin/sectors", adminSectors);
 app.use("/api/admin/points", adminPoints);
 app.use("/api/admin/services", adminServices);
 app.use("/api/me/notifications", meNotifications);
+app.use("/api/dev", devNotify);
+
 
 
 app.use(errorHandler);

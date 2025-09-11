@@ -10,5 +10,6 @@ const server = (0, http_1.createServer)(server_1.app);
 const io = new socket_io_1.Server(server, { cors: { origin: ["http://localhost:3000"] } });
 (0, io_1.setIO)(io);
 (0, sockets_1.initSockets)(io);
+// dev-only route
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => console.log(`API listening on :${PORT}`));

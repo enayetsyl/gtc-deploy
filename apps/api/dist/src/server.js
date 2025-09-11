@@ -18,6 +18,7 @@ const admin_sectors_1 = require("./routes/admin.sectors");
 const admin_points_1 = require("./routes/admin.points");
 const admin_services_1 = require("./routes/admin.services");
 const notifications_me_1 = require("./routes/notifications.me");
+const dev_1 = require("./routes/dev");
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)({
     origin: ["http://localhost:3000"],
@@ -33,4 +34,5 @@ exports.app.use("/api/admin/sectors", admin_sectors_1.adminSectors);
 exports.app.use("/api/admin/points", admin_points_1.adminPoints);
 exports.app.use("/api/admin/services", admin_services_1.adminServices);
 exports.app.use("/api/me/notifications", notifications_me_1.meNotifications);
+exports.app.use("/api/dev", dev_1.devNotify);
 exports.app.use(error_1.errorHandler);

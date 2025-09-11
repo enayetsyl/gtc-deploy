@@ -2,6 +2,7 @@
 
 import Protected from "@/components/protected";
 import { useAuth } from "@/providers/auth-provider";
+import NotificationBell from "@/components/notification-bell";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -10,6 +11,7 @@ export default function Dashboard() {
       <main className="p-6 space-y-6">
         <header className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <NotificationBell />
         </header>
 
         <section className="rounded-xl border p-6">
