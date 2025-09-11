@@ -8,6 +8,9 @@ import { errorHandler } from "./middleware/error";
 import { router as healthRouter } from "./routes/health.js";
 import { authRouter } from "./routes/auth";
 import { meRouter } from "./routes/me";
+import { adminSectors } from "./routes/admin.sectors";
+import { adminPoints } from "./routes/admin.points";
+import { adminServices } from "./routes/admin.services";
 
 export const app = express();
 
@@ -22,6 +25,10 @@ app.use("/uploads", express.static(path.resolve("uploads")));
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/me", meRouter);
+app.use("/api/admin/sectors", adminSectors);
+app.use("/api/admin/points", adminPoints);
+app.use("/api/admin/services", adminServices);
+
 
 
 app.use(errorHandler);

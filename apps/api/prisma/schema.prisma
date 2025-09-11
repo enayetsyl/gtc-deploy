@@ -16,15 +16,17 @@ model Ping {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   passwordHash String
   name         String
-  role         Role     @default(GTC_POINT)
-  sectorId     String? // for SECTOR_OWNER later
-  gtcPointId   String? // for GTC_POINT later
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role         Role      @default(GTC_POINT)
+  sectorId     String? // for SECTOR_OWNER
+  gtcPointId   String? // for GTC_POINT
+  sector       Sector?   @relation("SectorUsers", fields: [sectorId], references: [id])
+  gtcPoint     GtcPoint? @relation("PointUsers", fields: [gtcPointId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 enum Role {
@@ -32,4 +34,57 @@ enum Role {
   SECTOR_OWNER
   GTC_POINT
   EXTERNAL
+}
+
+model Sector {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  points    GtcPoint[]
+
+  // Optional: sector owners (Users with sectorId referencing this)
+  users User[] @relation("SectorUsers")
+}
+
+model GtcPoint {
+  id        String            @id @default(cuid())
+  name      String
+  email     String            @unique
+  sectorId  String
+  sector    Sector            @relation(fields: [sectorId], references: [id])
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  services  GtcPointService[]
+  users     User[]            @relation("PointUsers") 
+}
+
+model Service {
+  id         String            @id @default(cuid())
+  code       String            @unique
+  name       String
+  active     Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  pointLinks GtcPointService[]
+}
+
+model GtcPointService {
+  id         String        @id @default(cuid())
+  gtcPointId String
+  serviceId  String
+  status     ServiceStatus @default(ENABLED)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  gtcPoint GtcPoint @relation(fields: [gtcPointId], references: [id])
+  service  Service  @relation(fields: [serviceId], references: [id])
+
+  @@unique([gtcPointId, serviceId])
+}
+
+enum ServiceStatus {
+  ENABLED
+  DISABLED
+  PENDING_REQUEST
 }
