@@ -1,0 +1,4 @@
+# apps/web/.dockerignore
+node_modules
+.next
+npm-debug.log
