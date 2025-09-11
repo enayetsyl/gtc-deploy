@@ -1,8 +1,7 @@
 // apps/api/src/index.ts
 import { createServer } from "http";
-
 import { Server } from "socket.io";
-import { initSockets } from "./sockets/index.js";
+import { initSockets } from "./sockets";
 import { app } from "./server";
 
 const server = createServer(app);

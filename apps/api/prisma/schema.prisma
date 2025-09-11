@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider          = "mysql"
+  url               = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
@@ -12,5 +12,24 @@ model Ping {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
 
-  @@map("_Ping") // keep table name as `_Ping`
+  @@map("_Ping")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(GTC_POINT)
+  sectorId     String? // for SECTOR_OWNER later
+  gtcPointId   String? // for GTC_POINT later
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  SECTOR_OWNER
+  GTC_POINT
+  EXTERNAL
 }

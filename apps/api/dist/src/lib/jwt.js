@@ -1,0 +1,56 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.signAccessToken = signAccessToken;
+exports.signRefreshToken = signRefreshToken;
+exports.setRefreshCookie = setRefreshCookie;
+exports.clearRefreshCookie = clearRefreshCookie;
+exports.verifyAccessToken = verifyAccessToken;
+exports.verifyRefreshToken = verifyRefreshToken;
+exports.revokeRefreshToken = revokeRefreshToken;
+// src/lib/jwt.ts
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const redis_1 = require("./redis");
+const crypto_1 = require("crypto");
+const ACCESS_TTL = process.env.ACCESS_TOKEN_TTL ?? "15m";
+const REFRESH_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 7);
+const JWT_SECRET = process.env.JWT_SECRET ?? "dev_supersecret_change_me";
+const REFRESH_COOKIE = "rt";
+function signAccessToken(payload) {
+    return jsonwebtoken_1.default.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TTL });
+}
+async function signRefreshToken(userId) {
+    const jti = (0, crypto_1.randomUUID)();
+    const token = jsonwebtoken_1.default.sign({ sub: userId, jti }, JWT_SECRET, { expiresIn: `${REFRESH_TTL_DAYS}d` });
+    // store jti in redis with ttl
+    const ttlSecs = REFRESH_TTL_DAYS * 24 * 60 * 60;
+    await redis_1.redis.set(`refresh:${jti}`, userId, "EX", ttlSecs);
+    return { token, jti };
+}
+function setRefreshCookie(res, token) {
+    res.cookie(REFRESH_COOKIE, token, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false, // set true behind HTTPS in prod
+        path: "/api/auth/refresh",
+        maxAge: REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000,
+    });
+}
+function clearRefreshCookie(res) {
+    res.clearCookie(REFRESH_COOKIE, { path: "/api/auth/refresh" });
+}
+function verifyAccessToken(token) {
+    return jsonwebtoken_1.default.verify(token, JWT_SECRET);
+}
+async function verifyRefreshToken(token) {
+    const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+    const exists = await redis_1.redis.get(`refresh:${decoded.jti}`);
+    if (!exists)
+        throw new Error("refresh_revoked");
+    return decoded;
+}
+async function revokeRefreshToken(jti) {
+    await redis_1.redis.del(`refresh:${jti}`);
+}

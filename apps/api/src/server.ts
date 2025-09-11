@@ -2,11 +2,26 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import path from "node:path";
+import { errorHandler } from "./middleware/error";
 import { router as healthRouter } from "./routes/health.js";
+import { authRouter } from "./routes/auth";
+import { meRouter } from "./routes/me";
 
 export const app = express();
-app.use(cors());
+
+app.use(cors({
+  origin: ["http://localhost:3000"],
+  credentials: true,
+}));
+app.use(cookieParser());
 app.use(express.json());
+
 app.use("/uploads", express.static(path.resolve("uploads")));
 app.use("/api/health", healthRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/me", meRouter);
+
+
+app.use(errorHandler);
