@@ -1,5 +1,5 @@
-
 # c:/EForgeIT/gtc/.gitignore
+
 ```ignore
 # gtc/.gitignore
 node_modules
@@ -9,7 +9,9 @@ node_modules
 apps/api/uploads
 
 ```
+
 # c:/EForgeIT/gtc/docker-compose.yml
+
 ```dockercompose
 services:
   mysql:
@@ -43,7 +45,7 @@ services:
     container_name: gtc-api
     env_file: ./apps/api/.env.docker
     ports: ["4000:4000"]
-    volumes: 
+    volumes:
       - ./apps/api:/app
       - /app/node_modules
     depends_on:
@@ -55,7 +57,7 @@ services:
     container_name: gtc-web
     env_file: ./apps/web/.env.local
     ports: ["3000:3000"]
-    volumes: 
+    volumes:
       - ./apps/web:/app
       - /app/node_modules
     depends_on:
@@ -65,7 +67,9 @@ volumes:
   mysql_data:
 
 ```
+
 # c:/EForgeIT/gtc/package.json
+
 ```json
 {
   "name": "gtc",
@@ -77,9 +81,10 @@ volumes:
     "start": "npm run start -w @gtc/api & npm run start -w @gtc/web"
   }
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/prisma/schema.prisma
+
 ```plaintext
 generator client {
   provider = "prisma-client-js"
@@ -99,15 +104,17 @@ model Ping {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   passwordHash String
   name         String
-  role         Role     @default(GTC_POINT)
-  sectorId     String? // for SECTOR_OWNER later
-  gtcPointId   String? // for GTC_POINT later
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role         Role      @default(GTC_POINT)
+  sectorId     String? // for SECTOR_OWNER
+  gtcPointId   String? // for GTC_POINT
+  sector       Sector?   @relation("SectorUsers", fields: [sectorId], references: [id])
+  gtcPoint     GtcPoint? @relation("PointUsers", fields: [gtcPointId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 enum Role {
@@ -117,22 +124,77 @@ enum Role {
   EXTERNAL
 }
 
+model Sector {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  points    GtcPoint[]
+
+  // Optional: sector owners (Users with sectorId referencing this)
+  users User[] @relation("SectorUsers")
+}
+
+model GtcPoint {
+  id        String            @id @default(cuid())
+  name      String
+  email     String            @unique
+  sectorId  String
+  sector    Sector            @relation(fields: [sectorId], references: [id])
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  services  GtcPointService[]
+  users     User[]            @relation("PointUsers")
+}
+
+model Service {
+  id         String            @id @default(cuid())
+  code       String            @unique
+  name       String
+  active     Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  pointLinks GtcPointService[]
+}
+
+model GtcPointService {
+  id         String        @id @default(cuid())
+  gtcPointId String
+  serviceId  String
+  status     ServiceStatus @default(ENABLED)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  gtcPoint GtcPoint @relation(fields: [gtcPointId], references: [id])
+  service  Service  @relation(fields: [serviceId], references: [id])
+
+  @@unique([gtcPointId, serviceId])
+}
+
+enum ServiceStatus {
+  ENABLED
+  DISABLED
+  PENDING_REQUEST
+}
+
 ```
+
 # c:/EForgeIT/gtc/apps/api/prisma/seed.ts
+
 ```typescript
-// prisma/seed.ts
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 import argon2 from "argon2";
 
 const prisma = new PrismaClient();
 
 const EMAIL = process.env.SEED_ADMIN_EMAIL || "admin@gtc.local";
-const PASS  = process.env.SEED_ADMIN_PASSWORD || "admin123";
+const PASS = process.env.SEED_ADMIN_PASSWORD || "admin123";
 
 async function main() {
-  // keep a ping row for connectivity sanity
+  // sanity row
   await prisma.ping.create({ data: {} });
 
+  // admin user
   const hash = await argon2.hash(PASS);
   await prisma.user.upsert({
     where: { email: EMAIL },
@@ -141,17 +203,78 @@ async function main() {
       email: EMAIL,
       passwordHash: hash,
       name: "Admin",
-      role: "ADMIN",
+      role: Role.ADMIN,
     },
   });
 
-  console.log(`Seeded admin -> ${EMAIL} / ${PASS}`);
+  // sectors
+  const training = await prisma.sector.upsert({
+    where: { name: "Training" },
+    update: {},
+    create: { name: "Training" },
+  });
+  const university = await prisma.sector.upsert({
+    where: { name: "University" },
+    update: {},
+    create: { name: "University" },
+  });
+
+  // gtc points
+  const pointA = await prisma.gtcPoint.upsert({
+    where: { email: "point.a@gtc.local" },
+    update: {},
+    create: {
+      name: "GTC Point A",
+      email: "point.a@gtc.local",
+      sectorId: training.id,
+    },
+  });
+  const pointB = await prisma.gtcPoint.upsert({
+    where: { email: "point.b@gtc.local" },
+    update: {},
+    create: {
+      name: "GTC Point B",
+      email: "point.b@gtc.local",
+      sectorId: university.id,
+    },
+  });
+
+  // services
+  const svcA = await prisma.service.upsert({
+    where: { code: "DOC_SIGN" },
+    update: {},
+    create: { code: "DOC_SIGN", name: "Document Signing" },
+  });
+  const svcB = await prisma.service.upsert({
+    where: { code: "LEAD_INTAKE" },
+    update: {},
+    create: { code: "LEAD_INTAKE", name: "Lead Intake" },
+  });
+
+  // link a couple services to point A
+  await prisma.gtcPointService.upsert({
+    where: {
+      gtcPointId_serviceId: { gtcPointId: pointA.id, serviceId: svcA.id },
+    },
+    update: {},
+    create: { gtcPointId: pointA.id, serviceId: svcA.id, status: "ENABLED" },
+  });
+  await prisma.gtcPointService.upsert({
+    where: {
+      gtcPointId_serviceId: { gtcPointId: pointA.id, serviceId: svcB.id },
+    },
+    update: { status: "DISABLED" },
+    create: { gtcPointId: pointA.id, serviceId: svcB.id, status: "DISABLED" },
+  });
+
+  console.log("Seeded admin, sectors, points, services.");
 }
 
 main().finally(() => prisma.$disconnect());
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/config/env.ts
+
 ```typescript
 // apps/api/src/config/env.ts
 export const env = {
@@ -159,9 +282,10 @@ export const env = {
   db: process.env.DATABASE_URL!,
   redis: process.env.REDIS_URL!,
 };
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/lib/jwt.ts
+
 ```typescript
 // src/lib/jwt.ts
 import jwt, { type Secret, type SignOptions } from "jsonwebtoken";
@@ -170,20 +294,31 @@ import { redis } from "./redis";
 import { randomUUID } from "crypto";
 
 const ACCESS_TTL: string = process.env.ACCESS_TOKEN_TTL ?? "15m";
-const REFRESH_TTL_DAYS: number = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 7);
+const REFRESH_TTL_DAYS: number = Number(
+  process.env.REFRESH_TOKEN_TTL_DAYS ?? 7
+);
 
-const JWT_SECRET: Secret = process.env.JWT_SECRET ?? "dev_supersecret_change_me";
+const JWT_SECRET: Secret =
+  process.env.JWT_SECRET ?? "dev_supersecret_change_me";
 const REFRESH_COOKIE = "rt";
 
 type Role = "ADMIN" | "SECTOR_OWNER" | "GTC_POINT" | "EXTERNAL";
 
-export function signAccessToken(payload: { sub: string; email: string; role: Role }) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TTL } as SignOptions);
+export function signAccessToken(payload: {
+  sub: string;
+  email: string;
+  role: Role;
+}) {
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: ACCESS_TTL,
+  } as SignOptions);
 }
 
 export async function signRefreshToken(userId: string) {
   const jti = randomUUID();
-  const token = jwt.sign({ sub: userId, jti }, JWT_SECRET, { expiresIn: `${REFRESH_TTL_DAYS}d` });
+  const token = jwt.sign({ sub: userId, jti }, JWT_SECRET, {
+    expiresIn: `${REFRESH_TTL_DAYS}d`,
+  });
   // store jti in redis with ttl
   const ttlSecs = REFRESH_TTL_DAYS * 24 * 60 * 60;
   await redis.set(`refresh:${jti}`, userId, "EX", ttlSecs);
@@ -205,11 +340,22 @@ export function clearRefreshCookie(res: Response) {
 }
 
 export function verifyAccessToken(token: string) {
-  return jwt.verify(token, JWT_SECRET) as { sub: string; email: string; role: Role; iat: number; exp: number };
+  return jwt.verify(token, JWT_SECRET) as {
+    sub: string;
+    email: string;
+    role: Role;
+    iat: number;
+    exp: number;
+  };
 }
 
 export async function verifyRefreshToken(token: string) {
-  const decoded = jwt.verify(token, JWT_SECRET) as { sub: string; jti: string; iat: number; exp: number };
+  const decoded = jwt.verify(token, JWT_SECRET) as {
+    sub: string;
+    jti: string;
+    iat: number;
+    exp: number;
+  };
   const exists = await redis.get(`refresh:${decoded.jti}`);
   if (!exists) throw new Error("refresh_revoked");
   return decoded;
@@ -218,23 +364,26 @@ export async function verifyRefreshToken(token: string) {
 export async function revokeRefreshToken(jti: string) {
   await redis.del(`refresh:${jti}`);
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/lib/prisma.ts
+
 ```typescript
 // apps/api/src/lib/prisma.ts
 import { PrismaClient } from "@prisma/client";
 export const prisma = new PrismaClient();
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/lib/redis.ts
+
 ```typescript
 // apps/api/src/lib/redis.ts
 import { Redis } from "ioredis";
 export const redis = new Redis(process.env.REDIS_URL!);
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/middleware/auth.ts
+
 ```typescript
 // src/middleware/auth.ts
 import type { Request, Response, NextFunction } from "express";
@@ -255,38 +404,57 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-export function requireRole(...roles: Array<"ADMIN" | "SECTOR_OWNER" | "GTC_POINT" | "EXTERNAL">) {
+export function requireRole(
+  ...roles: Array<"ADMIN" | "SECTOR_OWNER" | "GTC_POINT" | "EXTERNAL">
+) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" });
-    if (!roles.includes(req.user.role)) return res.status(403).json({ error: "Forbidden" });
+    if (!roles.includes(req.user.role))
+      return res.status(403).json({ error: "Forbidden" });
     next();
   };
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/middleware/error.ts
+
 ```typescript
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 
-export function errorHandler(err: any, _req: Request, res: Response, _next: NextFunction) {
+export function errorHandler(
+  err: any,
+  _req: Request,
+  res: Response,
+  _next: NextFunction
+) {
   console.error(err);
   if (err instanceof ZodError) {
-    return res.status(400).json({ error: "ValidationError", issues: err.issues });
+    return res
+      .status(400)
+      .json({ error: "ValidationError", issues: err.issues });
   }
   return res.status(500).json({ error: "InternalServerError" });
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/queues/worker.ts
+
 ```typescript
 // apps/api/src/queues/worker.ts
 import { Worker } from "bullmq";
 const connection = { connection: { url: process.env.REDIS_URL! } };
-new Worker("emails", async (job) => { /* send email */ }, connection);
-
+new Worker(
+  "emails",
+  async (job) => {
+    /* send email */
+  },
+  connection
+);
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/routes/auth.ts
+
 ```typescript
 // src/routes/auth.ts
 import { Router } from "express";
@@ -312,7 +480,9 @@ const loginSchema = z.object({
 authRouter.post("/login", async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
+    return res
+      .status(400)
+      .json({ error: "ValidationError", issues: parsed.error.issues });
   }
   const { email, password } = parsed.data;
 
@@ -321,7 +491,11 @@ authRouter.post("/login", async (req, res) => {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const access = signAccessToken({ sub: user.id, email: user.email, role: user.role as any });
+  const access = signAccessToken({
+    sub: user.id,
+    email: user.email,
+    role: user.role as any,
+  });
   const { token: refresh } = await signRefreshToken(user.id);
   setRefreshCookie(res, refresh);
 
@@ -346,7 +520,11 @@ authRouter.post("/refresh", async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: decoded.sub } });
     if (!user) return res.status(401).json({ error: "User not found" });
 
-    const access = signAccessToken({ sub: user.id, email: user.email, role: user.role as any });
+    const access = signAccessToken({
+      sub: user.id,
+      email: user.email,
+      role: user.role as any,
+    });
     return res.json({ accessToken: access });
   } catch (e) {
     clearRefreshCookie(res);
@@ -367,17 +545,19 @@ authRouter.post("/logout", async (req, res) => {
   clearRefreshCookie(res);
   return res.json({ ok: true });
 });
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/routes/health.ts
+
 ```typescript
 // apps/api/src/routes/health.ts
 import { Router } from "express";
 export const router = Router();
 router.get("/", (_req, res) => res.json({ ok: true }));
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/routes/me.ts
+
 ```typescript
 // src/routes/me.ts
 import { Router } from "express";
@@ -394,9 +574,10 @@ meRouter.get("/", requireAuth, async (req, res) => {
   if (!me) return res.status(404).json({ error: "Not found" });
   return res.json(me);
 });
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/sockets/index.ts
+
 ```typescript
 // apps/api/src/sockets/index.ts
 import type { Server } from "socket.io";
@@ -405,9 +586,10 @@ export function initSockets(io: Server) {
     socket.emit("hello", { message: "connected" });
   });
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/types/express.d.ts
+
 ```typescript
 // src/types/express.d.ts
 import "express";
@@ -421,9 +603,10 @@ declare module "express-serve-static-core" {
     };
   }
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/index.ts
+
 ```typescript
 // apps/api/src/index.ts
 import { createServer } from "http";
@@ -437,9 +620,10 @@ initSockets(io);
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => console.log(`API listening on :${PORT}`));
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/server.ts
+
 ```typescript
 // apps/api/src/server.ts
 import "dotenv/config";
@@ -451,13 +635,18 @@ import { errorHandler } from "./middleware/error";
 import { router as healthRouter } from "./routes/health.js";
 import { authRouter } from "./routes/auth";
 import { meRouter } from "./routes/me";
+import { adminSectors } from "./routes/admin.sectors";
+import { adminPoints } from "./routes/admin.points";
+import { adminServices } from "./routes/admin.services";
 
 export const app = express();
 
-app.use(cors({
-  origin: ["http://localhost:3000"],
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: ["http://localhost:3000"],
+    credentials: true,
+  })
+);
 app.use(cookieParser());
 app.use(express.json());
 
@@ -465,11 +654,15 @@ app.use("/uploads", express.static(path.resolve("uploads")));
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/me", meRouter);
-
+app.use("/api/admin/sectors", adminSectors);
+app.use("/api/admin/points", adminPoints);
+app.use("/api/admin/services", adminServices);
 
 app.use(errorHandler);
 ```
+
 # c:/EForgeIT/gtc/apps/api/.dockerignore
+
 ```ignore
 # apps/api/.dockerignore
 node_modules
@@ -478,7 +671,9 @@ npm-debug.log
 uploads
 
 ```
+
 # c:/EForgeIT/gtc/apps/api/.env
+
 ```properties
 PORT=4000
 DATABASE_URL="mysql://app:app_pw@127.0.0.1:3307/gtc_local"
@@ -493,7 +688,9 @@ QUEUE_CONCURRENCY=8
 SHADOW_DATABASE_URL="mysql://root:root_pw@127.0.0.1:3307/gtc_shadow"
 
 ```
+
 # c:/EForgeIT/gtc/apps/api/.env.docker
+
 ```bash
 # apps/api/.env.docker  (container dev)
 PORT=4000
@@ -510,7 +707,9 @@ SHADOW_DATABASE_URL="mysql://root:root_pw@127.0.0.1:3307/gtc_shadow"
 
 
 ```
+
 # c:/EForgeIT/gtc/apps/api/Dockerfile
+
 ```dockerfile
 # apps/api/Dockerfile
 FROM node:20-alpine
@@ -522,7 +721,9 @@ EXPOSE 4000
 CMD ["npm", "run", "dev"]
 
 ```
+
 # c:/EForgeIT/gtc/apps/api/package.json
+
 ```json
 {
   "name": "@gtc/api",
@@ -563,9 +764,10 @@ CMD ["npm", "run", "dev"]
     "typescript": "^5.9.2"
   }
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/api/tsconfig.json
+
 ```jsonc
 {
   "compilerOptions": {
@@ -577,13 +779,12 @@ CMD ["npm", "run", "dev"]
     "strict": true,
     "esModuleInterop": true
   },
-  "include": [
-    "src",
-    "prisma"
-  ]
+  "include": ["src", "prisma"]
 }
 ```
+
 # c:/EForgeIT/gtc/apps/web/.dockerignore
+
 ```ignore
 # apps/web/.dockerignore
 node_modules
@@ -591,14 +792,18 @@ node_modules
 npm-debug.log
 
 ```
+
 # c:/EForgeIT/gtc/apps/web/.env.local
+
 ```bash
 # apps/web/.env.local
 NEXT_PUBLIC_API_URL=http://localhost:4000
 NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
 
 ```
+
 # c:/EForgeIT/gtc/apps/web/.gitignore
+
 ```ignore
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
@@ -643,7 +848,9 @@ yarn-error.log*
 next-env.d.ts
 
 ```
+
 # c:/EForgeIT/gtc/apps/web/components.json
+
 ```json
 {
   "$schema": "https://ui.shadcn.com/schema.json",
@@ -667,9 +874,10 @@ next-env.d.ts
   },
   "registries": {}
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/Dockerfile
+
 ```dockerfile
 # apps/web/Dockerfile
 FROM node:20-alpine
@@ -681,7 +889,9 @@ EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
 ```
+
 # c:/EForgeIT/gtc/apps/web/eslint.config.mjs
+
 ```javascript
 import { dirname } from "path";
 import { fileURLToPath } from "url";
@@ -708,9 +918,10 @@ const eslintConfig = [
 ];
 
 export default eslintConfig;
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/next-env.d.ts
+
 ```typescript
 /// <reference types="next" />
 /// <reference types="next/image-types/global" />
@@ -718,17 +929,19 @@ export default eslintConfig;
 
 // NOTE: This file should not be edited
 // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/next.config.ts
+
 ```typescript
 // apps/web/next.config.ts
 import type { NextConfig } from "next";
 const nextConfig: NextConfig = { reactStrictMode: true };
 export default nextConfig;
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/package.json
+
 ```json
 {
   "name": "web",
@@ -769,9 +982,10 @@ export default nextConfig;
     "typescript": "^5.9.2"
   }
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/tsconfig.json
+
 ```jsonc
 {
   "compilerOptions": {
@@ -800,9 +1014,10 @@ export default nextConfig;
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/postcss.config.mjs
+
 ```javascript
 const config = {
   plugins: {
@@ -812,7 +1027,9 @@ const config = {
 
 export default config;
 ```
+
 # c:/EForgeIT/gtc/apps/web/src/app/globals.css
+
 ```css
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -936,9 +1153,10 @@ export default config;
     @apply bg-background text-foreground;
   }
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/src/app/layout.tsx
+
 ```tsx
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -978,9 +1196,10 @@ export default function RootLayout({
     </html>
   );
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/src/app/page.tsx
+
 ```tsx
 // apps/web/src/app/page.tsx
 export default function Home() {
@@ -990,9 +1209,10 @@ export default function Home() {
     </main>
   );
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/src/app/(auth)/login/page.tsx
+
 ```tsx
 "use client";
 
@@ -1012,11 +1232,20 @@ export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
-  const [errors, setErrors] = useState<{ email?: string; password?: string; root?: string }>({});
+  const [errors, setErrors] = useState<{
+    email?: string;
+    password?: string;
+    root?: string;
+  }>({});
 
   const loginResponseSchema = z.object({
     accessToken: z.string(),
-    user: z.object({ id: z.string(), name: z.string(), email: z.string(), role: z.string() }),
+    user: z.object({
+      id: z.string(),
+      name: z.string(),
+      email: z.string(),
+      role: z.string(),
+    }),
   });
 
   const mutate = useMutation({
@@ -1034,7 +1263,9 @@ export default function LoginPage() {
       const getErrMsg = (err: unknown): string => {
         if (typeof err === "object" && err !== null) {
           const maybe = err as Record<string, unknown>;
-          const response = maybe.response as Record<string, unknown> | undefined;
+          const response = maybe.response as
+            | Record<string, unknown>
+            | undefined;
           const data = response?.data as Record<string, unknown> | undefined;
           const error = data?.error;
           if (typeof error === "string") return error;
@@ -1069,7 +1300,9 @@ export default function LoginPage() {
       >
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold">Sign in</h1>
-          <p className="text-sm text-gray-500">Use your admin or point credentials.</p>
+          <p className="text-sm text-gray-500">
+            Use your admin or point credentials.
+          </p>
         </div>
 
         <div>
@@ -1081,7 +1314,9 @@ export default function LoginPage() {
             onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
             autoComplete="email"
           />
-          {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
+          {errors.email && (
+            <p className="text-xs text-red-600 mt-1">{errors.email}</p>
+          )}
         </div>
 
         <div>
@@ -1090,10 +1325,14 @@ export default function LoginPage() {
             type="password"
             className="w-full rounded-md border px-3 py-2"
             value={form.password}
-            onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
+            onChange={(e) =>
+              setForm((s) => ({ ...s, password: e.target.value }))
+            }
             autoComplete="current-password"
           />
-          {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password}</p>}
+          {errors.password && (
+            <p className="text-xs text-red-600 mt-1">{errors.password}</p>
+          )}
         </div>
 
         {errors.root && (
@@ -1111,9 +1350,10 @@ export default function LoginPage() {
     </main>
   );
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/src/app/(protected)/dashboard/page.tsx
+
 ```tsx
 "use client";
 
@@ -1147,9 +1387,10 @@ export default function Dashboard() {
     </Protected>
   );
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/src/components/protected.tsx
+
 ```tsx
 "use client";
 
@@ -1168,14 +1409,14 @@ export default function Protected({ children }: { children: React.ReactNode }) {
   if (!isAuthed) return null;
   return <>{children}</>;
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/src/lib/axios.ts
+
 ```typescript
 // apps/web/src/lib/axios.ts
 import axios from "axios";
 export const api = axios.create({ baseURL: process.env.NEXT_PUBLIC_API_URL });
-
 
 let onUnauthorized: (() => void) | null = null;
 export function setOnUnauthorized(cb: () => void) {
@@ -1191,24 +1432,28 @@ api.interceptors.response.use(
   }
 );
 ```
+
 # c:/EForgeIT/gtc/apps/web/src/lib/queryClient.ts
+
 ```typescript
 // apps/web/src/lib/queryClient.ts
 import { QueryClient } from "@tanstack/react-query";
 export const queryClient = new QueryClient();
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/src/lib/utils.ts
+
 ```typescript
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/src/providers/auth-provider.tsx
+
 ```tsx
 "use client";
 
@@ -1235,7 +1480,10 @@ const AuthContext = createContext<AuthCtx | null>(null);
 const STORAGE_KEY = "gtc_auth";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [{ user, token }, setState] = useState<AuthState>({ user: null, token: null });
+  const [{ user, token }, setState] = useState<AuthState>({
+    user: null,
+    token: null,
+  });
 
   // load from storage on first mount
   useEffect(() => {
@@ -1259,7 +1507,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = (data: { token: string; user: User }) => {
     setState({ user: data.user, token: data.token });
     api.defaults.headers.common.Authorization = `Bearer ${data.token}`;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ user: data.user, token: data.token }));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ user: data.user, token: data.token })
+    );
   };
 
   const logout = () => {
@@ -1284,9 +1535,10 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
   return ctx;
 }
-
 ```
+
 # c:/EForgeIT/gtc/apps/web/src/providers/query-provider.tsx
+
 ```tsx
 "use client";
 
@@ -1306,5 +1558,7 @@ export default function QueryProvider({ children }: PropsWithChildren) {
 
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
-
 ```
+
+admin@gtc.local
+admin123
