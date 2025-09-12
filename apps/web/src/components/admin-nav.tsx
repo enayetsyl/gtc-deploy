@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 
-const items = [
+// base admin items
+const baseItems = [
   { href: "/admin/sectors", label: "Sectors" },
   { href: "/admin/points", label: "GTC Points" },
   { href: "/admin/services", label: "Services" },
@@ -13,7 +14,18 @@ const items = [
 
 export default function AdminNav() {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+
+  // build items based on role
+  const items = [...baseItems];
+  if (user?.role === "ADMIN") {
+    // admin sees admin conventions
+    items.unshift({ href: "/admin/conventions", label: "Conventions" });
+  }
+  if (user?.role === "GTC_POINT") {
+    // point users see point conventions
+    items.unshift({ href: "/point/conventions", label: "My Conventions" });
+  }
   return (
     <nav className="flex gap-2">
       {items.map((it) => {

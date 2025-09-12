@@ -14,6 +14,7 @@ type AuthCtx = {
   user: User | null;
   token: string | null;
   isAuthed: boolean;
+  initialized: boolean;
   login: (data: { token: string; user: User }) => void;
   logout: () => void;
 };
@@ -23,7 +24,11 @@ const AuthContext = createContext<AuthCtx | null>(null);
 const STORAGE_KEY = "gtc_auth";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [{ user, token }, setState] = useState<AuthState>({ user: null, token: null });
+  const [{ user, token }, setState] = useState<AuthState>({
+    user: null,
+    token: null,
+  });
+  const [initialized, setInitialized] = useState(false);
 
   // load from storage on first mount
   useEffect(() => {
@@ -37,6 +42,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch {}
+    // mark init done regardless of success so consumers can act
+    setInitialized(true);
   }, []);
 
   // global 401 handler
@@ -47,7 +54,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = (data: { token: string; user: User }) => {
     setState({ user: data.user, token: data.token });
     api.defaults.headers.common.Authorization = `Bearer ${data.token}`;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ user: data.user, token: data.token }));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ user: data.user, token: data.token })
+    );
   };
 
   const logout = () => {
@@ -60,8 +70,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value = useMemo<AuthCtx>(
-    () => ({ user, token, isAuthed: Boolean(user && token), login, logout }),
-    [user, token]
+    () => ({
+      user,
+      token,
+      isAuthed: Boolean(user && token),
+      initialized,
+      login,
+      logout,
+    }),
+    [user, token, initialized]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
