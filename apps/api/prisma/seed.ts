@@ -42,6 +42,21 @@ async function main() {
     create: { name: "GTC Point B", email: "point.b@gtc.local", sectorId: university.id },
   });
 
+  // GTC Point user for testing uploads
+const pointUser = await prisma.user.upsert({
+  where: { email: "user.pointa@gtc.local" },
+  update: {},
+  create: {
+    email: "user.pointa@gtc.local",
+    passwordHash: await argon2.hash("point123"),
+    name: "Point A User",
+    role: Role.GTC_POINT,
+    gtcPointId: pointA.id,
+  },
+});
+console.log("Seeded point user:", pointUser.email, "(pass: point123)");
+
+
   // services
   const svcA = await prisma.service.upsert({
     where: { code: "DOC_SIGN" },

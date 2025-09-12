@@ -16,18 +16,20 @@ model Ping {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  name         String
-  role         Role      @default(GTC_POINT)
-  sectorId     String? // for SECTOR_OWNER
-  gtcPointId   String? // for GTC_POINT
-  sector       Sector?   @relation("SectorUsers", fields: [sectorId], references: [id])
-  gtcPoint     GtcPoint? @relation("PointUsers", fields: [gtcPointId], references: [id])
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  role          Role           @default(GTC_POINT)
+  sectorId      String? // for SECTOR_OWNER
+  gtcPointId    String? // for GTC_POINT
+  sector        Sector?        @relation("SectorUsers", fields: [sectorId], references: [id])
+  gtcPoint      GtcPoint?      @relation("PointUsers", fields: [gtcPointId], references: [id])
   notifications Notification[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  uploadedConventionDocuments ConventionDocument[] @relation("UserUploadedConventionDocuments")
 }
 
 enum Role {
@@ -45,19 +47,21 @@ model Sector {
   points    GtcPoint[]
 
   // Optional: sector owners (Users with sectorId referencing this)
-  users User[] @relation("SectorUsers")
+  users       User[]       @relation("SectorUsers")
+  conventions Convention[]
 }
 
 model GtcPoint {
-  id        String            @id @default(cuid())
-  name      String
-  email     String            @unique
-  sectorId  String
-  sector    Sector            @relation(fields: [sectorId], references: [id])
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  services  GtcPointService[]
-  users     User[]            @relation("PointUsers") 
+  id          String            @id @default(cuid())
+  name        String
+  email       String            @unique
+  sectorId    String
+  sector      Sector            @relation(fields: [sectorId], references: [id])
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  services    GtcPointService[]
+  users       User[]            @relation("PointUsers")
+  conventions Convention[]
 }
 
 model Service {
@@ -100,15 +104,62 @@ enum NotificationType {
 }
 
 model Notification {
-  id         String            @id @default(cuid())
-  userId     String
-  type       NotificationType  @default(GENERIC)
-  subject    String
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType @default(GENERIC)
+  subject     String
   contentHtml String?
-  read       Boolean           @default(false)
-  createdAt  DateTime          @default(now())
+  read        Boolean          @default(false)
+  createdAt   DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, read, createdAt])
+}
+
+enum ConventionStatus {
+  NEW
+  UPLOADED
+  APPROVED
+  DECLINED
+}
+
+enum ConventionDocKind {
+  PREFILL
+  SIGNED
+  OTHER
+}
+
+model Convention {
+  id               String           @id @default(cuid())
+  gtcPointId       String
+  sectorId         String
+  status           ConventionStatus @default(NEW)
+  internalSalesRep String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  gtcPoint  GtcPoint             @relation(fields: [gtcPointId], references: [id])
+  sector    Sector               @relation(fields: [sectorId], references: [id])
+  documents ConventionDocument[]
+
+  @@index([gtcPointId, status, createdAt])
+}
+
+model ConventionDocument {
+  id           String            @id @default(cuid())
+  conventionId String
+  kind         ConventionDocKind @default(SIGNED)
+  fileName     String
+  path         String
+  mime         String
+  size         Int
+  checksum     String
+  uploadedById String?
+  createdAt    DateTime          @default(now())
+
+  convention Convention @relation(fields: [conventionId], references: [id])
+  uploadedBy User?      @relation("UserUploadedConventionDocuments", fields: [uploadedById], references: [id])
+
+  @@index([conventionId, createdAt])
 }

@@ -104,18 +104,20 @@ model Ping {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  name         String
-  role         Role      @default(GTC_POINT)
-  sectorId     String? // for SECTOR_OWNER
-  gtcPointId   String? // for GTC_POINT
-  sector       Sector?   @relation("SectorUsers", fields: [sectorId], references: [id])
-  gtcPoint     GtcPoint? @relation("PointUsers", fields: [gtcPointId], references: [id])
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  role          Role           @default(GTC_POINT)
+  sectorId      String? // for SECTOR_OWNER
+  gtcPointId    String? // for GTC_POINT
+  sector        Sector?        @relation("SectorUsers", fields: [sectorId], references: [id])
+  gtcPoint      GtcPoint?      @relation("PointUsers", fields: [gtcPointId], references: [id])
   notifications Notification[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  uploadedConventionDocuments ConventionDocument[] @relation("UserUploadedConventionDocuments")
 }
 
 enum Role {
@@ -133,19 +135,21 @@ model Sector {
   points    GtcPoint[]
 
   // Optional: sector owners (Users with sectorId referencing this)
-  users User[] @relation("SectorUsers")
+  users       User[]       @relation("SectorUsers")
+  conventions Convention[]
 }
 
 model GtcPoint {
-  id        String            @id @default(cuid())
-  name      String
-  email     String            @unique
-  sectorId  String
-  sector    Sector            @relation(fields: [sectorId], references: [id])
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
-  services  GtcPointService[]
-  users     User[]            @relation("PointUsers") 
+  id          String            @id @default(cuid())
+  name        String
+  email       String            @unique
+  sectorId    String
+  sector      Sector            @relation(fields: [sectorId], references: [id])
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  services    GtcPointService[]
+  users       User[]            @relation("PointUsers")
+  conventions Convention[]
 }
 
 model Service {
@@ -188,17 +192,64 @@ enum NotificationType {
 }
 
 model Notification {
-  id         String            @id @default(cuid())
-  userId     String
-  type       NotificationType  @default(GENERIC)
-  subject    String
+  id          String           @id @default(cuid())
+  userId      String
+  type        NotificationType @default(GENERIC)
+  subject     String
   contentHtml String?
-  read       Boolean           @default(false)
-  createdAt  DateTime          @default(now())
+  read        Boolean          @default(false)
+  createdAt   DateTime         @default(now())
 
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, read, createdAt])
+}
+
+enum ConventionStatus {
+  NEW
+  UPLOADED
+  APPROVED
+  DECLINED
+}
+
+enum ConventionDocKind {
+  PREFILL
+  SIGNED
+  OTHER
+}
+
+model Convention {
+  id               String           @id @default(cuid())
+  gtcPointId       String
+  sectorId         String
+  status           ConventionStatus @default(NEW)
+  internalSalesRep String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  gtcPoint  GtcPoint             @relation(fields: [gtcPointId], references: [id])
+  sector    Sector               @relation(fields: [sectorId], references: [id])
+  documents ConventionDocument[]
+
+  @@index([gtcPointId, status, createdAt])
+}
+
+model ConventionDocument {
+  id           String            @id @default(cuid())
+  conventionId String
+  kind         ConventionDocKind @default(SIGNED)
+  fileName     String
+  path         String
+  mime         String
+  size         Int
+  checksum     String
+  uploadedById String?
+  createdAt    DateTime          @default(now())
+
+  convention Convention @relation(fields: [conventionId], references: [id])
+  uploadedBy User?      @relation("UserUploadedConventionDocuments", fields: [uploadedById], references: [id])
+
+  @@index([conventionId, createdAt])
 }
 
 ```
@@ -262,6 +313,20 @@ async function main() {
       sectorId: university.id,
     },
   });
+
+  // GTC Point user for testing uploads
+  const pointUser = await prisma.user.upsert({
+    where: { email: "user.pointa@gtc.local" },
+    update: {},
+    create: {
+      email: "user.pointa@gtc.local",
+      passwordHash: await argon2.hash("point123"),
+      name: "Point A User",
+      role: Role.GTC_POINT,
+      gtcPointId: pointA.id,
+    },
+  });
+  console.log("Seeded point user:", pointUser.email, "(pass: point123)");
 
   // services
   const svcA = await prisma.service.upsert({
@@ -407,6 +472,7 @@ export const redis = new Redis(process.env.REDIS_URL!);
 ```
 
 # c:/EForgeIT/gtc/apps/api/src/lib/mailer.ts
+
 ```
 import nodemailer from "nodemailer";
 
@@ -419,6 +485,7 @@ export const mailer = nodemailer.createTransport({
 ```
 
 # c:/EForgeIT/gtc/apps/api/src/queues/email.ts
+
 ```
 import { Queue } from "bullmq";
 
@@ -444,6 +511,7 @@ export async function enqueueEmail(data: EmailJob) {
 ```
 
 # c:/EForgeIT/gtc/apps/api/src/queues/worker.ts
+
 ```
 import { Worker, Job } from "bullmq";
 import { mailer } from "../lib/mailer";
@@ -663,7 +731,31 @@ meRouter.get("/", requireAuth, async (req, res) => {
 });
 ```
 
+# c:/EForgeIT/gtc/apps/api/src/routes/health.ts
+
+```
+import { Router } from "express";
+import { notifyUser } from "../services/notifications";
+import { requireAuth, requireRole } from "../middleware/auth";
+
+export const devNotify = Router();
+devNotify.use(requireAuth, requireRole("ADMIN"));
+
+devNotify.post("/test", async (req, res) => {
+  const userId = req.user!.id;
+  const n = await notifyUser({
+    userId,
+    subject: "Test notification",
+    contentHtml: "<p>Hello from Phase 3!</p>",
+    type: "GENERIC",
+  });
+  res.json(n);
+});
+
+```
+
 # c:/EForgeIT/gtc/apps/api/src/routes/notifications.me.ts
+
 ```
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
@@ -709,7 +801,9 @@ meNotifications.post("/:id/read", async (req, res) => {
 });
 
 ```
+
 # c:/EForgeIT/gtc/apps/api/src/services/notification.ts
+
 ```
 import { prisma, } from "../lib/prisma";
 import { emitToUser } from "../sockets/io";
@@ -773,6 +867,7 @@ export async function notifyUsers(
 ```
 
 # c:/EForgeIT/gtc/apps/api/src/sockets/index.ts
+
 ```
 import type { Server } from "socket.io";
 import { verifyAccessToken } from "../lib/jwt";
@@ -803,6 +898,7 @@ export function initSockets(io: Server) {
 ```
 
 # c:/EForgeIT/gtc/apps/api/src/sockets/io.ts
+
 ```
 import type { Server } from "socket.io";
 let ioRef: Server | null = null;
@@ -821,1731 +917,568 @@ export function emitToUser(userId: string, event: string, payload: any) {
 
 ```
 
-
-
-# c:/EForgeIT/gtc/apps/api/src/sockets/index.ts
+# c:/EForgeIT/gtc/apps/api/src/routes/admin.conventions.ts
 
 ```typescript
-// apps/api/src/sockets/index.ts
-import type { Server } from "socket.io";
-export function initSockets(io: Server) {
-  io.on("connection", (socket) => {
-    socket.emit("hello", { message: "connected" });
+import { Router } from "express";
+import { z } from "zod";
+import { requireAuth, requireRole } from "../middleware/auth";
+import { prisma } from "../lib/prisma";
+import { onConventionDecision } from "../services/conventions";
+
+export const adminConventions = Router();
+adminConventions.use(requireAuth, requireRole("ADMIN"));
+
+// list (basic filters)
+adminConventions.get("/", async (req, res) => {
+  const status = (req.query.status as string | undefined)?.toUpperCase() as
+    | "NEW"
+    | "UPLOADED"
+    | "APPROVED"
+    | "DECLINED"
+    | undefined;
+
+  const where = status ? { status: status as any } : {};
+  const items = await prisma.convention.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    include: {
+      gtcPoint: true,
+      sector: true,
+      documents: { orderBy: { createdAt: "desc" } },
+    },
+    take: 200,
   });
-}
+  res.json({ items });
+});
+
+// decision (approve/decline, optional internalSalesRep)
+const decisionSchema = z.object({
+  action: z.enum(["APPROVE", "DECLINE"]),
+  internalSalesRep: z.string().min(1).optional(),
+});
+adminConventions.patch("/:id", async (req, res) => {
+  const { id } = z.object({ id: z.string().min(1) }).parse(req.params);
+  const body = decisionSchema.safeParse(req.body);
+  if (!body.success)
+    return res
+      .status(400)
+      .json({ error: "ValidationError", issues: body.error.issues });
+
+  const approved = body.data.action === "APPROVE";
+  const conv = await prisma.convention.update({
+    where: { id },
+    data: {
+      status: approved ? "APPROVED" : "DECLINED",
+      internalSalesRep: body.data.internalSalesRep,
+    },
+  });
+
+  await onConventionDecision(conv.id, approved, body.data.internalSalesRep);
+
+  res.json(conv);
+});
 ```
 
-# c:/EForgeIT/gtc/apps/api/src/types/express.d.ts
+# c:/EForgeIT/gtc/apps/api/src/routes/conventions.ts
 
 ```typescript
-// src/types/express.d.ts
-import "express";
-
-declare module "express-serve-static-core" {
-  interface Request {
-    user?: {
-      id: string;
-      email: string;
-      role: "ADMIN" | "SECTOR_OWNER" | "GTC_POINT" | "EXTERNAL";
-    };
-  }
-}
-```
-
-# c:/EForgeIT/gtc/apps/api/src/index.ts
-
-```typescript
-// apps/api/src/index.ts
-import { createServer } from "http";
-import { Server } from "socket.io";
-import { initSockets } from "./sockets";
-import { app } from "./server";
-import { setIO } from "./sockets/io";
-
-const server = createServer(app);
-const io = new Server(server, { cors: { origin: ["http://localhost:3000"] } });
-setIO(io);
-initSockets(io);
-
-const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => console.log(`API listening on :${PORT}`));
-
-
-```
-
-# c:/EForgeIT/gtc/apps/api/src/server.ts
-
-```typescript
-// apps/api/src/server.ts
-import "dotenv/config";
-import express from "express";
-import cors from "cors";
-import cookieParser from "cookie-parser";
+import { Router } from "express";
+import { z } from "zod";
+import multer from "multer";
+import { requireAuth, requireRole } from "../middleware/auth";
+import { prisma } from "../lib/prisma";
+import { storage } from "../storage/provider";
+import { buildPrefillPdf } from "../utils/pdf";
+import { onConventionUploaded } from "../services/conventions";
+import { lookup as mimeLookup } from "mime-types";
 import path from "node:path";
-import { errorHandler } from "./middleware/error";
-import { router as healthRouter } from "./routes/health.js";
-import { authRouter } from "./routes/auth";
-import { meRouter } from "./routes/me";
-import { adminSectors } from "./routes/admin.sectors";
-import { adminPoints } from "./routes/admin.points";
-import { adminServices } from "./routes/admin.services";import { meNotifications } from "./routes/notifications.me";
+import fs from "node:fs/promises";
 
+export const conventionsRouter = Router();
+conventionsRouter.use(requireAuth);
 
-export const app = express();
-
-app.use(cors({
-  origin: ["http://localhost:3000"],
-  credentials: true,
-}));
-app.use(cookieParser());
-app.use(express.json());
-
-app.use("/uploads", express.static(path.resolve("uploads")));
-app.use("/api/health", healthRouter);
-app.use("/api/auth", authRouter);
-app.use("/api/me", meRouter);
-app.use("/api/admin/sectors", adminSectors);
-app.use("/api/admin/points", adminPoints);
-app.use("/api/admin/services", adminServices);
-app.use("/api/me/notifications", meNotifications);
-
-
-app.use(errorHandler);
-```
-
-# c:/EForgeIT/gtc/apps/api/.dockerignore
-
-```ignore
-# apps/api/.dockerignore
-node_modules
-dist
-npm-debug.log
-uploads
-
-```
-
-# c:/EForgeIT/gtc/apps/api/.env
-
-```properties
-PORT=4000
-DATABASE_URL="mysql://app:app_pw@127.0.0.1:3307/gtc_local"
-REDIS_URL="redis://127.0.0.1:6379"
-JWT_SECRET="dev_supersecret_change_me"
-MAIL_HOST=127.0.0.1
-MAIL_PORT=1025
-MAIL_FROM="GTC <noreply@gtc.local>"
-APP_BASE_URL="http://localhost:3000"
-FILE_STORAGE_ROOT="./uploads"
-QUEUE_CONCURRENCY=8
-SHADOW_DATABASE_URL="mysql://root:root_pw@127.0.0.1:3307/gtc_shadow"
-
-```
-
-# c:/EForgeIT/gtc/apps/api/.env.docker
-
-```bash
-# apps/api/.env.docker  (container dev)
-PORT=4000
-DATABASE_URL="mysql://app:app_pw@mysql:3306/gtc_local"
-REDIS_URL="redis://redis:6379"
-JWT_SECRET="dev_supersecret_change_me"
-MAIL_HOST=mailpit
-MAIL_PORT=1025
-MAIL_FROM="GTC <noreply@gtc.local>"
-APP_BASE_URL="http://localhost:3000"
-FILE_STORAGE_ROOT="./uploads"
-QUEUE_CONCURRENCY=8
-SHADOW_DATABASE_URL="mysql://root:root_pw@127.0.0.1:3307/gtc_shadow"
-
-
-```
-
-# c:/EForgeIT/gtc/apps/api/Dockerfile
-
-```dockerfile
-# apps/api/Dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install --no-audit --no-fund
-COPY . .
-EXPOSE 4000
-CMD ["npm", "run", "dev"]
-
-```
-
-# c:/EForgeIT/gtc/apps/api/package.json
-
-```json
-{
-  "name": "@gtc/api",
-  "private": true,
-  "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
-    "migrate": "prisma migrate dev",
-    "seed": "ts-node prisma/seed.ts",
-    "worker": "tsx watch src/queues/worker.ts"
-  },
-  "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "argon2": "^0.44.0",
-    "bullmq": "^5.58.5",
-    "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
-    "dotenv": "^16.6.1",
-    "express": "^4.21.2",
-    "ioredis": "^5.7.0",
-    "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^7.0.6",
-    "socket.io": "^4.8.1",
-    "uuid": "^13.0.0",
-    "zod": "^3.25.76"
-  },
-  "devDependencies": {
-    "@types/argon2": "^0.14.1",
-    "@types/cookie-parser": "^1.4.9",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.23",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^20.19.13",
-    "@types/nodemailer": "^7.0.1",
-    "prisma": "^5.22.0",
-    "ts-node": "^10.9.2",
-    "ts-node-dev": "^2.0.0",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
-  }
-}
-
-```
-
-# c:/EForgeIT/gtc/apps/api/tsconfig.json
-
-```jsonc
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "outDir": "dist",
-    "rootDir": ".",
-    "strict": true,
-    "esModuleInterop": true
-  },
-  "include": ["src", "prisma"]
-}
-```
-
-# c:/EForgeIT/gtc/apps/web/.dockerignore
-
-```ignore
-# apps/web/.dockerignore
-node_modules
-.next
-npm-debug.log
-
-```
-
-# c:/EForgeIT/gtc/apps/web/.env.local
-
-```bash
-# apps/web/.env.local
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
-
-```
-
-# c:/EForgeIT/gtc/apps/web/.gitignore
-
-```ignore
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-```
-
-# c:/EForgeIT/gtc/apps/web/components.json
-
-```json
-{
-  "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "new-york",
-  "rsc": true,
-  "tsx": true,
-  "tailwind": {
-    "config": "",
-    "css": "src/app/globals.css",
-    "baseColor": "neutral",
-    "cssVariables": true,
-    "prefix": ""
-  },
-  "iconLibrary": "lucide",
-  "aliases": {
-    "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
-    "lib": "@/lib",
-    "hooks": "@/hooks"
-  },
-  "registries": {}
-}
-```
-
-# c:/EForgeIT/gtc/apps/web/Dockerfile
-
-```dockerfile
-# apps/web/Dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install --no-audit --no-fund
-COPY . .
-EXPOSE 3000
-CMD ["npm", "run", "dev"]
-
-```
-
-# c:/EForgeIT/gtc/apps/web/eslint.config.mjs
-
-```javascript
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
+// 4.1 Create a convention (GTC point or admin)
+const createSchema = z.object({
+  gtcPointId: z.string().uuid().optional(), // admin may specify; point users derive from profile
+  sectorId: z.string().uuid().optional(), // admin may specify
 });
+conventionsRouter.post(
+  "/",
+  requireRole("GTC_POINT", "ADMIN"),
+  async (req, res) => {
+    const parsed = createSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ error: "ValidationError", issues: parsed.error.issues });
 
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
-  {
-    ignores: [
-      "node_modules/**",
-      ".next/**",
-      "out/**",
-      "build/**",
-      "next-env.d.ts",
-    ],
-  },
-];
+    let { gtcPointId, sectorId } = parsed.data;
 
-export default eslintConfig;
-```
-
-# c:/EForgeIT/gtc/apps/web/next-env.d.ts
-
-```typescript
-/// <reference types="next" />
-/// <reference types="next/image-types/global" />
-/// <reference path="./.next/types/routes.d.ts" />
-
-// NOTE: This file should not be edited
-// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
-```
-
-# c:/EForgeIT/gtc/apps/web/next.config.ts
-
-```typescript
-// apps/web/next.config.ts
-import type { NextConfig } from "next";
-const nextConfig: NextConfig = { reactStrictMode: true };
-export default nextConfig;
-```
-
-# c:/EForgeIT/gtc/apps/web/package.json
-
-```json
-{
-  "name": "web",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@radix-ui/react-slot": "^1.2.3",
-    "@tanstack/react-query": "^5.87.4",
-    "axios": "^1.11.0",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.543.0",
-    "next": "15.5.2",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "socket.io-client": "^4.8.1",
-    "tailwind-merge": "^3.3.1",
-    "zod": "^3.25.76"
-  },
-  "devDependencies": {
-    "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20.19.13",
-    "@types/react": "^19.1.12",
-    "@types/react-dom": "^19.1.9",
-    "autoprefixer": "^10.4.21",
-    "eslint": "^9.35.0",
-    "eslint-config-next": "^15.5.2",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.13",
-    "tw-animate-css": "^1.3.8",
-    "typescript": "^5.9.2"
-  }
-}
-```
-
-# c:/EForgeIT/gtc/apps/web/tsconfig.json
-
-```jsonc
-{
-  "compilerOptions": {
-    "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
-    "module": "esnext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
-}
-```
-
-# c:/EForgeIT/gtc/apps/web/postcss.config.mjs
-
-```javascript
-const config = {
-  plugins: {
-    "@tailwindcss/postcss": {},
-  },
-};
-
-export default config;
-```
-
-# c:/EForgeIT/gtc/apps/web/src/app/globals.css
-
-```css
-@import "tailwindcss";
-@import "tw-animate-css";
-
-@custom-variant dark (&:is(.dark *));
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-}
-
-:root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
-```
-
-# c:/EForgeIT/gtc/apps/web/src/app/layout.tsx
-
-```tsx
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import QueryProvider from "@/providers/query-provider";
-import { AuthProvider } from "@/providers/auth-provider";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "GTC",
-  description: "Network GTC",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <QueryProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </QueryProvider>
-      </body>
-    </html>
-  );
-}
-```
-
-# c:/EForgeIT/gtc/apps/web/src/app/page.tsx
-
-```tsx
-// apps/web/src/app/page.tsx
-export default function Home() {
-  return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">GTC Web</h1>
-    </main>
-  );
-}
-```
-
-# c:/EForgeIT/gtc/apps/web/src/app/(auth)/login/page.tsx
-
-```tsx
-"use client";
-
-import { useState } from "react";
-import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
-import { api } from "@/lib/axios";
-import { useAuth, User } from "@/providers/auth-provider";
-import { useRouter } from "next/navigation";
-
-const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-});
-
-export default function LoginPage() {
-  const { login } = useAuth();
-  const router = useRouter();
-  const [form, setForm] = useState({ email: "", password: "" });
-  const [errors, setErrors] = useState<{
-    email?: string;
-    password?: string;
-    root?: string;
-  }>({});
-
-  const loginResponseSchema = z.object({
-    accessToken: z.string(),
-    user: z.object({
-      id: z.string(),
-      name: z.string(),
-      email: z.string(),
-      role: z.string(),
-    }),
-  });
-
-  const mutate = useMutation({
-    mutationFn: async (payload: { email: string; password: string }) => {
-      const res = await api.post("/api/auth/login", payload);
-      const parsed = loginResponseSchema.parse(res.data);
-      // map API shape to client shape expected by login()
-      return { token: parsed.accessToken, user: parsed.user as User };
-    },
-    onSuccess: (data) => {
-      login(data);
-      router.replace("/dashboard");
-    },
-    onError: (e: unknown) => {
-      const getErrMsg = (err: unknown): string => {
-        if (typeof err === "object" && err !== null) {
-          const maybe = err as Record<string, unknown>;
-          const response = maybe.response as
-            | Record<string, unknown>
-            | undefined;
-          const data = response?.data as Record<string, unknown> | undefined;
-          const error = data?.error;
-          if (typeof error === "string") return error;
-        }
-        return "Login failed";
-      };
-      setErrors((prev) => ({ ...prev, root: getErrMsg(e) }));
-    },
-  });
-
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-    const parsed = schema.safeParse(form);
-    if (!parsed.success) {
-      const fieldErrs: typeof errors = {};
-      parsed.error.issues.forEach((i) => {
-        const k = i.path[0] as "email" | "password";
-        fieldErrs[k] = i.message;
+    // If GTC_POINT user, derive from their mapping
+    if (req.user!.role === "GTC_POINT") {
+      const me = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        include: { gtcPoint: { include: { sector: true } } },
       });
-      setErrors(fieldErrs);
-      return;
+      if (!me?.gtcPoint)
+        return res
+          .status(409)
+          .json({ error: "User is not attached to a GTC Point" });
+      gtcPointId = me.gtcPoint.id;
+      sectorId = me.gtcPoint.sectorId;
+    } else {
+      // admin path: both ids required
+      if (!gtcPointId || !sectorId)
+        return res
+          .status(400)
+          .json({ error: "gtcPointId and sectorId are required for admin" });
     }
-    mutate.mutate(parsed.data);
-  };
 
-  return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm bg-white rounded-xl shadow p-6 space-y-4"
-      >
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">Sign in</h1>
-          <p className="text-sm text-gray-500">
-            Use your admin or point credentials.
-          </p>
-        </div>
+    const conv = await prisma.convention.create({
+      data: {
+        gtcPointId: gtcPointId!,
+        sectorId: sectorId!,
+        status: "NEW" as any,
+      },
+    });
+    res.status(201).json(conv);
+  }
+);
 
-        <div>
-          <label className="block text-sm mb-1">Email</label>
-          <input
-            type="email"
-            className="w-full rounded-md border px-3 py-2"
-            value={form.email}
-            onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
-            autoComplete="email"
-          />
-          {errors.email && (
-            <p className="text-xs text-red-600 mt-1">{errors.email}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm mb-1">Password</label>
-          <input
-            type="password"
-            className="w-full rounded-md border px-3 py-2"
-            value={form.password}
-            onChange={(e) =>
-              setForm((s) => ({ ...s, password: e.target.value }))
-            }
-            autoComplete="current-password"
-          />
-          {errors.password && (
-            <p className="text-xs text-red-600 mt-1">{errors.password}</p>
-          )}
-        </div>
-
-        {errors.root && (
-          <div className="text-sm text-red-600">{errors.root}</div>
-        )}
-
-        <button
-          type="submit"
-          className="w-full rounded-md bg-black text-white py-2 font-medium disabled:opacity-60"
-          disabled={mutate.isPending}
-        >
-          {mutate.isPending ? "Signing in..." : "Sign in"}
-        </button>
-      </form>
-    </main>
-  );
-}
-```
-
-# c:/EForgeIT/gtc/apps/web/src/app/(protected)/dashboard/page.tsx
-```tsx
-"use client";
-
-import Protected from "@/components/protected";
-import { useAuth } from "@/providers/auth-provider";
-
-export default function Dashboard() {
-  const { user } = useAuth();
-  return (
-    <Protected>
-      <main className="p-6 space-y-6">
-        <header className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-        </header>
-
-        <section className="rounded-xl border p-6">
-          <p className="text-lg">
-            Welcome, <span className="font-semibold">{user?.name}</span>.
-          </p>
-          <p className="text-gray-600 mt-2">
-            Your role: <span className="font-mono">{user?.role}</span>
-          </p>
-        </section>
-      </main>
-    </Protected>
-  );
-}
-
-```
-
-# c:/EForgeIT/gtc/apps/api/src/routes/admin.sectors.ts
-```typescript
-import { Router } from "express";
-import { z } from "zod";
-import { prisma } from "../lib/prisma";
-import { requireAuth, requireRole } from "../middleware/auth";
-
-export const adminSectors = Router();
-adminSectors.use(requireAuth, requireRole("ADMIN"));
-
-// list with basic pagination
-adminSectors.get("/", async (req, res) => {
-  const page = Math.max(1, Number(req.query.page ?? 1));
-  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 20)));
-  const [items, total] = await Promise.all([
-    prisma.sector.findMany({
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.sector.count(),
-  ]);
-  res.json({ items, total, page, pageSize });
+// 4.2 Prefill PDF (no DB write) – return a flattened simple PDF
+const prefillSchema = z.object({
+  applicantName: z.string().min(1).optional(),
+  pointName: z.string().min(1).optional(),
+  title: z.string().min(1).optional(),
 });
-
-const createSchema = z.object({ name: z.string().min(2).max(100) });
-
-adminSectors.post("/", async (req, res) => {
-  const parsed = createSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
-  const sector = await prisma.sector.create({ data: parsed.data });
-  res.status(201).json(sector);
-});
-
-const idParam = z.object({ id: z.string().min(1) });
-const updateSchema = z.object({ name: z.string().min(2).max(100) });
-
-adminSectors.get("/:id", async (req, res) => {
-  const { id } = idParam.parse(req.params);
-  const sector = await prisma.sector.findUnique({ where: { id } });
-  if (!sector) return res.status(404).json({ error: "Not found" });
-  res.json(sector);
-});
-
-adminSectors.patch("/:id", async (req, res) => {
-  const { id } = idParam.parse(req.params);
-  const body = updateSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
-  const sector = await prisma.sector.update({ where: { id }, data: body.data });
-  res.json(sector);
-});
-
-adminSectors.delete("/:id", async (req, res) => {
-  const { id } = idParam.parse(req.params);
-  // optional safety: prevent delete if points exist
-  const count = await prisma.gtcPoint.count({ where: { sectorId: id } });
-  if (count > 0) return res.status(409).json({ error: "Sector has points; move or delete them first." });
-  await prisma.sector.delete({ where: { id } });
-  res.json({ ok: true });
-});
-
-```
-
-# c:/EForgeIT/gtc/apps/api/src/routes/admin.points.ts
-```typescript
-import { Router } from "express";
-import { z } from "zod";
-import { prisma } from "../lib/prisma";
-import { requireAuth, requireRole } from "../middleware/auth";
-
-export const adminPoints = Router();
-adminPoints.use(requireAuth, requireRole("ADMIN"));
-
-adminPoints.get("/", async (req, res) => {
-  const page = Math.max(1, Number(req.query.page ?? 1));
-  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 20)));
-  const [items, total] = await Promise.all([
-    prisma.gtcPoint.findMany({
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { createdAt: "desc" },
-      include: { sector: true },
-    }),
-    prisma.gtcPoint.count(),
-  ]);
-  res.json({ items, total, page, pageSize });
-});
-
-const createSchema = z.object({
-  name: z.string().min(2).max(200),
-  email: z.string().email(),
-  sectorId: z.string().min(1),
-});
-
-adminPoints.post("/", async (req, res) => {
-  const parsed = createSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
-  const point = await prisma.gtcPoint.create({ data: parsed.data });
-  res.status(201).json(point);
-});
-
-const idParam = z.object({ id: z.string().min(1) });
-const updateSchema = z.object({
-  name: z.string().min(2).max(200).optional(),
-  email: z.string().email().optional(),
-  sectorId: z.string().min(1).optional(),
-});
-
-adminPoints.get("/:id", async (req, res) => {
-  const { id } = idParam.parse(req.params);
-  const point = await prisma.gtcPoint.findUnique({ where: { id }, include: { sector: true, services: true } });
-  if (!point) return res.status(404).json({ error: "Not found" });
-  res.json(point);
-});
-
-adminPoints.patch("/:id", async (req, res) => {
-  const { id } = idParam.parse(req.params);
-  const body = updateSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
-  const point = await prisma.gtcPoint.update({ where: { id }, data: body.data });
-  res.json(point);
-});
-
-adminPoints.delete("/:id", async (req, res) => {
-  const { id } = idParam.parse(req.params);
-  const svcCount = await prisma.gtcPointService.count({ where: { gtcPointId: id } });
-  if (svcCount > 0) return res.status(409).json({ error: "Point has service links; remove them first." });
-  await prisma.gtcPoint.delete({ where: { id } });
-  res.json({ ok: true });
-});
-
-```
-
-# c:/EForgeIT/gtc/apps/api/src/routes/admin.services.ts
-```typescript
-import { Router } from "express";
-import { z } from "zod";
-import { prisma } from "../lib/prisma";
-import { requireAuth, requireRole } from "../middleware/auth";
-
-export const adminServices = Router();
-adminServices.use(requireAuth, requireRole("ADMIN"));
-
-adminServices.get("/", async (req, res) => {
-  const items = await prisma.service.findMany({ orderBy: { createdAt: "desc" } });
-  res.json(items);
-});
-
-const createSchema = z.object({
-  code: z.string().min(2).max(50).regex(/^[A-Z0-9_]+$/),
-  name: z.string().min(2).max(200),
-  active: z.boolean().optional().default(true),
-});
-
-adminServices.post("/", async (req, res) => {
-  const parsed = createSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
-  const service = await prisma.service.create({ data: parsed.data });
-  res.status(201).json(service);
-});
-
-const idParam = z.object({ id: z.string().min(1) });
-const updateSchema = z.object({
-  code: z.string().min(2).max(50).regex(/^[A-Z0-9_]+$/).optional(),
-  name: z.string().min(2).max(200).optional(),
-  active: z.boolean().optional(),
-});
-
-adminServices.get("/:id", async (req, res) => {
-  const { id } = idParam.parse(req.params);
-  const service = await prisma.service.findUnique({ where: { id } });
-  if (!service) return res.status(404).json({ error: "Not found" });
-  res.json(service);
-});
-
-adminServices.patch("/:id", async (req, res) => {
-  const { id } = idParam.parse(req.params);
-  const body = updateSchema.safeParse(req.body);
-  if (!body.success) return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
-  const service = await prisma.service.update({ where: { id }, data: body.data });
-  res.json(service);
-});
-
-adminServices.delete("/:id", async (req, res) => {
-  const { id } = idParam.parse(req.params);
-  const links = await prisma.gtcPointService.count({ where: { serviceId: id } });
-  if (links > 0) return res.status(409).json({ error: "Service is linked to points; unlink first." });
-  await prisma.service.delete({ where: { id } });
-  res.json({ ok: true });
-});
-
-```
-
-# c:/EForgeIT/gtc/apps/web/src/lib/admin-api.ts
-```typescript
-import { api } from "./axios";
-
-export type Sector = { id: string; name: string; createdAt: string; updatedAt: string };
-export type Point = { id: string; name: string; email: string; sectorId: string; createdAt: string; updatedAt: string; sector?: Sector };
-export type Service = { id: string; code: string; name: string; active: boolean; createdAt: string; updatedAt: string };
-
-export type Paged<T> = { items: T[]; total: number; page: number; pageSize: number };
-
-export async function listSectors(page = 1, pageSize = 50) {
-  const { data } = await api.get<Paged<Sector>>(`/api/admin/sectors`, { params: { page, pageSize } });
-  return data;
-}
-export async function createSector(payload: { name: string }) {
-  const { data } = await api.post<Sector>(`/api/admin/sectors`, payload);
-  return data;
-}
-export async function updateSector(id: string, payload: { name: string }) {
-  const { data } = await api.patch<Sector>(`/api/admin/sectors/${id}`, payload);
-  return data;
-}
-export async function deleteSector(id: string) {
-  const { data } = await api.delete(`/api/admin/sectors/${id}`);
-  return data;
-}
-
-export async function listPoints(page = 1, pageSize = 50) {
-  const { data } = await api.get<Paged<Point>>(`/api/admin/points`, { params: { page, pageSize } });
-  return data;
-}
-export async function createPoint(payload: { name: string; email: string; sectorId: string }) {
-  const { data } = await api.post<Point>(`/api/admin/points`, payload);
-  return data;
-}
-export async function updatePoint(id: string, payload: Partial<{ name: string; email: string; sectorId: string }>) {
-  const { data } = await api.patch<Point>(`/api/admin/points/${id}`, payload);
-  return data;
-}
-export async function deletePoint(id: string) {
-  const { data } = await api.delete(`/api/admin/points/${id}`);
-  return data;
-}
-
-export async function listServices() {
-  const { data } = await api.get<Service>(`/api/admin/services`);
-  return data;
-}
-export async function createService(payload: { code: string; name: string; active?: boolean }) {
-  const { data } = await api.post<Service>(`/api/admin/services`, payload);
-  return data;
-}
-export async function updateService(id: string, payload: Partial<{ code: string; name: string; active: boolean }>) {
-  const { data } = await api.patch<Service>(`/api/admin/services/${id}`, payload);
-  return data;
-}
-export async function deleteService(id: string) {
-  const { data } = await api.delete(`/api/admin/services/${id}`);
-  return data;
-}
-
-```
-
-# c:/EForgeIT/gtc/apps/web/src/app/(protected)/layout.tsx
-```tsx
-import AdminNav from "@/components/admin-nav";
-import Protected from "@/components/protected";
-
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <Protected>
-      <div className="p-6 space-y-6">
-        <header className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Admin</h1>
-          <AdminNav />
-        </header>
-        {children}
-      </div>
-    </Protected>
-  );
-}
-
-```
-
-# c:/EForgeIT/gtc/apps/web/src/app/(protected)/page.tsx
-```tsx
-export default function AdminHome() {
-  return (
-    <main className="rounded-xl border p-6">
-      <p className="text-gray-700">
-        Choose a section: Sectors, GTC Points, or Services.
-      </p>
-    </main>
-  );
-}
-
-```
-
-# c:/EForgeIT/gtc/apps/web/src/components/admin-nav.tsx
-```tsx
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/providers/auth-provider";
-
-const items = [
-  { href: "/admin/sectors", label: "Sectors" },
-  { href: "/admin/points", label: "GTC Points" },
-  { href: "/admin/services", label: "Services" },
-];
-
-export default function AdminNav() {
-  const pathname = usePathname();
-  const { logout } = useAuth();
-  return (
-    <nav className="flex gap-2">
-      {items.map((it) => {
-        const active = pathname?.startsWith(it.href);
-        return (
-          <Link
-            key={it.href}
-            href={it.href}
-            className={cn(
-              "rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50",
-              active && "bg-black text-white hover:bg-black"
-            )}
-          >
-            {it.label}
-          </Link>
-        );
-      })}
-      <button
-        onClick={logout}
-        className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
-      >
-        Logout
-      </button>
-    </nav>
-  );
-}
-
-```
-
-# c:/EForgeIT/gtc/apps/web/src/app/(protected)/admin/sectors/page.tsx
-```tsx
-"use client";
-
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createSector, deleteSector, listSectors, updateSector, type Sector } from "@/lib/admin-api";
-import { useState } from "react";
-import { z } from "zod";
-
-const sectorSchema = z.object({ name: z.string().min(2).max(100) });
-
-export default function SectorsPage() {
-  const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [editing, setEditing] = useState<null | Sector>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  const q = useQuery({ queryKey: ["admin", "sectors"], queryFn: () => listSectors(1, 100) });
-
-  const createMut = useMutation({
-    mutationFn: (payload: { name: string }) => createSector(payload),
-    onSuccess: () => {
-      setName("");
-      qc.invalidateQueries({ queryKey: ["admin", "sectors"] });
-    },
-    onError: () => setErr("Failed to create sector"),
-  });
-
-  const updateMut = useMutation({
-    mutationFn: (p: { id: string; name: string }) => updateSector(p.id, { name: p.name }),
-    onSuccess: () => {
-      setEditing(null);
-      qc.invalidateQueries({ queryKey: ["admin", "sectors"] });
-    },
-    onError: () => setErr("Failed to update"),
-  });
-
-  const deleteMut = useMutation({
-    mutationFn: (id: string) => deleteSector(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "sectors"] }),
-    onError: () => setErr("Delete failed (maybe sector has points)"),
-  });
-
-  return (
-    <main className="space-y-6">
-      <section className="rounded-xl border p-6 space-y-4">
-        <h2 className="text-lg font-semibold">Create sector</h2>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setErr(null);
-            const parsed = sectorSchema.safeParse({ name });
-            if (!parsed.success) return setErr(parsed.error.issues[0]?.message ?? "Validation error");
-            createMut.mutate(parsed.data);
-          }}
-          className="flex gap-2"
-        >
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="rounded-md border px-3 py-2"
-            placeholder="e.g., Training"
-          />
-          <button className="rounded-md bg-black text-white px-3 py-2" disabled={createMut.isPending}>
-            {createMut.isPending ? "Creating..." : "Create"}
-          </button>
-        </form>
-        {err && <p className="text-sm text-red-600">{err}</p>}
-      </section>
-
-      <section className="rounded-xl border p-6">
-        <h2 className="text-lg font-semibold mb-4">Sectors</h2>
-        {q.isLoading ? (
-          <p>Loading…</p>
-        ) : (
-          <div className="divide-y">
-            {q.data?.items.map((s) => (
-              <div key={s.id} className="py-3 flex items-center justify-between gap-4">
-                {editing?.id === s.id ? (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const parsed = sectorSchema.safeParse({ name: editing.name });
-                      if (!parsed.success) return;
-                      updateMut.mutate({ id: s.id, name: parsed.data.name });
-                    }}
-                    className="flex-1 flex gap-2"
-                  >
-                    <input
-                      className="rounded-md border px-3 py-2 flex-1"
-                      value={editing.name}
-                      onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                    />
-                    <button className="rounded-md border px-3 py-2" type="button" onClick={() => setEditing(null)}>
-                      Cancel
-                    </button>
-                    <button className="rounded-md bg-black text-white px-3 py-2">
-                      {updateMut.isPending ? "Saving..." : "Save"}
-                    </button>
-                  </form>
-                ) : (
-                  <>
-                    <div className="flex-1">
-                      <div className="font-medium">{s.name}</div>
-                      <div className="text-xs text-gray-500">{s.id}</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button className="rounded-md border px-3 py-1.5" onClick={() => setEditing(s)}>
-                        Edit
-                      </button>
-                      <button
-                        className="rounded-md border px-3 py-1.5"
-                        onClick={() => deleteMut.mutate(s.id)}
-                        disabled={deleteMut.isPending}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </main>
-  );
-}
-
-```
-
-# c:/EForgeIT/gtc/apps/web/src/app/(protected)/admin/points/page.tsx
-```tsx
-"use client";
-
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createPoint, listPoints, listSectors, type Point } from "@/lib/admin-api";
-import { useMemo, useState } from "react";
-import { z } from "zod";
-
-const schema = z.object({
-  name: z.string().min(2).max(200),
-  email: z.string().email(),
-  sectorId: z.string().min(1),
-});
-
-export default function PointsPage() {
-  const qc = useQueryClient();
-  const [form, setForm] = useState({ name: "", email: "", sectorId: "" });
-  const [err, setErr] = useState<string | null>(null);
-
-  const sectorsQ = useQuery({ queryKey: ["admin", "sectors"], queryFn: () => listSectors(1, 100) });
-  const pointsQ = useQuery({ queryKey: ["admin", "points"], queryFn: () => listPoints(1, 100) });
-
-  const sectorOptions = useMemo(() => sectorsQ.data?.items ?? [], [sectorsQ.data]);
-
-  const createMut = useMutation({
-    mutationFn: (payload: { name: string; email: string; sectorId: string }) => createPoint(payload),
-    onSuccess: () => {
-      setForm({ name: "", email: "", sectorId: "" });
-      qc.invalidateQueries({ queryKey: ["admin", "points"] });
-    },
-    onError: () => setErr("Failed to create point (check sector)"),
-  });
-
-  return (
-    <main className="space-y-6">
-      <section className="rounded-xl border p-6 space-y-4">
-        <h2 className="text-lg font-semibold">Create GTC Point</h2>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setErr(null);
-            const parsed = schema.safeParse(form);
-            if (!parsed.success) {
-              return setErr(parsed.error.issues[0]?.message ?? "Validation error");
-            }
-            createMut.mutate(parsed.data);
-          }}
-          className="grid gap-3 sm:grid-cols-2"
-        >
-          <div className="sm:col-span-1">
-            <label className="block text-sm mb-1">Name</label>
-            <input
-              className="w-full rounded-md border px-3 py-2"
-              value={form.name}
-              onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-            />
-          </div>
-          <div className="sm:col-span-1">
-            <label className="block text-sm mb-1">Email</label>
-            <input
-              className="w-full rounded-md border px-3 py-2"
-              value={form.email}
-              onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-sm mb-1">Sector</label>
-            <select
-              className="w-full rounded-md border px-3 py-2"
-              value={form.sectorId}
-              onChange={(e) => setForm((s) => ({ ...s, sectorId: e.target.value }))}
-              disabled={sectorsQ.isLoading}
-            >
-              <option value="">Select a sector…</option>
-              {sectorOptions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500 mt-1">A valid sector is required (avoids foreign key errors).</p>
-          </div>
-
-          <div className="sm:col-span-2">
-            <button className="rounded-md bg-black text-white px-3 py-2" disabled={createMut.isPending}>
-              {createMut.isPending ? "Creating..." : "Create"}
-            </button>
-            {err && <span className="ml-3 text-sm text-red-600">{err}</span>}
-          </div>
-        </form>
-      </section>
-
-      <section className="rounded-xl border p-6">
-        <h2 className="text-lg font-semibold mb-4">GTC Points</h2>
-        {pointsQ.isLoading ? (
-          <p>Loading…</p>
-        ) : (
-          <div className="divide-y">
-            {pointsQ.data?.items.map((p: Point) => (
-              <div key={p.id} className="py-3 flex items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-xs text-gray-600">{p.email}</div>
-                  <div className="text-xs text-gray-500 mt-1">Sector: {p.sector?.name ?? p.sectorId}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </main>
-  );
-}
-
-```
-
-# c:/EForgeIT/gtc/apps/web/src/app/(protected)/admin/services/page.tsx
-```tsx
-"use client";
-
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createService, deleteService, listServices, updateService, type Service } from "@/lib/admin-api";
-import { useState } from "react";
-import { z } from "zod";
-
-const schema = z.object({
-  code: z.string().min(2).max(50).regex(/^[A-Z0-9_]+$/),
-  name: z.string().min(2).max(200),
-});
-
-export default function ServicesPage() {
-  const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["admin", "services"], queryFn: () => listServices() });
-
-  const [form, setForm] = useState({ code: "", name: "" });
-  const [err, setErr] = useState<string | null>(null);
-
-  const createMut = useMutation({
-    mutationFn: (payload: { code: string; name: string }) => createService(payload),
-    onSuccess: () => {
-      setForm({ code: "", name: "" });
-      qc.invalidateQueries({ queryKey: ["admin", "services"] });
-    },
-    onError: () => setErr("Failed to create service"),
-  });
-
-  const toggleMut = useMutation({
-    mutationFn: (svc: Service) => updateService(svc.id, { active: !svc.active }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "services"] }),
-  });
-
-  const delMut = useMutation({
-    mutationFn: (id: string) => deleteService(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "services"] }),
-    onError: () => setErr("Delete failed (service linked to points)"),
-  });
-
-  return (
-    <main className="space-y-6">
-      <section className="rounded-xl border p-6 space-y-4">
-        <h2 className="text-lg font-semibold">Create service</h2>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setErr(null);
-            const parsed = schema.safeParse(form);
-            if (!parsed.success) return setErr(parsed.error.issues[0]?.message ?? "Validation error");
-            createMut.mutate(parsed.data);
-          }}
-          className="grid gap-3 sm:grid-cols-2"
-        >
-          <div>
-            <label className="block text-sm mb-1">Code (UPPER_SNAKE)</label>
-            <input
-              className="w-full rounded-md border px-3 py-2"
-              value={form.code}
-              onChange={(e) => setForm((s) => ({ ...s, code: e.target.value.toUpperCase() }))}
-              placeholder="DOC_SIGN"
-            />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Name</label>
-            <input
-              className="w-full rounded-md border px-3 py-2"
-              value={form.name}
-              onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-              placeholder="Document Signing"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <button className="rounded-md bg-black text-white px-3 py-2" disabled={createMut.isPending}>
-              {createMut.isPending ? "Creating..." : "Create"}
-            </button>
-            {err && <span className="ml-3 text-sm text-red-600">{err}</span>}
-          </div>
-        </form>
-      </section>
-
-      <section className="rounded-xl border p-6">
-        <h2 className="text-lg font-semibold mb-4">Services</h2>
-        {q.isLoading ? (
-          <p>Loading…</p>
-        ) : (
-          <div className="divide-y">
-            {q.data?.map((svc) => (
-              <div key={svc.id} className="py-3 flex items-center justify-between">
-                <div>
-                  <div className="font-medium">{svc.name}</div>
-                  <div className="text-xs text-gray-600">{svc.code}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="rounded-md border px-3 py-1.5"
-                    onClick={() => toggleMut.mutate(svc)}
-                    disabled={toggleMut.isPending}
-                  >
-                    {svc.active ? "Disable" : "Enable"}
-                  </button>
-                  <button
-                    className="rounded-md border px-3 py-1.5"
-                    onClick={() => delMut.mutate(svc.id)}
-                    disabled={delMut.isPending}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </main>
-  );
-}
-
-```
-
-# c:/EForgeIT/gtc/apps/web/src/components/protected.tsx
-```tsx
-"use client";
-
-import Protected from "@/components/protected";
-import { useAuth } from "@/providers/auth-provider";
-
-export default function Dashboard() {
-  const { user } = useAuth();
-  return (
-    <Protected>
-      <main className="p-6 space-y-6">
-        <header className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-        </header>
-
-        <section className="rounded-xl border p-6">
-          <p className="text-lg">
-            Welcome, <span className="font-semibold">{user?.name}</span>.
-          </p>
-          <p className="text-gray-600 mt-2">
-            Your role: <span className="font-mono">{user?.role}</span>
-          </p>
-        </section>
-      </main>
-    </Protected>
-  );
-}
-
-```
-
-# c:/EForgeIT/gtc/apps/web/src/components/protected.tsx
-
-```tsx
-"use client";
-
-import { useEffect } from "react";
-import { useAuth } from "@/providers/auth-provider";
-import { useRouter } from "next/navigation";
-
-export default function Protected({ children }: { children: React.ReactNode }) {
-  const { isAuthed } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isAuthed) router.replace("/login");
-  }, [isAuthed, router]);
-
-  if (!isAuthed) return null;
-  return <>{children}</>;
-}
-```
-
-# c:/EForgeIT/gtc/apps/web/src/lib/axios.ts
-
-```typescript
-// apps/web/src/lib/axios.ts
-import axios from "axios";
-export const api = axios.create({ baseURL: process.env.NEXT_PUBLIC_API_URL });
-
-let onUnauthorized: (() => void) | null = null;
-export function setOnUnauthorized(cb: () => void) {
-  onUnauthorized = cb;
-}
-
-api.interceptors.response.use(
-  (r) => r,
-  (err) => {
-    const status = err?.response?.status;
-    if (status === 401 && onUnauthorized) onUnauthorized();
-    return Promise.reject(err);
+conventionsRouter.post(
+  "/prefill",
+  requireRole("GTC_POINT", "ADMIN"),
+  async (req, res) => {
+    const parsed = prefillSchema.safeParse(req.body || {});
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ error: "ValidationError", issues: parsed.error.issues });
+
+    let pointName = parsed.data.pointName;
+    if (!pointName && req.user!.role === "GTC_POINT") {
+      const me = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        include: { gtcPoint: true },
+      });
+      pointName = me?.gtcPoint?.name || undefined;
+    }
+
+    const pdf = await buildPrefillPdf({
+      title: parsed.data.title,
+      applicantName: parsed.data.applicantName,
+      pointName,
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="convention-prefill.pdf"`
+    );
+    res.send(pdf);
+  }
+);
+
+// 4.3 Upload signed convention file → stores file + creates ConventionDocument + update status + notify admins
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+}); // 15MB
+
+conventionsRouter.post(
+  "/:id/upload",
+  requireRole("GTC_POINT", "ADMIN"),
+  upload.single("file"),
+  async (req, res) => {
+    const id = req.params.id;
+    const conv = await prisma.convention.findUnique({
+      where: { id },
+      include: { gtcPoint: true, sector: true },
+    });
+    if (!conv) return res.status(404).json({ error: "Convention not found" });
+
+    // GTC point can only upload to its own convention
+    if (req.user!.role === "GTC_POINT") {
+      const belongs = await prisma.user.findFirst({
+        where: { id: req.user!.id, gtcPointId: conv.gtcPointId },
+        select: { id: true },
+      });
+      if (!belongs) return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const file = req.file;
+    if (!file)
+      return res
+        .status(400)
+        .json({ error: "file is required (multipart/form-data)" });
+
+    if (conv.status === "APPROVED" || conv.status === "DECLINED") {
+      return res
+        .status(409)
+        .json({ error: "Convention is finalized; uploads are locked" });
+    }
+
+    const was = conv.status;
+
+    // PDF magic bytes: %PDF
+    const b = file.buffer;
+    const isPdfMagic =
+      b.length >= 4 &&
+      b[0] === 0x25 &&
+      b[1] === 0x50 &&
+      b[2] === 0x44 &&
+      b[3] === 0x46;
+    if (!isPdfMagic)
+      return res
+        .status(400)
+        .json({ error: "File does not look like a valid PDF" });
+
+    const mime =
+      file.mimetype ||
+      mimeLookup(file.originalname) ||
+      "application/octet-stream";
+    if (!String(mime).startsWith("application/pdf")) {
+      return res.status(400).json({ error: "Only PDF uploads are allowed" });
+    }
+
+    const stored = await storage.put({
+      buffer: file.buffer,
+      mime: String(mime),
+      originalName: file.originalname,
+    });
+
+    const { doc, statusChanged } = await prisma.$transaction(async (tx) => {
+      const created = await tx.conventionDocument.create({
+        data: {
+          conventionId: conv.id,
+          kind: "SIGNED",
+          fileName: stored.fileName,
+          path: stored.path,
+          mime: stored.mime,
+          size: stored.size,
+          checksum: stored.checksum,
+          uploadedById: req.user!.id,
+        },
+      });
+
+      let changed = false;
+      if (was !== "UPLOADED") {
+        await tx.convention.update({
+          where: { id: conv.id },
+          data: { status: "UPLOADED" },
+        });
+        changed = true;
+      }
+      return { doc: created, statusChanged: changed };
+    });
+
+    if (statusChanged) {
+      await onConventionUploaded(conv.id);
+    }
+
+    res
+      .status(201)
+      .json({ ok: true, document: doc, downloadUrl: `/uploads${stored.path}` });
+  }
+);
+
+// 4.4 List my conventions (point sees own, admin sees all)
+conventionsRouter.get(
+  "/",
+  requireRole("GTC_POINT", "ADMIN"),
+  async (req, res) => {
+    const page = Math.max(1, Number(req.query.page ?? 1));
+    const pageSize = Math.min(
+      100,
+      Math.max(1, Number(req.query.pageSize ?? 20))
+    );
+
+    const where =
+      req.user!.role === "ADMIN"
+        ? {}
+        : {
+            gtcPoint: { users: { some: { id: req.user!.id } } },
+          };
+
+    const [items, total] = await Promise.all([
+      prisma.convention.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          gtcPoint: true,
+          sector: true,
+          documents: { orderBy: { createdAt: "desc" } },
+        },
+      }),
+      prisma.convention.count({ where }),
+    ]);
+
+    res.json({ items, total, page, pageSize });
+  }
+);
+
+// list documents for a convention
+conventionsRouter.get(
+  "/:id/documents",
+  requireRole("GTC_POINT", "ADMIN"),
+  async (req, res) => {
+    const id = req.params.id;
+    const docConv = await prisma.convention.findUnique({
+      where: { id },
+      include: {
+        gtcPoint: { include: { users: { select: { id: true } } } },
+        documents: true,
+      },
+    });
+    if (!docConv)
+      return res.status(404).json({ error: "Convention not found" });
+
+    if (req.user!.role !== "ADMIN") {
+      const allowed = docConv.gtcPoint.users.some((u) => u.id === req.user!.id);
+      if (!allowed) return res.status(403).json({ error: "Forbidden" });
+    }
+
+    res.json({ items: docConv.documents });
+  }
+);
+
+// download a single document (auth-checked)
+conventionsRouter.get(
+  "/:id/documents/:docId/download",
+  requireRole("GTC_POINT", "ADMIN"),
+  async (req, res) => {
+    const { id, docId } = req.params;
+    const doc = await prisma.conventionDocument.findUnique({
+      where: { id: docId },
+      include: {
+        convention: {
+          include: {
+            gtcPoint: { include: { users: { select: { id: true } } } },
+          },
+        },
+      },
+    });
+    if (!doc || doc.conventionId !== id)
+      return res.status(404).json({ error: "Document not found" });
+
+    if (req.user!.role !== "ADMIN") {
+      const allowed = doc.convention.gtcPoint.users.some(
+        (u) => u.id === req.user!.id
+      );
+      if (!allowed) return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const absPath = path.resolve("uploads", "." + doc.path); // same folder you already use
+    try {
+      await fs.access(absPath);
+    } catch {
+      return res.status(410).json({ error: "File missing from storage" });
+    }
+
+    res.setHeader("Content-Type", doc.mime);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${doc.fileName}"`
+    );
+    res.sendFile(absPath);
   }
 );
 ```
 
-# c:/EForgeIT/gtc/apps/web/src/lib/queryClient.ts
+# c:/EForgeIT/gtc/apps/api/src/services/conventions.ts
 
 ```typescript
-// apps/web/src/lib/queryClient.ts
-import { QueryClient } from "@tanstack/react-query";
-export const queryClient = new QueryClient();
-```
+import { prisma } from "../lib/prisma";
+import { notifyUser, notifyUsers } from "./notifications";
 
-# c:/EForgeIT/gtc/apps/web/src/lib/utils.ts
-
-```typescript
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+export async function getAdmins() {
+  const admins = await prisma.user.findMany({
+    where: { role: "ADMIN" as any },
+    select: { id: true, email: true },
+  });
+  return admins.map((a) => a.id);
 }
 
+export async function getPointUsers(gtcPointId: string) {
+  const users = await prisma.user.findMany({
+    where: { gtcPointId },
+    select: { id: true },
+  });
+  return users.map((u) => u.id);
+}
+
+export async function onConventionUploaded(conventionId: string) {
+  const c = await prisma.convention.findUnique({
+    where: { id: conventionId },
+    include: { gtcPoint: true, sector: true },
+  });
+  if (!c) return;
+
+  const subject = `Convention uploaded: ${c.gtcPoint.name} (${c.sector.name})`;
+  const html = `<p>A new signed convention was uploaded.</p>
+<p><b>Point:</b> ${c.gtcPoint.name}<br/>
+<b>Sector:</b> ${c.sector.name}<br/>
+<b>Convention ID:</b> ${c.id}</p>`;
+
+  const adminIds = await getAdmins();
+  await notifyUsers(adminIds, {
+    type: "CONVENTION_UPLOADED",
+    subject,
+    contentHtml: html,
+  });
+}
+
+export async function onConventionDecision(
+  conventionId: string,
+  approved: boolean,
+  internalSalesRep?: string
+) {
+  const c = await prisma.convention.findUnique({
+    where: { id: conventionId },
+    include: { gtcPoint: true, sector: true },
+  });
+  if (!c) return;
+
+  const subject = `Convention ${approved ? "APPROVED" : "DECLINED"}: ${
+    c.gtcPoint.name
+  }`;
+  const html = `<p>Your convention has been <b>${
+    approved ? "APPROVED" : "DECLINED"
+  }</b>.</p>
+<p><b>Convention ID:</b> ${c.id}${
+    internalSalesRep
+      ? `<br/><b>Internal Sales Rep:</b> ${internalSalesRep}`
+      : ""
+  }</p>`;
+
+  const pointUsers = await getPointUsers(c.gtcPointId);
+  await notifyUsers(pointUsers, {
+    type: "CONVENTION_STATUS",
+    subject,
+    contentHtml: html,
+  });
+}
 ```
 
-# c:/EForgeIT/gtc/apps/web/src/providers/auth-provider.tsx
+# c:/EForgeIT/gtc/apps/api/src/storage/provider.ts
 
-```tsx
-"use client";
+```typescript
+import path from "node:path";
+import { promises as fs } from "node:fs";
+import { randomUUID, createHash } from "node:crypto";
+import sanitize from "sanitize-filename";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { api, setOnUnauthorized } from "@/lib/axios";
+const ROOT = process.env.FILE_STORAGE_ROOT || "./uploads";
 
-export type Role = "ADMIN" | "SECTOR_OWNER" | "GTC_POINT" | "EXTERNAL";
-export type User = { id: string; name: string; email: string; role: Role };
-
-type AuthState = {
-  user: User | null;
-  token: string | null;
-};
-type AuthCtx = {
-  user: User | null;
-  token: string | null;
-  isAuthed: boolean;
-  login: (data: { token: string; user: User }) => void;
-  logout: () => void;
+export type StoredFile = {
+  fileName: string; // the final stored file name (uuid-original)
+  path: string; // relative path under uploads, e.g. /2025/09/uuid-name.pdf
+  mime: string;
+  size: number;
+  checksum: string; // sha256
 };
 
-const AuthContext = createContext<AuthCtx | null>(null);
+export interface IStorage {
+  put(opts: {
+    buffer: Buffer;
+    mime: string;
+    originalName: string;
+  }): Promise<StoredFile>;
+  remove(relPath: string): Promise<void>;
+}
 
-const STORAGE_KEY = "gtc_auth";
+export class LocalStorage implements IStorage {
+  async put({
+    buffer,
+    mime,
+    originalName,
+  }: {
+    buffer: Buffer;
+    mime: string;
+    originalName: string;
+  }): Promise<StoredFile> {
+    const now = new Date();
+    const year = String(now.getFullYear());
+    const month = String(now.getMonth() + 1).padStart(2, "0");
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [{ user, token }, setState] = useState<AuthState>({
-    user: null,
-    token: null,
+    const safeName = sanitize(originalName) || "file";
+    const fileName = `${randomUUID()}-${safeName}`;
+    const relDir = path.posix.join("/", year, month);
+    const relPath = path.posix.join(relDir, fileName);
+
+    const absDir = path.resolve(ROOT, "." + relDir);
+    const absPath = path.resolve(ROOT, "." + relPath);
+
+    await fs.mkdir(absDir, { recursive: true });
+    await fs.writeFile(absPath, buffer);
+
+    const checksum = createHash("sha256").update(buffer).digest("hex");
+
+    return { fileName, path: relPath, mime, size: buffer.length, checksum };
+  }
+
+  async remove(relPath: string) {
+    const abs = path.resolve(ROOT, "." + relPath);
+    await fs.rm(abs, { force: true });
+  }
+}
+
+export const storage: IStorage = new LocalStorage();
+```
+
+# c:/EForgeIT/gtc/apps/api/src/utils/pdf.ts
+
+```typescript
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+
+export async function buildPrefillPdf(fields: {
+  title?: string; // e.g. "GTC Convention"
+  applicantName?: string; // optional
+  pointName?: string; // optional
+}) {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]); // A4
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+
+  const title = fields.title ?? "GTC Convention";
+  page.drawText(title, { x: 50, y: 780, size: 22, font, color: rgb(0, 0, 0) });
+
+  let y = 740;
+  const drawLine = (label: string, value?: string) => {
+    page.drawText(label, { x: 50, y, size: 12, font });
+    page.drawText(value ?? "", { x: 200, y, size: 12, font });
+    y -= 24;
+  };
+
+  drawLine("Applicant Name:", fields.applicantName ?? "");
+  drawLine("GTC Point:", fields.pointName ?? "");
+  drawLine("Date:", new Date().toISOString().split("T")[0]);
+
+  // signature box
+  page.drawRectangle({
+    x: 50,
+    y: 620,
+    width: 220,
+    height: 50,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 1,
+  });
+  page.drawText("Signature (after print & sign):", {
+    x: 55,
+    y: 675,
+    size: 10,
+    font,
   });
 
-  // load from storage on first mount
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed: AuthState = JSON.parse(raw);
-        setState(parsed);
-        if (parsed.token) {
-          api.defaults.headers.common.Authorization = `Bearer ${parsed.token}`;
-        }
-      }
-    } catch {}
-  }, []);
-
-  // global 401 handler
-  useEffect(() => {
-    setOnUnauthorized(() => logout);
-  }, []);
-
-  const login = (data: { token: string; user: User }) => {
-    setState({ user: data.user, token: data.token });
-    api.defaults.headers.common.Authorization = `Bearer ${data.token}`;
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ user: data.user, token: data.token })
-    );
-  };
-
-  const logout = () => {
-    setState({ user: null, token: null });
-    delete api.defaults.headers.common.Authorization;
-    localStorage.removeItem(STORAGE_KEY);
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
-  };
-
-  const value = useMemo<AuthCtx>(
-    () => ({ user, token, isAuthed: Boolean(user && token), login, logout }),
-    [user, token]
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const bytes = await doc.save();
+  return Buffer.from(bytes);
 }
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
-  return ctx;
-}
-
-```
-
-# c:/EForgeIT/gtc/apps/web/src/providers/query-provider.tsx
-
-```tsx
-"use client";
-
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { PropsWithChildren, useState } from "react";
-
-export default function QueryProvider({ children }: PropsWithChildren) {
-  const [client] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: { refetchOnWindowFocus: false, retry: 1 },
-          mutations: { retry: 0 },
-        },
-      })
-  );
-
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-}
-
 ```
