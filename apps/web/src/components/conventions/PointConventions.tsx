@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useCreateConvention, useListDocuments, useMyConventions, downloadDocument } from "../../hooks/useConventions";
+import { useCreateConvention,  useMyConventions, downloadDocument } from "../../hooks/useConventions";
 import PrefillForm from "./PrefillForm";
 import UploadSigned from "./UploadSigned";
 import { Button } from "../../components/ui/button";
@@ -71,6 +71,10 @@ return (
 Download
 </Button>
 <span className="text-xs text-muted-foreground">{d.fileName}</span>
+ <span className="text-muted-foreground">
+          {" "}
+          · {d.mime || "file"} · {(d.size / 1024).toFixed(0)} KB
+        </span>
 </li>
 ))}
 </ul>

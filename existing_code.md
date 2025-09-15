@@ -688,6 +688,10 @@ import { z } from "zod";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
 import { onConventionDecision } from "../services/conventions";
+import path from "node:path";
+import fs from "node:fs/promises";
+import archiver from "archiver";
+import sanitize from "sanitize-filename";
 
 export const adminConventions = Router();
 adminConventions.use(requireAuth, requireRole("ADMIN"));
@@ -733,6 +737,51 @@ adminConventions.patch("/:id", async (req, res) => {
   await onConventionDecision(conv.id, approved, body.data.internalSalesRep);
 
   res.json(conv);
+});
+
+
+// GET /api/admin/conventions/:id/archive → zip all documents for a convention (admin-only)
+adminConventions.get("/:id/archive", async (req, res) => {
+  const { id } = z.object({ id: z.string().min(1) }).parse(req.params);
+
+  // pull convention + docs (ordered newest first)
+  const conv = await prisma.convention.findUnique({
+    where: { id },
+    include: { gtcPoint: true, sector: true, documents: { orderBy: { createdAt: "desc" } } },
+  });
+  if (!conv) return res.status(404).json({ error: "Convention not found" });
+
+  // filename: convention-<id>-<point>-<sector>.zip (sanitized)
+  const safePoint = sanitize(conv.gtcPoint?.name ?? "point");
+  const safeSector = sanitize(conv.sector?.name ?? "sector");
+  const zipName = `convention-${conv.id}-${safePoint}-${safeSector}.zip`;
+
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
+
+  const archive = archiver("zip", { zlib: { level: 9 } });
+  archive.on("error", (err) => {
+    // terminate stream on error
+    res.status(500).end();
+  });
+
+  archive.pipe(res);
+
+  // add each existing file by absolute path; name inside zip = timestamp_kind_filename
+  for (const d of conv.documents) {
+    const absPath = path.resolve("uploads", "." + d.path); // mirrors your single-file download path
+    try {
+      await fs.access(absPath);
+      const ts = new Date(d.createdAt).toISOString().replace(/[:T]/g, "-").slice(0, 19);
+      const entryName = `${ts}_${d.kind}_${sanitize(d.fileName)}`;
+      archive.file(absPath, { name: entryName });
+    } catch {
+      // skip missing file (keeps export resilient)
+    }
+  }
+
+  // finalize stream
+  void archive.finalize();
 });
 
 ```
@@ -3141,10 +3190,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 ```
 "use client";
 import { useState } from "react";
-import { useAdminConventions, useAdminDecision } from "../../hooks/useConventions";
+import { downloadArchive, useAdminConventions, useAdminDecision } from "../../hooks/useConventions";
 import type { ConventionStatus } from "../../lib/types";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { downloadBlob } from "@/lib/axios";
 
 
 const statusTabs: (ConventionStatus | "ALL")[] = ["ALL", "NEW", "UPLOADED", "APPROVED", "DECLINED"];
@@ -3220,6 +3270,17 @@ return (
 <Input placeholder="Internal Sales Rep (optional)" value={rep} onChange={(e) => setRep(e.target.value)} />
 <Button size="sm" onClick={() => decision.mutate({ action: "APPROVE", internalSalesRep: rep || undefined })}>Approve</Button>
 <Button size="sm" variant="destructive" onClick={() => decision.mutate({ action: "DECLINE" })}>Decline</Button>
+<Button
+    size="sm"
+    variant="outline"
+    onClick={async () => {
+      const { blob, filename } = await downloadArchive(id);
+      downloadBlob(blob, filename);
+    }}
+    title="Download all documents as ZIP"
+  >
+    ZIP
+  </Button>
 </div>
 ) : (
 <span className="text-muted-foreground">—</span>
@@ -3234,7 +3295,7 @@ return (
 ```
 "use client";
 import { useState } from "react";
-import { useCreateConvention, useListDocuments, useMyConventions, downloadDocument } from "../../hooks/useConventions";
+import { useCreateConvention,  useMyConventions, downloadDocument } from "../../hooks/useConventions";
 import PrefillForm from "./PrefillForm";
 import UploadSigned from "./UploadSigned";
 import { Button } from "../../components/ui/button";
@@ -3305,6 +3366,10 @@ return (
 Download
 </Button>
 <span className="text-xs text-muted-foreground">{d.fileName}</span>
+ <span className="text-muted-foreground">
+          {" "}
+          · {d.mime || "file"} · {(d.size / 1024).toFixed(0)} KB
+        </span>
 </li>
 ))}
 </ul>
@@ -3326,6 +3391,137 @@ Download
 </div>
 );
 }
+```
+
+# apps/web/src/components/files.UploadWidget.tsx
+```
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import { Button } from "../../components/ui/button";
+
+type Props = {
+  accept?: string | string[];       // e.g. "application/pdf" or [".pdf","image/*"]
+  maxSizeMB?: number;                // e.g. 10
+  value?: File | null;
+  onSelect: (file: File | null) => void;
+  disabled?: boolean;
+  hint?: string;
+  className?: string;
+};
+
+function toArray(a?: string | string[]) {
+  if (!a) return [] as string[];
+  return Array.isArray(a) ? a : a.split(",").map((s) => s.trim());
+}
+function matchesAccept(file: File, accept?: string | string[]) {
+  const list = toArray(accept).map((s) => s.toLowerCase());
+  if (!list.length) return true;
+  const mime = (file.type || "").toLowerCase();
+  const name = (file.name || "").toLowerCase();
+  return list.some((a) => {
+    if (a.startsWith(".")) return name.endsWith(a);
+    if (a.endsWith("/*")) return mime.startsWith(a.slice(0, -1));
+    return mime === a;
+  });
+}
+
+export default function UploadWidget({
+  accept = "application/pdf",
+  maxSizeMB = 10,
+  value = null,
+  onSelect,
+  disabled,
+  hint,
+  className = "",
+}: Props) {
+  const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const validateAndSet = useCallback(
+    (file: File) => {
+      if (maxSizeMB && file.size > maxSizeMB * 1024 * 1024) {
+        setError(`File is too large (max ${maxSizeMB}MB).`);
+        onSelect(null);
+        return;
+      }
+      if (!matchesAccept(file, accept)) {
+        setError("File type not allowed.");
+        onSelect(null);
+        return;
+      }
+      setError(null);
+      onSelect(file);
+    },
+    [accept, maxSizeMB, onSelect]
+  );
+
+  const handleFiles = (files: FileList | null) => {
+    const f = files?.[0];
+    if (f) validateAndSet(f);
+  };
+
+  return (
+    <div className={className}>
+      <div
+        className={[
+          "rounded-lg border border-dashed p-4 text-sm",
+          "flex items-center justify-between gap-3",
+          dragOver ? "bg-muted/40" : "bg-muted/20",
+          disabled ? "opacity-60 pointer-events-none" : "",
+        ].join(" ")}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          handleFiles(e.dataTransfer?.files ?? null);
+        }}
+        onClick={() => inputRef.current?.click()}
+        role="button"
+        aria-disabled={disabled}
+      >
+        <div className="flex-1">
+          {value ? (
+            <div className="flex flex-col">
+              <span className="font-medium">{value.name}</span>
+              <span className="text-xs text-muted-foreground">
+                {(value.size / 1024).toFixed(0)} KB
+              </span>
+            </div>
+          ) : (
+            <div className="text-muted-foreground">
+              Drop a file here or <span className="underline">browse</span>
+            </div>
+          )}
+        </div>
+        <Button type="button" variant="outline" size="sm">
+          Choose file
+        </Button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={toArray(accept).join(",")}
+          className="hidden"
+          onChange={(e) => handleFiles(e.target.files)}
+          disabled={disabled}
+        />
+      </div>
+
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">
+          {hint ?? `Accepted: ${toArray(accept).join(", ") || "any"} · Max ${maxSizeMB}MB`}
+        </span>
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
 ```
 
 # apps/web/src/components/services/ServiceStatusBadge.tsx
@@ -3391,6 +3587,8 @@ return (
 import { useState } from "react";
 import { useUploadSigned } from "../../hooks/useConventions";
 import { Button } from "../../components/ui/button";
+import UploadWidget from "../files/UploadWidget";
+import { AxiosProgressEvent } from "axios";
 
 
 export default function UploadSigned({ conventionId }: { conventionId: string }) {
@@ -3399,22 +3597,33 @@ const [progress, setProgress] = useState<number | null>(null);
 const mutation = useUploadSigned(conventionId);
 
 
-async function onUpload() {
-if (!file) return;
-setProgress(0);
-await mutation.mutateAsync(file);
-setProgress(null);
-setFile(null);
-}
+  async function onUpload() {
+    if (!file) return;
+    setProgress(0);
+    await mutation.mutateAsync({
+      file,
+      onUploadProgress: (p: AxiosProgressEvent) => {
+        if (!p.total) return;
+        const pct = Math.round((p.loaded / p.total) * 100);
+        setProgress(pct);
+      },
+    });
+    setProgress(null);
+    setFile(null);
+  }
 
 
 return (
 <div className="flex items-center gap-3">
-<input
-type="file"
-accept="application/pdf"
-onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-/>
+<UploadWidget
+        accept="application/pdf"
+        maxSizeMB={10}
+        value={file}
+        onSelect={setFile}
+        disabled={mutation.isPending}
+        hint="Signed PDF only · Max 10MB"
+        className="min-w-[360px]"
+      />
 <Button disabled={!file || mutation.isPending} onClick={onUpload}>
 {mutation.isPending ? "Uploading…" : "Upload signed PDF"}
 </Button>
@@ -3553,7 +3762,7 @@ export default function Protected({ children }: { children: React.ReactNode }) {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/axios";
 import type { Convention, ConventionDocument, ConventionStatus } from "../lib/types";
-
+import type { AxiosProgressEvent, AxiosResponseHeaders } from "axios";
 
 export function useMyConventions(page = 1, pageSize = 20) {
 return useQuery({
@@ -3595,16 +3804,23 @@ qc.invalidateQueries({ queryKey: ["conventions"] });
 });
 }
 
+type UploadSignedVars = {
+  file: File;
+  onUploadProgress?: (e: AxiosProgressEvent) => void;
+};
+
 export function useUploadSigned(conventionId: string) {
 const qc = useQueryClient();
-return useMutation({
-mutationFn: async (file: File) => {
+return useMutation<
+    { ok: boolean; document: ConventionDocument; downloadUrl: string },
+    Error,
+    UploadSignedVars
+  >({
+mutationFn: async ({ file, onUploadProgress }) => {
 const fd = new FormData();
 fd.append("file", file);
-const { data } = await api.post(`/api/conventions/${conventionId}/upload`, fd, {
-headers: { "Content-Type": "multipart/form-data" },
-});
-return data as { ok: boolean; document: ConventionDocument; downloadUrl: string };
+const r = await api.post(`/api/conventions/${conventionId}/upload`, fd,  { onUploadProgress });
+ return r.data;
 },
 onSuccess: () => {
 qc.invalidateQueries({ queryKey: ["conventions"] });
@@ -3652,6 +3868,23 @@ qc.invalidateQueries({ queryKey: ["admin-conventions"] });
 qc.invalidateQueries({ queryKey: ["conventions"] });
 },
 });
+}
+
+function parseContentDispositionFilename(h?: string): string | null {
+  if (!h) return null;
+  // handles: filename="x.zip" OR filename*=UTF-8''x.zip
+  const mUtf = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(h);
+  if (mUtf?.[1]) return decodeURIComponent(mUtf[1].replace(/^["']|["']$/g, ""));
+  const m = /filename=([^;]+)/i.exec(h);
+  if (m?.[1]) return m[1].trim().replace(/^["']|["']$/g, "");
+  return null;
+}
+
+export async function downloadArchive(conventionId: string): Promise<{ blob: Blob; filename: string }> {
+  const r = await api.get(`/api/admin/conventions/${conventionId}/archive`, { responseType: "blob" });
+  const headers = (r.headers ?? {}) as AxiosResponseHeaders;
+  const filename = parseContentDispositionFilename(headers["content-disposition"]) || `convention-${conventionId}.zip`;
+  return { blob: r.data as Blob, filename };
 }
 ```
 

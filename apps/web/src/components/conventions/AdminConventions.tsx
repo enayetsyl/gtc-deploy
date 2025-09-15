@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
-import { useAdminConventions, useAdminDecision } from "../../hooks/useConventions";
+import { downloadArchive, useAdminConventions, useAdminDecision } from "../../hooks/useConventions";
 import type { ConventionStatus } from "../../lib/types";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { downloadBlob } from "@/lib/axios";
 
 
 const statusTabs: (ConventionStatus | "ALL")[] = ["ALL", "NEW", "UPLOADED", "APPROVED", "DECLINED"];
@@ -79,6 +80,17 @@ return (
 <Input placeholder="Internal Sales Rep (optional)" value={rep} onChange={(e) => setRep(e.target.value)} />
 <Button size="sm" onClick={() => decision.mutate({ action: "APPROVE", internalSalesRep: rep || undefined })}>Approve</Button>
 <Button size="sm" variant="destructive" onClick={() => decision.mutate({ action: "DECLINE" })}>Decline</Button>
+<Button
+    size="sm"
+    variant="outline"
+    onClick={async () => {
+      const { blob, filename } = await downloadArchive(id);
+      downloadBlob(blob, filename);
+    }}
+    title="Download all documents as ZIP"
+  >
+    ZIP
+  </Button>
 </div>
 ) : (
 <span className="text-muted-foreground">—</span>

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/axios";
 import type { Convention, ConventionDocument, ConventionStatus } from "../lib/types";
-
+import type { AxiosProgressEvent, AxiosResponseHeaders } from "axios";
 
 export function useMyConventions(page = 1, pageSize = 20) {
 return useQuery({
@@ -43,16 +43,23 @@ qc.invalidateQueries({ queryKey: ["conventions"] });
 });
 }
 
+type UploadSignedVars = {
+  file: File;
+  onUploadProgress?: (e: AxiosProgressEvent) => void;
+};
+
 export function useUploadSigned(conventionId: string) {
 const qc = useQueryClient();
-return useMutation({
-mutationFn: async (file: File) => {
+return useMutation<
+    { ok: boolean; document: ConventionDocument; downloadUrl: string },
+    Error,
+    UploadSignedVars
+  >({
+mutationFn: async ({ file, onUploadProgress }) => {
 const fd = new FormData();
 fd.append("file", file);
-const { data } = await api.post(`/api/conventions/${conventionId}/upload`, fd, {
-headers: { "Content-Type": "multipart/form-data" },
-});
-return data as { ok: boolean; document: ConventionDocument; downloadUrl: string };
+const r = await api.post(`/api/conventions/${conventionId}/upload`, fd,  { onUploadProgress });
+ return r.data;
 },
 onSuccess: () => {
 qc.invalidateQueries({ queryKey: ["conventions"] });
@@ -100,4 +107,21 @@ qc.invalidateQueries({ queryKey: ["admin-conventions"] });
 qc.invalidateQueries({ queryKey: ["conventions"] });
 },
 });
+}
+
+function parseContentDispositionFilename(h?: string): string | null {
+  if (!h) return null;
+  // handles: filename="x.zip" OR filename*=UTF-8''x.zip
+  const mUtf = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(h);
+  if (mUtf?.[1]) return decodeURIComponent(mUtf[1].replace(/^["']|["']$/g, ""));
+  const m = /filename=([^;]+)/i.exec(h);
+  if (m?.[1]) return m[1].trim().replace(/^["']|["']$/g, "");
+  return null;
+}
+
+export async function downloadArchive(conventionId: string): Promise<{ blob: Blob; filename: string }> {
+  const r = await api.get(`/api/admin/conventions/${conventionId}/archive`, { responseType: "blob" });
+  const headers = (r.headers ?? {}) as AxiosResponseHeaders;
+  const filename = parseContentDispositionFilename(headers["content-disposition"]) || `convention-${conventionId}.zip`;
+  return { blob: r.data as Blob, filename };
 }
