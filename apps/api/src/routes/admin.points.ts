@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
+import { onServiceStatusChanged } from "../services/services";
 
 export const adminPoints = Router();
 adminPoints.use(requireAuth, requireRole("ADMIN"));
@@ -62,4 +63,39 @@ adminPoints.delete("/:id", async (req, res) => {
   if (svcCount > 0) return res.status(409).json({ error: "Point has service links; remove them first." });
   await prisma.gtcPoint.delete({ where: { id } });
   res.json({ ok: true });
+});
+
+// list services for a point (optional helper)
+adminPoints.get("/:id/services", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const items = await prisma.gtcPointService.findMany({
+    where: { gtcPointId: id },
+    include: { service: true },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json({ items });
+});
+
+const svcActionSchema = z.object({ action: z.enum(["ENABLE", "DISABLE"]) });
+
+/** PATCH /api/admin/points/:id/services/:serviceId  { action: "ENABLE"|"DISABLE" } */
+adminPoints.patch("/:id/services/:serviceId", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const serviceId = z.string().min(1).parse(req.params.serviceId);
+  const body = svcActionSchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
+
+  const svc = await prisma.service.findUnique({ where: { id: serviceId } });
+  if (!svc) return res.status(404).json({ error: "Service not found" });
+
+  const status = body.data.action === "ENABLE" ? "ENABLED" : "DISABLED";
+  const link = await prisma.gtcPointService.upsert({
+    where: { gtcPointId_serviceId: { gtcPointId: id, serviceId } },
+    update: { status },
+    create: { gtcPointId: id, serviceId, status },
+  });
+
+  await onServiceStatusChanged(id, serviceId, status as any);
+
+  res.json(link);
 });

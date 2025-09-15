@@ -742,6 +742,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
+import { onServiceStatusChanged } from "../services/services";
 
 export const adminPoints = Router();
 adminPoints.use(requireAuth, requireRole("ADMIN"));
@@ -802,6 +803,41 @@ adminPoints.delete("/:id", async (req, res) => {
   if (svcCount > 0) return res.status(409).json({ error: "Point has service links; remove them first." });
   await prisma.gtcPoint.delete({ where: { id } });
   res.json({ ok: true });
+});
+
+// list services for a point (optional helper)
+adminPoints.get("/:id/services", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const items = await prisma.gtcPointService.findMany({
+    where: { gtcPointId: id },
+    include: { service: true },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json({ items });
+});
+
+const svcActionSchema = z.object({ action: z.enum(["ENABLE", "DISABLE"]) });
+
+/** PATCH /api/admin/points/:id/services/:serviceId  { action: "ENABLE"|"DISABLE" } */
+adminPoints.patch("/:id/services/:serviceId", async (req, res) => {
+  const { id } = idParam.parse(req.params);
+  const serviceId = z.string().min(1).parse(req.params.serviceId);
+  const body = svcActionSchema.safeParse(req.body);
+  if (!body.success) return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
+
+  const svc = await prisma.service.findUnique({ where: { id: serviceId } });
+  if (!svc) return res.status(404).json({ error: "Service not found" });
+
+  const status = body.data.action === "ENABLE" ? "ENABLED" : "DISABLED";
+  const link = await prisma.gtcPointService.upsert({
+    where: { gtcPointId_serviceId: { gtcPointId: id, serviceId } },
+    update: { status },
+    create: { gtcPointId: id, serviceId, status },
+  });
+
+  await onServiceStatusChanged(id, serviceId, status as any);
+
+  res.json(link);
 });
 
 ```
@@ -1316,6 +1352,88 @@ meNotifications.post("/:id/read", async (req, res) => {
 
 ```
 
+# apps/api/src/routes/point.services.ts
+```
+import { Router } from "express";
+import { prisma } from "../lib/prisma";
+import { z } from "zod";
+import { requireAuth, requireRole } from "../middleware/auth";
+import { onServiceRequested } from "../services/services";
+
+export const pointServices = Router();
+pointServices.use(requireAuth, requireRole("GTC_POINT"));
+
+async function myPointId(userId: string) {
+  const u = await prisma.user.findUnique({ where: { id: userId } });
+  if (!u?.gtcPointId) {
+    const err: any = new Error("User is not attached to a GTC Point");
+    err.status = 409;
+    throw err;
+  }
+  return u.gtcPointId;
+}
+
+/** GET /api/point/services → my point’s services (with Service details) */
+pointServices.get("/", async (req, res) => {
+  let pointId: string;
+  try {
+    pointId = await myPointId(req.user!.id);
+  } catch (e: any) {
+    return res.status(e.status ?? 500).json({ error: e.message ?? "Error" });
+  }
+  const items = await prisma.gtcPointService.findMany({
+    where: { gtcPointId: pointId },
+    include: { service: true },
+    orderBy: { createdAt: "desc" },
+  });
+  res.json({ items });
+});
+
+/** POST /api/point/services/requests → set PENDING_REQUEST (by id or code) */
+const requestSchema = z
+  .object({
+    serviceId: z.string().min(1).optional(),
+    serviceCode: z.string().regex(/^[A-Z0-9_]+$/).optional(),
+  })
+  .refine((d) => d.serviceId || d.serviceCode, { message: "serviceId or serviceCode required" });
+
+pointServices.post("/requests", async (req, res) => {
+  let pointId: string;
+  try {
+    pointId = await myPointId(req.user!.id);
+  } catch (e: any) {
+    return res.status(e.status ?? 500).json({ error: e.message ?? "Error" });
+  }
+
+  const parsed = requestSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
+
+  const svc = parsed.data.serviceId
+    ? await prisma.service.findUnique({ where: { id: parsed.data.serviceId } })
+    : await prisma.service.findUnique({ where: { code: parsed.data.serviceCode! } });
+  if (!svc || !svc.active) return res.status(404).json({ error: "Service not found or inactive" });
+
+  const existing = await prisma.gtcPointService.findUnique({
+    where: { gtcPointId_serviceId: { gtcPointId: pointId, serviceId: svc.id } },
+  });
+  if (existing?.status === "ENABLED") {
+    return res.status(409).json({ error: "Service already enabled for this point" });
+  }
+
+  const link = await prisma.gtcPointService.upsert({
+    where: { gtcPointId_serviceId: { gtcPointId: pointId, serviceId: svc.id } },
+    update: { status: "PENDING_REQUEST" },
+    create: { gtcPointId: pointId, serviceId: svc.id, status: "PENDING_REQUEST" },
+  });
+
+  await onServiceRequested(pointId, svc.id);
+
+  res.status(201).json(link);
+});
+
+```
+
+
 # apps/api/src/services/conventions.ts
 ```
 import { prisma } from "../lib/prisma";
@@ -1435,6 +1553,58 @@ export async function notifyUsers(
 }
 
 ```
+
+# apps/api/src/services/services.ts
+```
+import { prisma } from "../lib/prisma";
+import { notifyUsers } from "./notifications";
+import { getAdmins, getPointUsers } from "./conventions";
+
+/** Point → request a service (notifies Admins) */
+export async function onServiceRequested(gtcPointId: string, serviceId: string) {
+  const [point, service] = await Promise.all([
+    prisma.gtcPoint.findUnique({ where: { id: gtcPointId }, include: { sector: true } }),
+    prisma.service.findUnique({ where: { id: serviceId } }),
+  ]);
+  if (!point || !service) return;
+
+  const subject = `Service request: ${service.name} from ${point.name}`;
+  const html = `<p><b>Point:</b> ${point.name} / ${point.sector?.name ?? ""}<br/><b>Service:</b> ${service.name} (${service.code})</p>`;
+
+  const admins = await getAdmins();
+  await notifyUsers(admins, {
+    type: "SERVICE_REQUEST",
+    subject,
+    contentHtml: html,
+  });
+}
+
+/** Admin → enable/disable (notifies Point users) */
+export async function onServiceStatusChanged(
+  gtcPointId: string,
+  serviceId: string,
+  status: "ENABLED" | "DISABLED"
+) {
+  const [point, service] = await Promise.all([
+    prisma.gtcPoint.findUnique({ where: { id: gtcPointId }, include: { sector: true } }),
+    prisma.service.findUnique({ where: { id: serviceId } }),
+  ]);
+  if (!point || !service) return;
+
+  const subject = `Service ${status === "ENABLED" ? "enabled" : "disabled"}: ${service.name}`;
+  const html = `<p>Your service <b>${service.name}</b> has been <b>${status}</b>.</p>`;
+
+  const users = await getPointUsers(gtcPointId);
+  await notifyUsers(users, {
+    type: "SERVICE_STATUS",
+    subject,
+    contentHtml: html,
+  });
+}
+
+```
+
+
 # apps/api/src/socket/index.ts
 ```
 import type { Server } from "socket.io";
@@ -1632,7 +1802,7 @@ import { adminServices } from "./routes/admin.services";import { meNotifications
 import { devNotify } from "./routes/dev";
 import { conventionsRouter } from "./routes/conventions";     
 import { adminConventions } from "./routes/admin.conventions"; 
-
+import { pointServices } from "./routes/point.services";
 
 export const app = express();
 
@@ -1654,7 +1824,7 @@ app.use("/api/me/notifications", meNotifications);
 app.use("/api/dev", devNotify);
 app.use("/api/conventions", conventionsRouter);
 app.use("/api/admin/conventions", adminConventions);
-
+app.use("/api/point/services", pointServices);
 
 app.use(errorHandler);
 ```
@@ -1831,9 +2001,11 @@ export default nextConfig;
     "clsx": "^2.1.1",
     "lucide-react": "^0.543.0",
     "next": "15.5.2",
+    "next-themes": "^0.4.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "socket.io-client": "^4.8.1",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "zod": "^3.25.76"
   },
@@ -2034,6 +2206,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createPoint, listPoints, listSectors, type Point } from "@/lib/admin-api";
 import { useMemo, useState } from "react";
 import { z } from "zod";
+import Link from "next/link";
 
 const schema = z.object({
   name: z.string().min(2).max(200),
@@ -2132,6 +2305,16 @@ export default function PointsPage() {
                   <div className="text-xs text-gray-600">{p.email}</div>
                   <div className="text-xs text-gray-500 mt-1">Sector: {p.sector?.name ?? p.sectorId}</div>
                 </div>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/admin/points/${p.id}/services`}
+                    className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
+                    title="Manage services for this point"
+                  >
+                    Services
+                  </Link>
+                  {/* (optional) overview/edit buttons can go here too */}
+                </div>
               </div>
             ))}
           </div>
@@ -2142,6 +2325,123 @@ export default function PointsPage() {
 }
 
 ```
+
+# apps/web/src/app/(protected)/admin/points/[id]/services/page.tsx
+```
+"use client";
+
+import { useParams } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/lib/queryKeys/services";
+import { getAdminPointServices, ServiceLink, toggleAdminPointService } from "@/lib/clients/servicesClient";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import ServiceStatusBadge from "@/components/services/ServiceStatusBadge";
+import { toast } from "sonner";
+import { AxiosError } from "axios";
+import Link from "next/link";
+
+type ToggleVars = { serviceId: string; action: "ENABLE" | "DISABLE" };
+type ApiError = AxiosError<{ error?: string }>;
+type MutCtx = { prev?: ServiceLink[] };
+
+export default function AdminPointServicesPage() {
+  const params = useParams<{ id: string }>();
+  const pointId = params.id!;
+
+  const qc = useQueryClient();
+  const { data, isLoading, isError } = useQuery<ServiceLink[]>({
+    queryKey: qk.adminPointServices(pointId),
+    queryFn: () => getAdminPointServices(pointId),
+  });
+
+  const toggle = useMutation<ServiceLink, ApiError, ToggleVars,  MutCtx>({
+    mutationFn: ({ serviceId, action }: { serviceId: string; action: "ENABLE" | "DISABLE" }) =>
+      toggleAdminPointService(pointId, serviceId, action),
+    onMutate: async ({ serviceId, action }) => {
+      await qc.cancelQueries({ queryKey: qk.adminPointServices(pointId) });
+      const prev = qc.getQueryData<ServiceLink[]>(
+        qk.adminPointServices(pointId)
+      );
+
+      if (prev) {
+        const next: ServiceLink[] = prev.map((x) => (x.serviceId === serviceId ? { ...x, status: action === "ENABLE" ? "ENABLED" : "DISABLED" } : x));
+        qc.setQueryData(qk.adminPointServices(pointId), next);
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData<ServiceLink[]>(qk.adminPointServices(pointId), ctx.prev);
+      toast.error("Update failed");
+    },
+    onSuccess: (link) => {
+      toast.success(`Service ${link.status.toLowerCase()} for point`);
+      qc.invalidateQueries({ queryKey: qk.adminPointServices(pointId) });
+    },
+  });
+
+  return (
+    <div className="container mx-auto py-6 space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Point Services</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading && <p>Loading…</p>}
+          {isError && <p className="text-destructive">Failed to load.</p>}
+          {!isLoading && data && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[44%]">Service</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-medium">{row.service.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{row.service.code}</TableCell>
+                    <TableCell><ServiceStatusBadge status={row.status} /></TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={toggle.isPending || row.status === "ENABLED"}
+                        onClick={() => toggle.mutate({ serviceId: row.serviceId, action: "ENABLE" })}
+                      >
+                        Enable
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={toggle.isPending || row.status === "DISABLED"}
+                        onClick={() => toggle.mutate({ serviceId: row.serviceId, action: "DISABLE" })}
+                      >
+                        Disable
+                      </Button>
+                
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <p className="text-sm text-muted-foreground">
+        Changes notify the point in real-time (in-app + email).
+      </p>
+    </div>
+  );
+}
+
+```
+
 
 # apps/web/src/app/(protected)/admin/sectors/page.tsx
 ```
@@ -2542,8 +2842,93 @@ import PointConventionsPage from "../../../../components/conventions/PointConven
 export default function Page() { return <PointConventionsPage />; }
 ```
 
+# apps/web/src/app/(Protected)/point/services/page.tsx
+```
+"use client";
+
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/lib/queryKeys/services";
+import { getPointServices, requestServiceById, ServiceLink } from "@/lib/clients/servicesClient";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import ServiceStatusBadge from "@/components/services/ServiceStatusBadge";
+import { toast } from "sonner";
+import { AxiosError } from "axios";
+
+export default function PointServicesPage() {
+  const qc = useQueryClient();
+  const { data, isLoading, isError } = useQuery<ServiceLink[]>({ queryKey: qk.pointServices, queryFn: getPointServices });
+
+  const requestMut = useMutation<
+    ServiceLink,                            // return type
+    AxiosError<{ error?: string }>,         // error type
+    string                                  // variables type (serviceId)
+  >({
+    mutationFn: (serviceId: string) => requestServiceById(serviceId),
+    onSuccess: () => {
+      toast.success("Request sent to Admins");
+      qc.invalidateQueries({ queryKey: qk.pointServices });
+    },
+     onError: (err) => toast.error(err.response?.data?.error ?? "Failed to request service"),
+  });
+
+  return (
+    <div className="container mx-auto py-6 space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>My Services</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading && <p>Loading…</p>}
+          {isError && <p className="text-destructive">Failed to load.</p>}
+          {!isLoading && data && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[44%]">Service</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.map((row) => {
+                  const canRequest = row.status === "DISABLED";
+                  return (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-medium">{row.service.name}</TableCell>
+                      <TableCell className="text-muted-foreground">{row.service.code}</TableCell>
+                      <TableCell><ServiceStatusBadge status={row.status} /></TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          disabled={!canRequest || requestMut.isPending}
+                          onClick={() => requestMut.mutate(row.serviceId)}
+                        >
+                          {canRequest ? "Request" : row.status === "PENDING_REQUEST" ? "Pending…" : "—"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <p className="text-sm text-muted-foreground">
+        Tip: “Request” is only available for services that are currently <b>Disabled</b>.
+      </p>
+    </div>
+  );
+}
+```
+
 # apps/web/src/app/(protected)/layout.tsx
 ```
+"use client"
 import AdminNav from "@/components/admin-nav";
 import Protected from "@/components/protected";
 import NotificationBell from "@/components/notification-bell";
@@ -2943,6 +3328,23 @@ Download
 }
 ```
 
+# apps/web/src/components/services/ServiceStatusBadge.tsx
+```
+"use client";
+import { Badge } from "@/components/ui/badge";
+
+export default function ServiceStatusBadge({ status }: { status: "ENABLED" | "DISABLED" | "PENDING_REQUEST" }) {
+  const map: Record<string, { variant?: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+    ENABLED: { variant: "default", label: "Enabled" },
+    DISABLED: { variant: "secondary", label: "Disabled" },
+    PENDING_REQUEST: { variant: "outline", label: "Pending" },
+  };
+  const v = map[status] ?? { variant: "outline", label: status };
+  return <Badge variant={v.variant}>{v.label}</Badge>;
+}
+
+```
+
 # apps/web/src/components/PrefillFrom.tsx
 ```
 "use client";
@@ -3251,6 +3653,69 @@ qc.invalidateQueries({ queryKey: ["conventions"] });
 },
 });
 }
+```
+
+# apps/web/src/lib/clients/servicesClient.ts
+```
+import { api } from "../axios";
+
+export type ServiceLite = { id: string; code: string; name: string; active: boolean };
+export type ServiceLink = {
+  id: string;
+  gtcPointId: string;
+  serviceId: string;
+  status: "ENABLED" | "DISABLED" | "PENDING_REQUEST";
+  createdAt: string;
+  updatedAt: string;
+  service: ServiceLite;
+};
+
+export async function getPointServices() {
+  const { data } = await api.get<{ items: ServiceLink[] }>("/api/point/services");
+  return data.items;
+}
+
+export async function requestServiceByCode(serviceCode: string) {
+  const { data } = await api.post<ServiceLink>("/api/point/services/requests", { serviceCode });
+  return data;
+}
+export async function requestServiceById(serviceId: string) {
+  const { data } = await api.post<ServiceLink>("/api/point/services/requests", { serviceId });
+  return data;
+}
+
+export async function getAdminPointServices(pointId: string) {
+  const { data } = await api.get<{ items: ServiceLink[] }>(`/api/admin/points/${pointId}/services`);
+  return data.items;
+}
+
+export async function toggleAdminPointService(
+  pointId: string,
+  serviceId: string,
+  action: "ENABLE" | "DISABLE"
+) {
+  const { data } = await api.patch<ServiceLink>(
+    `/api/admin/points/${pointId}/services/${serviceId}`,
+    { action }
+  );
+  return data;
+}
+
+/** Some installs return array for /api/admin/services; normalize to array */
+export async function getAdminServicesAll() {
+  const { data } = await api.get(`/api/admin/services`);
+  return Array.isArray(data) ? (data as ServiceLite[]) : ((data?.items ?? []) as ServiceLite[]);
+}
+
+```
+
+# apps/web/src/lib/queryKeys/services.ts
+```
+export const qk = {
+  pointServices: ["point", "services"] as const,
+  adminPointServices: (pointId: string) => ["admin", "points", pointId, "services"] as const,
+  adminServices: ["admin", "services"] as const,
+};
 ```
 
 # apps/web/src/lib/admin-api.ts

@@ -14,7 +14,7 @@ import { adminServices } from "./routes/admin.services";import { meNotifications
 import { devNotify } from "./routes/dev";
 import { conventionsRouter } from "./routes/conventions";     
 import { adminConventions } from "./routes/admin.conventions"; 
-
+import { pointServices } from "./routes/point.services";
 
 export const app = express();
 
@@ -36,6 +36,6 @@ app.use("/api/me/notifications", meNotifications);
 app.use("/api/dev", devNotify);
 app.use("/api/conventions", conventionsRouter);
 app.use("/api/admin/conventions", adminConventions);
-
+app.use("/api/point/services", pointServices);
 
 app.use(errorHandler);
