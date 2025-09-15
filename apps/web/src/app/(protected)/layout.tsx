@@ -1,3 +1,4 @@
+"use client/"
 import AdminNav from "@/components/admin-nav";
 import Protected from "@/components/protected";
 import NotificationBell from "@/components/notification-bell";

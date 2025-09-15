@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createPoint, listPoints, listSectors, type Point } from "@/lib/admin-api";
 import { useMemo, useState } from "react";
 import { z } from "zod";
+import Link from "next/link";
 
 const schema = z.object({
   name: z.string().min(2).max(200),
@@ -101,6 +102,16 @@ export default function PointsPage() {
                   <div className="font-medium">{p.name}</div>
                   <div className="text-xs text-gray-600">{p.email}</div>
                   <div className="text-xs text-gray-500 mt-1">Sector: {p.sector?.name ?? p.sectorId}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/admin/points/${p.id}/services`}
+                    className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
+                    title="Manage services for this point"
+                  >
+                    Services
+                  </Link>
+                  {/* (optional) overview/edit buttons can go here too */}
                 </div>
               </div>
             ))}
