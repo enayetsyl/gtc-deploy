@@ -5,6 +5,7 @@ const express_1 = require("express");
 const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 const auth_1 = require("../middleware/auth");
+const services_1 = require("../services/services");
 exports.adminPoints = (0, express_1.Router)();
 exports.adminPoints.use(auth_1.requireAuth, (0, auth_1.requireRole)("ADMIN"));
 exports.adminPoints.get("/", async (req, res) => {
@@ -61,4 +62,34 @@ exports.adminPoints.delete("/:id", async (req, res) => {
         return res.status(409).json({ error: "Point has service links; remove them first." });
     await prisma_1.prisma.gtcPoint.delete({ where: { id } });
     res.json({ ok: true });
+});
+// list services for a point (optional helper)
+exports.adminPoints.get("/:id/services", async (req, res) => {
+    const { id } = idParam.parse(req.params);
+    const items = await prisma_1.prisma.gtcPointService.findMany({
+        where: { gtcPointId: id },
+        include: { service: true },
+        orderBy: { createdAt: "desc" },
+    });
+    res.json({ items });
+});
+const svcActionSchema = zod_1.z.object({ action: zod_1.z.enum(["ENABLE", "DISABLE"]) });
+/** PATCH /api/admin/points/:id/services/:serviceId  { action: "ENABLE"|"DISABLE" } */
+exports.adminPoints.patch("/:id/services/:serviceId", async (req, res) => {
+    const { id } = idParam.parse(req.params);
+    const serviceId = zod_1.z.string().min(1).parse(req.params.serviceId);
+    const body = svcActionSchema.safeParse(req.body);
+    if (!body.success)
+        return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
+    const svc = await prisma_1.prisma.service.findUnique({ where: { id: serviceId } });
+    if (!svc)
+        return res.status(404).json({ error: "Service not found" });
+    const status = body.data.action === "ENABLE" ? "ENABLED" : "DISABLED";
+    const link = await prisma_1.prisma.gtcPointService.upsert({
+        where: { gtcPointId_serviceId: { gtcPointId: id, serviceId } },
+        update: { status },
+        create: { gtcPointId: id, serviceId, status },
+    });
+    await (0, services_1.onServiceStatusChanged)(id, serviceId, status);
+    res.json(link);
 });

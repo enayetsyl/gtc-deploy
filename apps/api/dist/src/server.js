@@ -19,6 +19,14 @@ const admin_points_1 = require("./routes/admin.points");
 const admin_services_1 = require("./routes/admin.services");
 const notifications_me_1 = require("./routes/notifications.me");
 const dev_1 = require("./routes/dev");
+const conventions_1 = require("./routes/conventions");
+const admin_conventions_1 = require("./routes/admin.conventions");
+const point_services_1 = require("./routes/point.services");
+const admin_leads_1 = require("./routes/admin.leads");
+const me_leads_1 = require("./routes/me.leads");
+const leads_public_1 = require("./routes/leads.public");
+const leads_files_1 = require("./routes/leads.files");
+const sectors_public_1 = require("./routes/sectors.public");
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)({
     origin: ["http://localhost:3000"],
@@ -35,4 +43,12 @@ exports.app.use("/api/admin/points", admin_points_1.adminPoints);
 exports.app.use("/api/admin/services", admin_services_1.adminServices);
 exports.app.use("/api/me/notifications", notifications_me_1.meNotifications);
 exports.app.use("/api/dev", dev_1.devNotify);
+exports.app.use("/api/conventions", conventions_1.conventionsRouter);
+exports.app.use("/api/admin/conventions", admin_conventions_1.adminConventions);
+exports.app.use("/api/point/services", point_services_1.pointServices);
+exports.app.use("/api/leads/public", leads_public_1.leadsPublic);
+exports.app.use("/api/leads", leads_files_1.leadFiles);
+exports.app.use("/api/me/leads", me_leads_1.meLeads);
+exports.app.use("/api/admin/leads", admin_leads_1.adminLeads);
+exports.app.use("/api/sectors/public", sectors_public_1.sectorsPublic);
 exports.app.use(error_1.errorHandler);

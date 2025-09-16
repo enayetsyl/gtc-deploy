@@ -48,7 +48,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // global 401 handler
   useEffect(() => {
-    setOnUnauthorized(() => logout);
+    // pass the logout function directly so the handler invokes it
+    setOnUnauthorized(logout);
   }, []);
 
   const login = (data: { token: string; user: User }) => {

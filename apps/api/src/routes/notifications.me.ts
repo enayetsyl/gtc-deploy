@@ -34,9 +34,15 @@ meNotifications.get("/unread-count", async (req, res) => {
 
 meNotifications.post("/:id/read", async (req, res) => {
   const { id } = z.object({ id: z.string().min(1) }).parse(req.params);
-  const notif = await prisma.notification.update({
-    where: { id },
+  // restrict update to notifications owned by the authenticated user
+  const result = await prisma.notification.updateMany({
+    where: { id, userId: req.user!.id },
     data: { read: true },
   });
+  if (result.count === 0) {
+    return res.status(404).json({ error: "notification not found" });
+  }
+  // fetch and return the updated notification
+  const notif = await prisma.notification.findUnique({ where: { id } });
   res.json(notif);
 });

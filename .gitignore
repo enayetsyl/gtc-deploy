@@ -4,3 +4,4 @@ node_modules
 .env
 .env.*
 apps/api/uploads
+.github/*
