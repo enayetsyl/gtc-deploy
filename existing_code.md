@@ -320,8 +320,8 @@ model Notification {
   id          String           @id @default(cuid())
   userId      String
   type        NotificationType @default(GENERIC)
-  subject     String
-  contentHtml String?
+  subject     String          @db.VarChar(255)
+  contentHtml String?         @db.Text 
   read        Boolean          @default(false)
   createdAt   DateTime         @default(now())
 
@@ -381,93 +381,72 @@ model ConventionDocument {
 
 # apps/api/prisma/seed.ts
 ```
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import argon2 from "argon2";
 
 const prisma = new PrismaClient();
 
-const EMAIL = process.env.SEED_ADMIN_EMAIL || "admin@gtc.local";
-const PASS  = process.env.SEED_ADMIN_PASSWORD || "admin123";
-
 async function main() {
-  // sanity row
-  await prisma.ping.create({ data: {} });
-
-  // admin user
-  const hash = await argon2.hash(PASS);
+  // Admin (kept if you already had this)
   await prisma.user.upsert({
-    where: { email: EMAIL },
+    where: { email: "admin@gtc.local" },
     update: {},
-    create: { email: EMAIL, passwordHash: hash, name: "Admin", role: Role.ADMIN },
+    create: {
+      email: "admin@gtc.local",
+      name: "Admin",
+      passwordHash: await argon2.hash("admin123"),
+      role: "admin".toUpperCase() as any, // or "ADMIN" if your enum is uppercase
+    },
   });
 
-  // sectors
+  // One sector to attach the owner/point
   const training = await prisma.sector.upsert({
     where: { name: "Training" },
     update: {},
     create: { name: "Training" },
   });
-  const university = await prisma.sector.upsert({
-    where: { name: "University" },
+
+  // Sector Owner login
+  await prisma.user.upsert({
+    where: { email: "owner.training@gtc.local" },
     update: {},
-    create: { name: "University" },
+    create: {
+      email: "owner.training@gtc.local",
+      name: "Valentina Owner",
+      passwordHash: await argon2.hash("owner123"),
+      role: "SECTOR_OWNER" as any,
+      sectorId: training.id,
+    },
   });
 
-  // gtc points
-  const pointA = await prisma.gtcPoint.upsert({
-    where: { email: "point.a@gtc.local" },
+  // A GTC point + user (handy for /point/leads testing)
+  const point = await prisma.gtcPoint.upsert({
+    where: { email: "point.training@gtc.local" },
     update: {},
-    create: { name: "GTC Point A", email: "point.a@gtc.local", sectorId: training.id },
-  });
-  const pointB = await prisma.gtcPoint.upsert({
-    where: { email: "point.b@gtc.local" },
-    update: {},
-    create: { name: "GTC Point B", email: "point.b@gtc.local", sectorId: university.id },
+    create: {
+      name: "Training Point A",
+      email: "point.training@gtc.local",
+      sectorId: training.id,
+    },
   });
 
-  // GTC Point user for testing uploads
-const pointUser = await prisma.user.upsert({
-  where: { email: "user.pointa@gtc.local" },
-  update: {},
-  create: {
-    email: "user.pointa@gtc.local",
-    passwordHash: await argon2.hash("point123"),
-    name: "Point A User",
-    role: Role.GTC_POINT,
-    gtcPointId: pointA.id,
-  },
-});
-console.log("Seeded point user:", pointUser.email, "(pass: point123)");
-
-
-  // services
-  const svcA = await prisma.service.upsert({
-    where: { code: "DOC_SIGN" },
+  await prisma.user.upsert({
+    where: { email: "user.pointA@gtc.local" },
     update: {},
-    create: { code: "DOC_SIGN", name: "Document Signing" },
+    create: {
+      email: "user.pointA@gtc.local",
+      name: "Point User A",
+      passwordHash: await argon2.hash("point123"),
+      role: "GTC_POINT" as any,
+      gtcPointId: point.id,
+    },
   });
-  const svcB = await prisma.service.upsert({
-    where: { code: "LEAD_INTAKE" },
-    update: {},
-    create: { code: "LEAD_INTAKE", name: "Lead Intake" },
-  });
-
-  // link a couple services to point A
-  await prisma.gtcPointService.upsert({
-    where: { gtcPointId_serviceId: { gtcPointId: pointA.id, serviceId: svcA.id } },
-    update: {},
-    create: { gtcPointId: pointA.id, serviceId: svcA.id, status: "ENABLED" },
-  });
-  await prisma.gtcPointService.upsert({
-    where: { gtcPointId_serviceId: { gtcPointId: pointA.id, serviceId: svcB.id } },
-    update: { status: "DISABLED" },
-    create: { gtcPointId: pointA.id, serviceId: svcB.id, status: "DISABLED" },
-  });
-
-  console.log("Seeded admin, sectors, points, services.");
 }
 
-main().finally(() => prisma.$disconnect());
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+}).finally(async () => prisma.$disconnect());
 
 ```
 
@@ -785,6 +764,41 @@ adminConventions.get("/:id/archive", async (req, res) => {
 });
 
 ```
+
+# apps/api/src/routes/admin.leads.ts
+```
+import { Router } from "express";
+import { prisma } from "../lib/prisma";
+import { requireAuth, requireRole } from "../middleware/auth";
+import { z } from "zod";
+
+export const adminLeads = Router();
+adminLeads.use(requireAuth, requireRole("ADMIN"));
+
+/** GET /api/admin/leads?sectorId=&page=&pageSize= */
+adminLeads.get("/", async (req, res) => {
+  const page = Math.max(1, Number(req.query.page ?? 1));
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 20)));
+  const sectorId = (req.query.sectorId as string | undefined) || undefined;
+
+  const where = sectorId ? { sectorId } : {};
+
+  const [items, total] = await Promise.all([
+    prisma.lead.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { sector: true, attachments: true },
+    }),
+    prisma.lead.count({ where }),
+  ]);
+
+  res.json({ items, total, page, pageSize });
+});
+
+```
+
 # apps/api/src/routes/admin.points.ts
 ```
 import { Router } from "express";
@@ -1334,6 +1348,174 @@ export const router = Router();
 router.get("/", (_req, res) => res.json({ ok: true }));
 
 ```
+
+# apps/api/src/routes/leads.files.ts
+```
+import { Router } from "express";
+import { prisma } from "../lib/prisma";
+import { requireAuth, requireRole } from "../middleware/auth";
+import path from "node:path";
+import fs from "node:fs/promises";
+
+export const leadFiles = Router();
+
+/** GET /api/leads/:id/attachments/:attId/download  (ADMIN, SECTOR_OWNER, GTC_POINT) */
+leadFiles.get("/:id/attachments/:attId/download", requireAuth, requireRole("ADMIN", "SECTOR_OWNER", "GTC_POINT"), async (req, res) => {
+  const { id, attId } = req.params;
+
+  const att = await prisma.leadAttachment.findUnique({
+    where: { id: attId },
+    include: { lead: true },
+  });
+  if (!att || att.leadId !== id) return res.status(404).json({ error: "Attachment not found" });
+
+  if (req.user!.role !== "ADMIN") {
+    // determine my sector
+    let mySectorId: string | null = null;
+    if (req.user!.role === "SECTOR_OWNER") {
+      const me = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { sectorId: true } });
+      mySectorId = me?.sectorId ?? null;
+    } else {
+      const me = await prisma.user.findUnique({ where: { id: req.user!.id }, include: { gtcPoint: true } });
+      mySectorId = me?.gtcPoint?.sectorId ?? null;
+    }
+    if (!mySectorId || mySectorId !== att.lead.sectorId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+  }
+
+  const abs = path.resolve("uploads", "." + att.path);
+  try {
+    await fs.access(abs);
+  } catch {
+    return res.status(410).json({ error: "File missing from storage" });
+  }
+
+  res.setHeader("Content-Type", att.mime);
+  res.setHeader("Content-Disposition", `attachment; filename="${att.fileName}"`);
+  res.sendFile(abs);
+});
+
+```
+
+# apps/api/src/routes/leads.public.ts
+```
+import { Router } from "express";
+import { z } from "zod";
+import multer from "multer";
+import { prisma } from "../lib/prisma";
+import { storage } from "../storage/provider";
+import { onLeadCreated } from "../services/leads";
+import { lookup as mimeLookup } from "mime-types";
+import { redis } from "../lib/redis";
+
+export const leadsPublic = Router();
+
+// Simple IP throttle via Redis (e.g., 5 req / 5 min)
+async function throttle(req: any, res: any, next: any) {
+  try {
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.ip || "ip:unknown";
+    const key = `rl:leads_public:${ip}`;
+    const max = 5;
+    const ttlSec = 5 * 60;
+
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, ttlSec);
+
+    if (count > max) {
+      const ttl = await redis.ttl(key);
+      res.setHeader("Retry-After", String(Math.max(ttl, 0)));
+      return res.status(429).json({ error: "Too many submissions. Try again later." });
+    }
+    next();
+  } catch {
+    // fail-open on throttle errors
+    next();
+  }
+}
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 5 }, // 10MB/file, max 5 files
+});
+
+const schema = z.object({
+  sectorId: z.string().min(1),
+  name: z.string().min(2).max(200),
+  email: z.string().email().optional(),
+  phone: z.string().min(6).max(32).optional(),
+  message: z.string().max(2000).optional(),
+  gdprAgree: z.coerce.boolean().refine((v) => v === true, "Consent required"),
+});
+
+// Basic MIME whitelist
+const ALLOWED = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+]);
+
+leadsPublic.post("/", throttle, upload.array("files", 5), async (req, res) => {
+  const body = schema.safeParse(req.body);
+  if (!body.success) {
+    return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
+  }
+
+  // create lead + store files
+  const files = (req.files as Express.Multer.File[]) ?? [];
+
+  const lead = await prisma.$transaction(async (tx) => {
+    const created = await tx.lead.create({
+      data: {
+        sectorId: body.data.sectorId,
+        name: body.data.name,
+        email: body.data.email,
+        phone: body.data.phone,
+        message: body.data.message,
+      },
+    });
+
+    if (files.length) {
+      for (const f of files) {
+        const mimeGuess = f.mimetype || (mimeLookup(f.originalname) as string) || "application/octet-stream";
+        const mime = String(mimeGuess).toLowerCase();
+
+        if (!ALLOWED.has(mime)) {
+          // skip disallowed files silently (or return 400 if you prefer strict)
+          continue;
+        }
+
+        const stored = await storage.put({
+          buffer: f.buffer,
+          mime,
+          originalName: f.originalname,
+        });
+
+        await tx.leadAttachment.create({
+          data: {
+            leadId: created.id,
+            fileName: stored.fileName,
+            path: stored.path,
+            mime: stored.mime,
+            size: stored.size,
+            checksum: stored.checksum,
+          },
+        });
+      }
+    }
+
+    return created;
+  });
+
+  // Fan-out
+  await onLeadCreated(lead.id);
+
+  res.status(201).json({ ok: true, id: lead.id });
+});
+
+```
+
+
 # apps/api/src/routes/me.ts
 ```
 // src/routes/me.ts
@@ -1350,6 +1532,53 @@ meRouter.get("/", requireAuth, async (req, res) => {
   });
   if (!me) return res.status(404).json({ error: "Not found" });
   return res.json(me);
+});
+
+```
+
+# apps/api/src/routes/me.leads.ts
+```
+import { Router } from "express";
+import { prisma } from "../lib/prisma";
+import { requireAuth, requireRole } from "../middleware/auth";
+import { z } from "zod";
+
+export const meLeads = Router();
+meLeads.use(requireAuth, requireRole("SECTOR_OWNER", "GTC_POINT"));
+
+/** GET /api/me/leads?page=&pageSize= */
+meLeads.get("/", async (req, res) => {
+  const page = Math.max(1, Number(req.query.page ?? 1));
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 20)));
+
+  // Resolve my sectorId (owner.sectorId OR point.sectorId)
+  let sectorId: string | null = null;
+
+  if (req.user!.role === "SECTOR_OWNER") {
+    const me = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { sectorId: true } });
+    sectorId = me?.sectorId ?? null;
+  } else if (req.user!.role === "GTC_POINT") {
+    const me = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      include: { gtcPoint: true },
+    });
+    sectorId = me?.gtcPoint?.sectorId ?? null;
+  }
+
+  if (!sectorId) return res.status(409).json({ error: "User is not attached to a sector" });
+
+  const [items, total] = await Promise.all([
+    prisma.lead.findMany({
+      where: { sectorId },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { attachments: true },
+    }),
+    prisma.lead.count({ where: { sectorId } }),
+  ]);
+
+  res.json({ items, total, page, pageSize });
 });
 
 ```
@@ -1482,6 +1711,28 @@ pointServices.post("/requests", async (req, res) => {
 
 ```
 
+# apps/api/src/routes/sectors.public.ts
+```
+// apps/api/src/routes/sectors.public.ts
+import { Router } from "express";
+import { prisma } from "../lib/prisma";
+
+export const sectorsPublic = Router();
+
+/**
+ * GET /api/sectors/public
+ * Public, minimal list for dropdowns (no auth)
+ * Response: [{ id, name }, ...] sorted by name
+ */
+sectorsPublic.get("/", async (_req, res) => {
+  const items = await prisma.sector.findMany({
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  res.json(items);
+});
+
+```
 
 # apps/api/src/services/conventions.ts
 ```
@@ -1536,6 +1787,74 @@ export async function onConventionDecision(conventionId: string, approved: boole
     subject,
     contentHtml: html,
   });
+}
+
+```
+
+# apps/api/src/services/leads.ts
+
+```
+import { prisma } from "../lib/prisma";
+import { notifyUsers } from "./notifications";
+
+/** Users with role SECTOR_OWNER for the sector */
+async function getSectorOwners(sectorId: string) {
+  const owners = await prisma.user.findMany({
+    where: { role: "SECTOR_OWNER" as any, sectorId },
+    select: { id: true },
+  });
+  return owners.map((u) => u.id);
+}
+
+/** All GTC point users in the sector */
+async function getSectorPointUsers(sectorId: string) {
+  const points = await prisma.gtcPoint.findMany({
+    where: { sectorId },
+    select: { id: true },
+  });
+  const pointIds = points.map((p) => p.id);
+  if (pointIds.length === 0) return [];
+  const users = await prisma.user.findMany({
+    where: { gtcPointId: { in: pointIds } },
+    select: { id: true },
+  });
+  return users.map((u) => u.id);
+}
+
+/** Fan-out when a new public lead is submitted */
+export async function onLeadCreated(leadId: string) {
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId },
+    include: { sector: true },
+  });
+  if (!lead) return;
+
+  const subject = `New lead for ${lead.sector?.name ?? "Sector"}`;
+  const html = `
+    <p>A new lead has been submitted.</p>
+    <p>
+      <b>Name:</b> ${lead.name}<br/>
+      ${lead.email ? `<b>Email:</b> ${lead.email}<br/>` : ""}
+      ${lead.phone ? `<b>Phone:</b> ${lead.phone}<br/>` : ""}
+      ${lead.message ? `<b>Message:</b> ${lead.message}<br/>` : ""}
+      <b>Sector:</b> ${lead.sector?.name ?? lead.sectorId}<br/>
+      <b>Lead ID:</b> ${lead.id}
+    </p>
+  `;
+
+  const [owners, pointUsers] = await Promise.all([
+    getSectorOwners(lead.sectorId),
+    getSectorPointUsers(lead.sectorId),
+  ]);
+
+  const unique = Array.from(new Set([...owners, ...pointUsers]));
+  if (unique.length) {
+    await notifyUsers(unique, {
+      type: "LEAD_NEW",
+      subject,
+      contentHtml: html,
+    });
+  }
 }
 
 ```
@@ -1852,6 +2171,11 @@ import { devNotify } from "./routes/dev";
 import { conventionsRouter } from "./routes/conventions";     
 import { adminConventions } from "./routes/admin.conventions"; 
 import { pointServices } from "./routes/point.services";
+import { adminLeads } from "./routes/admin.leads";
+import { meLeads } from "./routes/me.leads";
+import { leadsPublic } from "./routes/leads.public";
+import { leadFiles } from "./routes/leads.files";
+import { sectorsPublic } from "./routes/sectors.public";
 
 export const app = express();
 
@@ -1874,6 +2198,12 @@ app.use("/api/dev", devNotify);
 app.use("/api/conventions", conventionsRouter);
 app.use("/api/admin/conventions", adminConventions);
 app.use("/api/point/services", pointServices);
+app.use("/api/leads/public", leadsPublic);
+app.use("/api/leads", leadFiles);
+app.use("/api/me/leads", meLeads);
+app.use("/api/admin/leads", adminLeads);
+app.use("/api/sectors/public", sectorsPublic);
+
 
 app.use(errorHandler);
 ```
@@ -2043,6 +2373,9 @@ export default nextConfig;
     "lint": "eslint"
   },
   "dependencies": {
+    "@radix-ui/react-checkbox": "^1.3.3",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.3",
     "@tanstack/react-query": "^5.87.4",
     "axios": "^1.11.0",
@@ -2053,6 +2386,8 @@ export default nextConfig;
     "next-themes": "^0.4.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-hook-form": "^7.62.0",
+    "@hookform/resolvers": "^3.1.1",
     "socket.io-client": "^4.8.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
@@ -2073,6 +2408,7 @@ export default nextConfig;
     "typescript": "^5.9.2"
   }
 }
+
 
 ```
 
@@ -2246,6 +2582,140 @@ export default function LoginPage() {
 import AdminConventionsPage from "../../../../components/conventions/AdminConventions";
 export default function Page() { return <AdminConventionsPage />; }
 ```
+# apps/web/src/app/(protected)/admin/leads/page.tsx
+```
+"use client";
+import { useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useLeadsAdmin } from "@/hooks/useLeads";
+import { useLeadRealtime } from "@/hooks/useLeadRealtime";
+import { useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { AttachmentChip } from "@/components/lead/AttachmentChip";
+
+type Attachment = { id: string; fileName: string };
+type Lead = {
+  id: string;
+  createdAt: string;
+  sectorId?: string;
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  message?: string | null;
+  attachments?: Attachment[];
+};
+type LeadsPage = {
+  items: Lead[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export default function AdminLeadsPage() {
+const sp = useSearchParams();
+const router = useRouter();
+const qc = useQueryClient();
+const page = Number(sp.get("page") || 1);
+const pageSize = 20;
+const [sectorId, setSectorId] = useState<string>(sp.get("sectorId") || "");
+const { data, isLoading } = useLeadsAdmin(page, pageSize, sectorId || undefined);
+
+const leads = data as LeadsPage | undefined;
+
+useLeadRealtime(() => {
+qc.invalidateQueries({ queryKey: ["leads", "admin"] });
+});
+
+function applyFilter() {
+const qp = new URLSearchParams(sp.toString());
+if (sectorId) qp.set("sectorId", sectorId); else qp.delete("sectorId");
+qp.set("page", "1");
+router.push(`?${qp.toString()}`);
+}
+
+
+function go(p: number) {
+const qp = new URLSearchParams(sp.toString());
+qp.set("page", String(p));
+router.push(`?${qp.toString()}`);
+}
+
+
+  const total = leads?.total ?? 0;
+  const currentPage = leads?.page ?? page;
+  const currentPageSize = leads?.pageSize ?? pageSize;
+
+
+return (
+<div className="p-6">
+<Card>
+<CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+<CardTitle>All Leads</CardTitle>
+<div className="flex gap-2 items-center">
+<Input placeholder="Filter by sectorId" value={sectorId} onChange={(e) => setSectorId(e.target.value)} className="w-[260px]" />
+<Button variant="outline" onClick={applyFilter}>Apply</Button>
+</div>
+</CardHeader>
+<CardContent>
+{isLoading ? (
+<p>Loading…</p>
+) : (
+
+<>
+<Table>
+<TableHeader>
+<TableRow>
+<TableHead>Created</TableHead>
+<TableHead>Sector</TableHead>
+<TableHead>Name</TableHead>
+<TableHead>Email</TableHead>
+<TableHead>Phone</TableHead>
+<TableHead>Message</TableHead>
+<TableHead>Attachments</TableHead>
+</TableRow>
+</TableHeader>
+<TableBody>
+{leads?.items.map((l) => (
+<TableRow key={l.id}>
+<TableCell>{new Date(l.createdAt).toLocaleString()}</TableCell>
+<TableCell>{l.sectorId}</TableCell>
+<TableCell>{l.name}</TableCell>
+<TableCell>{l.email || "—"}</TableCell>
+<TableCell>{l.phone || "—"}</TableCell>
+<TableCell className="max-w-[320px] truncate">{l.message || "—"}</TableCell>
+<TableCell className="space-x-2">
+{l.attachments?.length ? (
+l.attachments.map((a) => (
+<AttachmentChip key={a.id} leadId={l.id} attId={a.id} name={a.fileName} />
+))
+) : (
+<span className="text-muted-foreground">None</span>
+)}
+</TableCell>
+</TableRow>
+))}
+</TableBody>
+</Table>
+
+
+<div className="flex items-center justify-between mt-4">
+<div className="text-sm text-muted-foreground">Total: {total}</div>
+<div className="space-x-2">
+<Button variant="outline" size="sm" onClick={() => go(Math.max(1, currentPage - 1))} disabled={currentPage <= 1}>Prev</Button>
+<Button variant="outline" size="sm" onClick={() => go(currentPage + 1)} disabled={(currentPage * currentPageSize) >= total}>Next</Button>
+</div>
+</div>
+</>
+)}
+</CardContent>
+</Card>
+</div>
+);
+}
+```
 
 # apps/web/src/app/(protected)/admin/points/page.tsx
 ```
@@ -2373,6 +2843,15 @@ export default function PointsPage() {
   );
 }
 
+```
+
+# apps/web/src/app/(protected)/admin/points/leads/page.tsx
+```
+"use client";
+
+import OwnerLeadsPage from "../../owner/leads/page";
+
+export default OwnerLeadsPage;
 ```
 
 # apps/web/src/app/(protected)/admin/points/[id]/services/page.tsx
@@ -2883,6 +3362,115 @@ export default function NotificationsPage() {
 
 ```
 
+# apps/web/src/app/(protected)/owner/leads/page.tsx
+```
+"use client";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useLeadsMe } from "@/hooks/useLeads";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { AttachmentChip } from "@/components/lead/AttachmentChip";
+
+type Attachment = { id: string; fileName: string };
+type Lead = {
+  id: string;
+  createdAt: string;
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  message?: string | null;
+  attachments?: Attachment[];
+};
+type LeadsPage = {
+  items: Lead[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+
+export default function OwnerLeadsPage() {
+const sp = useSearchParams();
+const router = useRouter();
+const page = Number(sp.get("page") || 1);
+const pageSize = 20;
+const { data, isLoading } = useLeadsMe(page, pageSize);
+
+ const leads = data as LeadsPage | undefined;
+
+function go(p: number) {
+const qp = new URLSearchParams(sp.toString());
+qp.set("page", String(p));
+router.push(`?${qp.toString()}`);
+}
+return (
+<div className="p-6">
+<Card>
+<CardHeader>
+<CardTitle>Leads (My Sector)</CardTitle>
+</CardHeader>
+<CardContent>
+{isLoading ? (
+<p>Loading…</p>
+) : (
+
+<>
+<Table>
+<TableHeader>
+<TableRow>
+<TableHead>Created</TableHead>
+<TableHead>Name</TableHead>
+<TableHead>Email</TableHead>
+<TableHead>Phone</TableHead>
+<TableHead>Message</TableHead>
+<TableHead>Attachments</TableHead>
+</TableRow>
+</TableHeader>
+<TableBody>
+{leads?.items.map((l: Lead) => (
+<TableRow key={l.id}>
+<TableCell>{new Date(l.createdAt).toLocaleString()}</TableCell>
+<TableCell>{l.name}</TableCell>
+<TableCell>{l.email || "—"}</TableCell>
+<TableCell>{l.phone || "—"}</TableCell>
+<TableCell className="max-w-[320px] truncate">{l.message || "—"}</TableCell>
+<TableCell className="space-x-2">
+{l.attachments?.length ? (
+l.attachments.map((a) => (
+<AttachmentChip key={a.id} leadId={l.id} attId={a.id} name={a.fileName} />
+))
+) : (
+<span className="text-muted-foreground">None</span>
+)}
+</TableCell>
+</TableRow>
+))}
+</TableBody>
+</Table>
+ <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">Total: {leads?.total ?? 0}</div>
+                <div className="space-x-2">
+                  <Button variant="outline" size="sm" onClick={() => go(Math.max(1, page - 1))} disabled={page <= 1}>Prev</Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => go(page + 1)}
+                    disabled={(leads?.page ?? 1) * (leads?.pageSize ?? pageSize) >= (leads?.total ?? 0)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+</>
+)}
+</CardContent>
+</Card>
+</div>
+);
+}
+```
+
 # apps/web/src/app/(protected)/point/conventions/page.tsx
 ```
 "use client";
@@ -3164,6 +3752,7 @@ import "./globals.css";
 import QueryProvider from "@/providers/query-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 import { SocketProvider } from "@/providers/socket-provider";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -3177,6 +3766,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <QueryProvider>
           <AuthProvider>
             <SocketProvider>{children}</SocketProvider>
+            <Toaster />
           </AuthProvider>
         </QueryProvider>
       </body>
@@ -3184,6 +3774,272 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   );
 }
 
+```
+
+# apps/web/src/app/lead/page.tsx
+```
+"use client";
+import { z } from "zod";
+import { useState, type ChangeEvent } from "react";
+import { type AxiosError } from "axios";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useSubmitLeadPublic } from "@/hooks/useLeads";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useSectorsPublic } from "@/hooks/useSectors";
+
+const LeadSchema = z.object({
+  sectorId: z.string().min(1, "Select a sector"),
+  name: z.string().min(2, "Enter your name"),
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().min(6).max(32).optional().or(z.literal("")),
+  message: z.string().max(2000).optional().or(z.literal("")),
+  gdprAgree: z
+    .boolean()
+    .refine((v) => v === true, { message: "You must agree" }),
+});
+
+type LeadFormValues = z.infer<typeof LeadSchema>;
+
+export default function LeadPage() {
+  const [files, setFiles] = useState<File[]>([]);
+  const [progress, setProgress] = useState<number | null>(null);
+  const submit = useSubmitLeadPublic();
+  const sectors = useSectorsPublic();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    watch,
+    reset,
+  } = useForm<LeadFormValues>({
+    resolver: zodResolver(LeadSchema),
+    defaultValues: {
+      sectorId: "",
+      name: "",
+      email: "",
+      phone: "",
+      message: "",
+      gdprAgree: false,
+    },
+  });
+
+  async function onSubmit(values: LeadFormValues) {
+    setProgress(0);
+    try {
+      await submit.mutateAsync({
+        ...values,
+        email: values.email || undefined,
+        phone: values.phone || undefined,
+        message: values.message || undefined,
+        files,
+        onUploadProgress: setProgress,
+      });
+      toast.success("Lead submitted — We will get back to you soon.");
+      reset();
+      setFiles([]);
+    } catch (err: unknown) {
+      const axiosErr = err as AxiosError<{ error?: string }> | undefined;
+      const status = axiosErr?.response?.status;
+      if (status === 429) {
+        toast.error("Too many submissions — Please try again later.");
+      } else {
+        toast.error("Submission failed — Please check fields and try again.");
+      }
+    } finally {
+      setProgress(null);
+    }
+  }
+
+  const sectorItems = (sectors.data || []) as Array<{ id: string; name: string }>;
+  const sectorValue = watch("sectorId");
+
+  console.log('sector', sectors.data)
+
+  return (
+    <div className="mx-auto max-w-2xl p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Contact / Lead</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+            {/* Register sectorId with RHF so it's included in the payload */}
+            <input type="hidden" {...register("sectorId")} />
+
+            <div>
+              <Label htmlFor="sectorId">Sector</Label>
+              {sectors.isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading sectors…</p>
+              ) : sectorItems.length ? (
+                <Select
+                  value={sectorValue}
+                  onValueChange={(v) =>
+                    setValue("sectorId", v, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select sector" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sectorItems.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <>
+                  <Input
+                    id="sectorId"
+                    placeholder="Enter sector ID"
+                    {...register("sectorId")}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No public sector list available. Enter sector ID manually.
+                  </p>
+                </>
+              )}
+              {errors.sectorId && (
+                <p className="text-sm text-red-500">{errors.sectorId.message}</p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" {...register("name")} />
+              {errors.name && (
+                <p className="text-sm text-red-500">{errors.name.message}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" {...register("email")} />
+                {errors.email && (
+                  <p className="text-sm text-red-500">
+                    {String(errors.email?.message ?? "")}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="phone">Phone</Label>
+                <Input id="phone" {...register("phone")} />
+                {errors.phone && (
+                  <p className="text-sm text-red-500">
+                    {String(errors.phone?.message ?? "")}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="message">Message</Label>
+              <Textarea id="message" rows={4} {...register("message")} />
+            </div>
+
+            <div>
+              <Label>Attachments</Label>
+              <input
+                type="file"
+                multiple
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setFiles(Array.from(e.target.files ?? []))
+                }
+                className="block w-full rounded border p-2"
+                accept=".pdf,image/png,image/jpeg"
+              />
+              {files.length > 0 && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {files.length} file(s) selected
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="gdpr"
+                checked={watch("gdprAgree")}
+                onCheckedChange={(v) => setValue("gdprAgree", Boolean(v))}
+              />
+              <Label htmlFor="gdpr">I agree to the privacy policy (GDPR)</Label>
+            </div>
+            {errors.gdprAgree && (
+              <p className="text-sm text-red-500">{errors.gdprAgree.message}</p>
+            )}
+
+            {progress !== null && (
+              <div className="w-full h-2 bg-muted rounded">
+                <div
+                  className="h-2 bg-primary rounded"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            )}
+
+            <Button type="submit" disabled={submit.isPending}>
+              Submit
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+```
+
+# apps/web/src/app/lead/AttachmentChip.tsx
+```
+"use client";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import { useDownloadLeadAttachment } from "@/hooks/useLeads";
+
+
+export function AttachmentChip({ leadId, attId, name }: { leadId: string; attId: string; name: string }) {
+const dl = useDownloadLeadAttachment();
+
+
+async function onClick() {
+const blob = await dl.mutateAsync({ leadId, attId });
+const url = window.URL.createObjectURL(blob);
+const a = document.createElement("a");
+a.href = url;
+a.download = name;
+document.body.appendChild(a);
+a.click();
+a.remove();
+window.URL.revokeObjectURL(url);
+}
+
+
+return (
+<Button variant="outline" size="sm" onClick={onClick} disabled={dl.isPending} className="gap-2">
+<Download className="h-4 w-4" /> {name}
+</Button>
+);
+}
 ```
 
 # apps/web/src/components/conventions/AdminConventions.tsx
@@ -3524,6 +4380,37 @@ export default function UploadWidget({
 
 ```
 
+# apps/web/src/components/lead/AttachmentChip.tsx
+```
+"use client";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import { useDownloadLeadAttachment } from "@/hooks/useLeads";
+
+
+export function AttachmentChip({ leadId, attId, name }: { leadId: string; attId: string; name: string }) {
+const dl = useDownloadLeadAttachment();
+
+
+async function onClick() {
+const blob = await dl.mutateAsync({ leadId, attId });
+const url = window.URL.createObjectURL(blob);
+const a = document.createElement("a");
+a.href = url;
+a.download = name;
+document.body.appendChild(a);
+a.click();
+a.remove();
+window.URL.revokeObjectURL(url);
+}
+return (
+<Button variant="outline" size="sm" onClick={onClick} disabled={dl.isPending} className="gap-2">
+<Download className="h-4 w-4" /> {name}
+</Button>
+);
+}
+```
+
 # apps/web/src/components/services/ServiceStatusBadge.tsx
 ```
 "use client";
@@ -3642,7 +4529,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 
-// base admin items
+// Base admin items (kept as-is)
 const baseItems = [
   { href: "/admin/sectors", label: "Sectors" },
   { href: "/admin/points", label: "GTC Points" },
@@ -3653,16 +4540,28 @@ export default function AdminNav() {
   const pathname = usePathname();
   const { logout, user } = useAuth();
 
-  // build items based on role
+  // If you want to HIDE admin-only items for non-admins, flip this:
+  // const items = user?.role === "ADMIN" ? [...baseItems] : [];
   const items = [...baseItems];
+
+  // Role-aware prepend items
   if (user?.role === "ADMIN") {
-    // admin sees admin conventions
-    items.unshift({ href: "/admin/conventions", label: "Conventions" });
+    // Admin sees Admin Leads + Admin Conventions
+    items.unshift(
+      { href: "/admin/leads", label: "Leads" },
+      { href: "/admin/conventions", label: "Conventions" },
+    );
+  } else if (user?.role === "GTC_POINT") {
+    // Point users see My Conventions + Point Leads
+    items.unshift(
+      { href: "/point/leads", label: "Leads" },
+      { href: "/point/conventions", label: "My Conventions" },
+    );
+  } else if (user?.role === "SECTOR_OWNER") {
+    // Sector owners see Owner Leads
+    items.unshift({ href: "/owner/leads", label: "Leads" });
   }
-  if (user?.role === "GTC_POINT") {
-    // point users see point conventions
-    items.unshift({ href: "/point/conventions", label: "My Conventions" });
-  }
+
   return (
     <nav className="flex gap-2">
       {items.map((it) => {
@@ -3680,6 +4579,7 @@ export default function AdminNav() {
           </Link>
         );
       })}
+
       <button
         onClick={logout}
         className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
@@ -3691,6 +4591,7 @@ export default function AdminNav() {
 }
 
 ```
+
 
 # apps/web/src/components/notification-bell.tsx
 ```
@@ -3887,6 +4788,196 @@ export async function downloadArchive(conventionId: string): Promise<{ blob: Blo
   return { blob: r.data as Blob, filename };
 }
 ```
+
+# apps/web/src/hooks/useLeads.ts
+```
+"use client";
+import { api } from "@/lib/axios";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import axios from "axios";
+
+
+export type Lead = {
+id: string;
+sectorId: string;
+name: string;
+email?: string;
+phone?: string;
+message?: string;
+createdAt: string;
+attachments: LeadAttachment[];
+};
+
+
+export type LeadAttachment = {
+id: string;
+fileName: string;
+path: string;
+mime: string;
+size: number;
+checksum: string;
+};
+
+
+export type Paginated<T> = {
+items: T[];
+total: number;
+page: number;
+pageSize: number;
+};
+
+
+// ---- Public submit hook (no auth required) ----
+export function useSubmitLeadPublic() {
+return useMutation({
+mutationFn: async (params: {
+sectorId: string;
+name: string;
+email?: string;
+phone?: string;
+message?: string;
+gdprAgree: boolean;
+files: File[];
+onUploadProgress?: (percent: number) => void;
+}) => {
+const fd = new FormData();
+fd.set("sectorId", params.sectorId);
+fd.set("name", params.name);
+if (params.email) fd.set("email", params.email);
+if (params.phone) fd.set("phone", params.phone);
+if (params.message) fd.set("message", params.message);
+fd.set("gdprAgree", String(params.gdprAgree));
+for (const f of params.files) fd.append("files", f);
+
+
+const url = `${process.env.NEXT_PUBLIC_API_URL}/api/leads/public`;
+await axios.post(url, fd, {
+withCredentials: false,
+onUploadProgress: (p) => {
+if (!params.onUploadProgress || !p.total) return;
+const pct = Math.round((p.loaded / p.total) * 100);
+params.onUploadProgress(pct);
+},
+headers: { Accept: "application/json" },
+});
+},
+});
+}
+
+// ---- Authed list hooks ----
+export function useLeadsMe(page: number, pageSize: number) {
+  return useQuery<Paginated<Lead>, Error>({
+    queryKey: ["leads", "me", { page, pageSize }],
+    queryFn: async () => {
+      const { data } = await api.get<Paginated<Lead>>("/api/me/leads", {
+        params: { page, pageSize },
+      });
+      return data;
+    },
+    
+  });
+}
+
+export function useLeadsAdmin(page: number, pageSize: number, sectorId?: string) {
+  return useQuery<Paginated<Lead>, Error>({
+    queryKey: ["leads", "admin", { page, pageSize, sectorId }],
+    queryFn: async () => {
+      const { data } = await api.get<Paginated<Lead>>("/api/admin/leads", {
+        params: { page, pageSize, sectorId },
+      });
+      return data;
+    },
+    enabled: true,
+  });
+}
+
+
+export function useDownloadLeadAttachment() {
+return useMutation({
+mutationFn: async (args: { leadId: string; attId: string }) => {
+const { data } = await api.get(`/api/leads/${args.leadId}/attachments/${args.attId}/download`, {
+responseType: "blob",
+});
+return data as Blob;
+},
+});
+}
+```
+
+# apps/web/src/hooks/useLeadRealtime.ts
+```
+"use client";
+import { useEffect, useRef } from "react";
+import { io, Socket } from "socket.io-client";
+
+
+export function useLeadRealtime(onNew: () => void) {
+const ref = useRef<Socket | null>(null);
+
+
+useEffect(() => {
+// Avoid double-connecting if SSR or missing env
+if (typeof window === "undefined") return;
+const base = process.env.NEXT_PUBLIC_SOCKET_URL;
+if (!base) return;
+
+
+// Use access token if you store it in localStorage (aligns with your AuthContext)
+const token = localStorage.getItem("accessToken");
+if (!token) return;
+
+
+const s = io(base, { auth: { token } });
+ref.current = s;
+
+
+const handler = () => {
+try { onNew(); } catch {}
+};
+
+
+s.on("lead:new", handler);
+
+
+return () => {
+s.off("lead:new", handler);
+s.disconnect();
+ref.current = null;
+};
+}, [onNew]);
+}
+```
+
+# apps/web/src/hooks/useSectors.ts
+```
+"use client";
+import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
+
+
+export type Sector = { id: string; name: string };
+
+type RawSector = Sector;
+type ApiResponse = RawSector[] | { items?: RawSector[] };
+
+export function useSectorsPublic() {
+return useQuery({
+queryKey: ["sectors", "public"],
+queryFn: async () => {
+const url = `${process.env.NEXT_PUBLIC_API_URL}/api/sectors/public`;
+try {
+const { data } = await axios.get<ApiResponse>(url);
+const items: RawSector[] = Array.isArray(data) ? data : data?.items ?? [];
+return items.map((s) => ({ id: s.id, name: s.name }));
+      } catch {
+return [] as Sector[]; // fallback: no list (manual entry)
+}
+},
+staleTime: 5 * 60 * 1000,
+});
+}
+```
+
 
 # apps/web/src/lib/clients/servicesClient.ts
 ```

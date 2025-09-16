@@ -49,6 +49,7 @@ model Sector {
   // Optional: sector owners (Users with sectorId referencing this)
   users       User[]       @relation("SectorUsers")
   conventions Convention[]
+  leads       Lead[]
 }
 
 model GtcPoint {
@@ -107,8 +108,8 @@ model Notification {
   id          String           @id @default(cuid())
   userId      String
   type        NotificationType @default(GENERIC)
-  subject     String
-  contentHtml String?
+  subject     String          @db.VarChar(255)
+  contentHtml String?         @db.Text 
   read        Boolean          @default(false)
   createdAt   DateTime         @default(now())
 
@@ -162,4 +163,35 @@ model ConventionDocument {
   uploadedBy User?      @relation("UserUploadedConventionDocuments", fields: [uploadedById], references: [id])
 
   @@index([conventionId, createdAt])
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  sectorId  String
+  name      String
+  email     String?
+  phone     String?
+  message   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sector      Sector           @relation(fields: [sectorId], references: [id])
+  attachments LeadAttachment[]
+
+  @@index([sectorId, createdAt])
+}
+
+model LeadAttachment {
+  id        String   @id @default(cuid())
+  leadId    String
+  fileName  String
+  path      String
+  mime      String
+  size      Int
+  checksum  String
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id])
+
+  @@index([leadId, createdAt])
 }

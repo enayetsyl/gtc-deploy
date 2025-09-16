@@ -15,6 +15,11 @@ import { devNotify } from "./routes/dev";
 import { conventionsRouter } from "./routes/conventions";     
 import { adminConventions } from "./routes/admin.conventions"; 
 import { pointServices } from "./routes/point.services";
+import { adminLeads } from "./routes/admin.leads";
+import { meLeads } from "./routes/me.leads";
+import { leadsPublic } from "./routes/leads.public";
+import { leadFiles } from "./routes/leads.files";
+import { sectorsPublic } from "./routes/sectors.public";
 
 export const app = express();
 
@@ -37,5 +42,11 @@ app.use("/api/dev", devNotify);
 app.use("/api/conventions", conventionsRouter);
 app.use("/api/admin/conventions", adminConventions);
 app.use("/api/point/services", pointServices);
+app.use("/api/leads/public", leadsPublic);
+app.use("/api/leads", leadFiles);
+app.use("/api/me/leads", meLeads);
+app.use("/api/admin/leads", adminLeads);
+app.use("/api/sectors/public", sectorsPublic);
+
 
 app.use(errorHandler);

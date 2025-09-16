@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 
-// base admin items
+// Base admin items (kept as-is)
 const baseItems = [
   { href: "/admin/sectors", label: "Sectors" },
   { href: "/admin/points", label: "GTC Points" },
@@ -16,16 +16,28 @@ export default function AdminNav() {
   const pathname = usePathname();
   const { logout, user } = useAuth();
 
-  // build items based on role
+  // If you want to HIDE admin-only items for non-admins, flip this:
+  // const items = user?.role === "ADMIN" ? [...baseItems] : [];
   const items = [...baseItems];
+
+  // Role-aware prepend items
   if (user?.role === "ADMIN") {
-    // admin sees admin conventions
-    items.unshift({ href: "/admin/conventions", label: "Conventions" });
+    // Admin sees Admin Leads + Admin Conventions
+    items.unshift(
+      { href: "/admin/leads", label: "Leads" },
+      { href: "/admin/conventions", label: "Conventions" },
+    );
+  } else if (user?.role === "GTC_POINT") {
+    // Point users see My Conventions + Point Leads
+    items.unshift(
+      { href: "/point/leads", label: "Leads" },
+      { href: "/point/conventions", label: "My Conventions" },
+    );
+  } else if (user?.role === "SECTOR_OWNER") {
+    // Sector owners see Owner Leads
+    items.unshift({ href: "/owner/leads", label: "Leads" });
   }
-  if (user?.role === "GTC_POINT") {
-    // point users see point conventions
-    items.unshift({ href: "/point/conventions", label: "My Conventions" });
-  }
+
   return (
     <nav className="flex gap-2">
       {items.map((it) => {
@@ -43,6 +55,7 @@ export default function AdminNav() {
           </Link>
         );
       })}
+
       <button
         onClick={logout}
         className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
