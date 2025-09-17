@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { api, API_BASE } from "@/lib/axios";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+// ...existing UI imports
 import { Button } from "@/components/ui/button";
 
 type OnboardDetail = {
@@ -19,7 +18,7 @@ type OnboardDetail = {
 
 export default function Client({ id }: { id: string }) {
   const [item, setItem] = useState<OnboardDetail | null>(null);
-  const [internalSalesRep, setInternalSalesRep] = useState<string>("");
+
   const router = useRouter();
   useEffect(() => {
     (async () => {
@@ -31,7 +30,6 @@ export default function Client({ id }: { id: string }) {
           | (OnboardDetail & { internalSalesRep?: string })
           | null;
         setItem(found);
-        setInternalSalesRep(found?.internalSalesRep ?? "");
       } catch (err) {
         console.error(err);
       }
@@ -54,18 +52,6 @@ export default function Client({ id }: { id: string }) {
       router.push("/admin/points-onboarding/list");
     } catch (err) {
       console.error(err);
-    }
-  }
-
-  async function saveInternalSalesRep() {
-    try {
-      await api.post(`/api/admin/points/onboarding/${id}/update`, {
-        internalSalesRep,
-      });
-      alert("Saved");
-    } catch (err) {
-      console.error(err);
-      alert("Save failed");
     }
   }
 
@@ -96,16 +82,6 @@ export default function Client({ id }: { id: string }) {
         )}
       </div>
       <div className="mt-4 space-y-2">
-        <div>
-          <Label>Internal sales rep (editable by admin)</Label>
-          <Input
-            value={internalSalesRep}
-            onChange={(e) => setInternalSalesRep(e.target.value)}
-          />
-          <div className="mt-2 flex gap-2">
-            <Button onClick={saveInternalSalesRep}>Save</Button>
-          </div>
-        </div>
         <div className="flex gap-2 mt-4">
           <Button variant="default" onClick={approve}>
             Approve

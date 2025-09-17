@@ -88,7 +88,7 @@ export async function submitOnboardingForm(onboardingToken: string, payload: Sub
 
   const adminAndOwners = Array.from(new Set([...adminIds, ...ownerIds]));
 
-  const adminLink = `${env.webBaseUrl.replace(/\/$/, "")}/admin/points/onboarding/${ob.id}`;
+  const adminLink = `${env.webBaseUrl.replace(/\/$/, "")}/admin/points-onboarding/${ob.id}`;
 
   if (adminAndOwners.length) {
     await notifyUsers(adminAndOwners, {
