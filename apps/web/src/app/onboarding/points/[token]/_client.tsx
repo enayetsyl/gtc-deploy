@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 type OnboardingPrefill = {
   name: string;
@@ -22,6 +23,8 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   );
   const [vat, setVat] = useState("");
   const [phone, setPhone] = useState("");
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [services, setServices] = useState<string[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const router = useRouter();
@@ -150,6 +153,12 @@ export default function OnboardingFormClient({ token }: { token: string }) {
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!agreed) {
+      toast.error(
+        "You must accept the Terms and Conditions before submitting."
+      );
+      return;
+    }
     const fd = new FormData();
     fd.append("vatOrTaxNumber", vat);
     fd.append("phone", phone);
@@ -189,6 +198,17 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       <div>
         <Label>Phone</Label>
         <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="flex-1" />
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => setTermsOpen(true)}
+        >
+          Terms and Conditions
+        </Button>
       </div>
 
       {prefill.includeServices && (
@@ -241,6 +261,77 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       <div>
         <Button type="submit">Submit</Button>
       </div>
+
+      {/* Terms modal (simple overlay) */}
+      {termsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setTermsOpen(false)}
+          />
+          <div className="relative max-w-2xl w-full bg-popover text-popover-foreground rounded-xl shadow-lg p-6 mx-4">
+            <h2 className="text-lg font-semibold mb-2">Terms and Conditions</h2>
+            <div className="text-sm text-muted-foreground space-y-3 mb-4 max-h-60 overflow-auto">
+              <p>
+                These are imaginary terms and conditions for demo purposes. By
+                signing below you agree to allow the platform to process your
+                onboarding request, contact you by email or phone, and store
+                submitted documents for administrative review.
+              </p>
+              <p>
+                You confirm that the information provided is accurate and that
+                you have authority to act on behalf of the organization. This
+                demo text is not legally binding.
+              </p>
+              <p>
+                If you disagree with any clause, do not submit the onboarding
+                request. Contact support for help.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                />
+                <span className="text-sm">
+                  I agree to the terms and conditions
+                </span>
+              </label>
+
+              <div className="ml-auto flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setTermsOpen(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (!agreed) {
+                      toast.error(
+                        "You must agree to the terms before signing."
+                      );
+                      return;
+                    }
+                    // close modal — signature is already captured on canvas; agreement recorded locally
+                    setTermsOpen(false);
+                    toast.success(
+                      "Terms accepted. You can now sign and submit."
+                    );
+                  }}
+                >
+                  Sign and accept
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
