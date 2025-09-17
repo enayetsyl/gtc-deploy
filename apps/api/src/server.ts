@@ -10,16 +10,18 @@ import { authRouter } from "./routes/auth";
 import { meRouter } from "./routes/me";
 import { adminSectors } from "./routes/admin.sectors";
 import { adminPoints } from "./routes/admin.points";
-import { adminServices } from "./routes/admin.services";import { meNotifications } from "./routes/notifications.me";
+import { adminServices } from "./routes/admin.services"; import { meNotifications } from "./routes/notifications.me";
 import { devNotify } from "./routes/dev";
-import { conventionsRouter } from "./routes/conventions";     
-import { adminConventions } from "./routes/admin.conventions"; 
+import { conventionsRouter } from "./routes/conventions";
+import { adminConventions } from "./routes/admin.conventions";
 import { pointServices } from "./routes/point.services";
 import { adminLeads } from "./routes/admin.leads";
 import { meLeads } from "./routes/me.leads";
 import { leadsPublic } from "./routes/leads.public";
 import { leadFiles } from "./routes/leads.files";
 import { sectorsPublic } from "./routes/sectors.public";
+import { adminPointsOnboarding } from "./routes/admin.points.onboarding";
+import { pointsOnboardingPublic } from "./routes/points.onboarding.public";
 
 export const app = express();
 
@@ -47,6 +49,8 @@ app.use("/api/leads", leadFiles);
 app.use("/api/me/leads", meLeads);
 app.use("/api/admin/leads", adminLeads);
 app.use("/api/sectors/public", sectorsPublic);
+app.use("/api/admin/points/onboarding", adminPointsOnboarding);
+app.use("/api/public/onboarding/points", pointsOnboardingPublic);
 
 
 app.use(errorHandler);
