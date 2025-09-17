@@ -1,15 +1,20 @@
 "use client";
 import { useEffect, useState } from "react";
+import { api } from "@/lib/axios";
 import Link from "next/link";
 
-type OnboardItem = { id: string; name: string; email: string };
+type OnboardItem = { id: string; name: string; email: string; status?: string };
 
 export default function ReviewList() {
   const [items, setItems] = useState<OnboardItem[]>([]);
   useEffect(() => {
     (async () => {
-      const r = await fetch("/api/admin/points/onboarding?status=SUBMITTED");
-      if (r.ok) setItems((await r.json()).items);
+      try {
+        const r = await api.get(`/api/admin/points/onboarding`);
+        setItems(r.data.items || []);
+      } catch (err) {
+        console.error(err);
+      }
     })();
   }, []);
   return (
@@ -27,7 +32,7 @@ export default function ReviewList() {
         {items.map((i) => (
           <li key={i.id}>
             <a href={`/admin/points-onboarding/${i.id}`}>
-              {i.name} — {i.email}
+              Name : {i.name} — Email : {i.email} — Status: {i.status ?? "UNKNOWN"}
             </a>
           </li>
         ))}
