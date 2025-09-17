@@ -30,6 +30,7 @@ model User {
   updatedAt     DateTime       @updatedAt
 
   uploadedConventionDocuments ConventionDocument[] @relation("UserUploadedConventionDocuments")
+  approvedPointOnboardings     PointOnboarding[]     @relation("UserApprovedPointOnboardings")
 }
 
 enum Role {
@@ -50,6 +51,7 @@ model Sector {
   users       User[]       @relation("SectorUsers")
   conventions Convention[]
   leads       Lead[]
+  pointOnboardings PointOnboarding[]
 }
 
 model GtcPoint {
@@ -63,6 +65,7 @@ model GtcPoint {
   services    GtcPointService[]
   users       User[]            @relation("PointUsers")
   conventions Convention[]
+  onboardings PointOnboarding[]
 }
 
 model Service {
@@ -73,6 +76,7 @@ model Service {
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
   pointLinks GtcPointService[]
+  onboardingLinks PointOnboardingService[]
 }
 
 model GtcPointService {
@@ -131,6 +135,14 @@ enum ConventionDocKind {
   OTHER
 }
 
+enum PointOnboardingStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  DECLINED
+  COMPLETED
+}
+
 model Convention {
   id               String           @id @default(cuid())
   gtcPointId       String
@@ -163,6 +175,49 @@ model ConventionDocument {
   uploadedBy User?      @relation("UserUploadedConventionDocuments", fields: [uploadedById], references: [id])
 
   @@index([conventionId, createdAt])
+}
+
+model PointOnboarding {
+  id                 String                 @id @default(cuid())
+  sectorId           String
+  email              String
+  name               String
+  vatOrTaxNumber     String?
+  phone              String?
+  signaturePath      String?
+  includeServices    Boolean                @default(false)
+  status             PointOnboardingStatus  @default(DRAFT)
+
+  onboardingToken    String                 @unique
+  registrationToken  String?                @unique
+  tokenExpiresAt     DateTime?
+
+  gtcPointId         String?
+  approvedByUserId   String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  submittedAt        DateTime?
+  approvedAt         DateTime?
+  completedAt        DateTime?
+
+  sector             Sector                 @relation(fields: [sectorId], references: [id])
+  approvedBy         User?                  @relation("UserApprovedPointOnboardings", fields: [approvedByUserId], references: [id])
+  gtcPoint           GtcPoint?              @relation(fields: [gtcPointId], references: [id])
+  services           PointOnboardingService[]
+
+  @@index([sectorId, status, createdAt])
+}
+
+model PointOnboardingService {
+  id                 String          @id @default(cuid())
+  onboardingId       String
+  serviceId          String
+  createdAt          DateTime        @default(now())
+
+  onboarding         PointOnboarding @relation(fields: [onboardingId], references: [id])
+  service            Service         @relation(fields: [serviceId], references: [id])
+
+  @@unique([onboardingId, serviceId])
 }
 
 model Lead {
