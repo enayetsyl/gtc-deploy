@@ -1,6 +1,11 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { api } from "@/lib/axios";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
 
 type OnboardingPrefill = {
   name: string;
@@ -23,12 +28,16 @@ export default function OnboardingFormClient({ token }: { token: string }) {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`/api/public/onboarding/points/${token}`);
-      if (!res.ok) return setPrefill(null);
-      const data = (await res.json()) as OnboardingPrefill;
-      setPrefill(data);
-      setServices(data.serviceIds ?? []);
-      setLoading(false);
+      try {
+        const r = await api.get(`/api/public/onboarding/points/${token}`);
+        const data = r.data as OnboardingPrefill;
+        setPrefill(data);
+        setServices(data.serviceIds ?? []);
+      } catch {
+        setPrefill(null);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [token]);
 
@@ -37,7 +46,106 @@ export default function OnboardingFormClient({ token }: { token: string }) {
     if (!c) return;
     const ctx = c.getContext("2d");
     if (!ctx) return;
-    ctx.clearRect(0, 0, c.width, c.height);
+    // clear using CSS pixels since we scale the context to devicePixelRatio
+    const rect = c.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+  }
+
+  // Drawing state and handlers
+  const drawing = useRef(false);
+  const lastPoint = useRef<{ x: number; y: number } | null>(null);
+
+  // Resize the canvas for DPR and keep a scaled context. Use ResizeObserver so
+  // the canvas updates if the layout changes. Pointer handlers are attached
+  // directly to the canvas element via React props (see below) for reliability.
+  useEffect(() => {
+    const maybeEl = canvasRef.current;
+    if (!maybeEl) return;
+    const el = maybeEl as HTMLCanvasElement;
+
+    function resize() {
+      const rect = el.getBoundingClientRect();
+      const dpr =
+        typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+      el.width = Math.max(1, Math.round(rect.width * dpr));
+      el.height = Math.max(1, Math.round(rect.height * dpr));
+      el.style.width = `${rect.width}px`;
+      el.style.height = `${rect.height}px`;
+      const ctx = el.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#000";
+    }
+
+    resize();
+    const ro = new ResizeObserver(() => resize());
+    ro.observe(el);
+    // Also update on window dpr changes (some browsers fire resize on zoom)
+    window.addEventListener("resize", resize);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
+
+  // React pointer handlers attached directly to <canvas> for better cross-browser behavior
+
+  function getEventPos(e: React.PointerEvent<HTMLCanvasElement>) {
+    const el = canvasRef.current;
+    if (!el) return null;
+    // Try native offsetX/offsetY first (handles transforms/padding better in many browsers)
+    const ne = e.nativeEvent as unknown as {
+      offsetX?: number;
+      offsetY?: number;
+    };
+    if (typeof ne.offsetX === "number" && typeof ne.offsetY === "number") {
+      return { x: ne.offsetX, y: ne.offsetY };
+    }
+    // fallback to client coordinates
+    const rect = el.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function handlePointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    const el = canvasRef.current;
+    if (!el) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+    drawing.current = true;
+    const p = getEventPos(e);
+    if (!p) return;
+    lastPoint.current = p;
+    const cctx = el.getContext("2d");
+    if (!cctx) return;
+    cctx.beginPath();
+    cctx.moveTo(p.x, p.y);
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!drawing.current) return;
+    const el = canvasRef.current;
+    if (!el) return;
+    const p = getEventPos(e);
+    if (!p) return;
+    const cctx = el.getContext("2d");
+    if (!cctx || !lastPoint.current) return;
+    cctx.lineTo(p.x, p.y);
+    cctx.stroke();
+    lastPoint.current = p;
+  }
+
+  function handlePointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
+    const el = canvasRef.current;
+    if (!el) return;
+    drawing.current = false;
+    lastPoint.current = null;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
   }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -54,65 +162,85 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       );
       if (blob) fd.append("signature", blob, "signature.png");
     }
-    const res = await fetch(`/api/public/onboarding/points/${token}/submit`, {
-      method: "POST",
-      body: fd,
-    });
-    if (res.ok) router.push("/onboarding/thanks");
-    else alert("Submit failed");
+    try {
+      await api.post(`/api/public/onboarding/points/${token}/submit`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      router.push("/onboarding/thanks");
+    } catch (err) {
+      console.error(err);
+      alert("Submit failed");
+    }
   }
 
   if (loading) return <div>Loading…</div>;
   if (!prefill) return <div>Invalid or expired link</div>;
 
   return (
-    <form onSubmit={submit}>
-      <h1>Onboarding for {prefill.name}</h1>
-      <p>Email: {prefill.email}</p>
+    <form onSubmit={submit} className="max-w-2xl space-y-4 mx-auto">
+      <h1 className="text-xl font-semibold">Onboarding for {prefill.name}</h1>
+      <p className="text-sm text-muted-foreground">Email: {prefill.email}</p>
+
       <div>
-        <label>VAT / Tax number</label>
-        <input value={vat} onChange={(e) => setVat(e.target.value)} />
+        <Label>VAT / Tax number</Label>
+        <Input value={vat} onChange={(e) => setVat(e.target.value)} />
       </div>
+
       <div>
-        <label>Phone</label>
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <Label>Phone</Label>
+        <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
       </div>
+
       {prefill.includeServices && (
         <div>
-          <label>Services (preselected)</label>
-          {prefill.serviceIds?.map((sid: string) => (
-            <div key={sid}>
-              <input
-                type="checkbox"
-                checked={services.includes(sid)}
-                onChange={(e) =>
-                  setServices((s) =>
-                    e.target.checked ? [...s, sid] : s.filter((x) => x !== sid)
-                  )
-                }
-              />{" "}
-              {sid}
-            </div>
-          ))}
+          <Label>Services (preselected)</Label>
+          <div className="space-y-2">
+            {prefill.serviceIds?.map((sid: string) => (
+              <div key={sid} className="flex items-center gap-2">
+                <Checkbox
+                  checked={services.includes(sid)}
+                  onCheckedChange={(c) =>
+                    setServices((s) =>
+                      c ? [...s, sid] : s.filter((x) => x !== sid)
+                    )
+                  }
+                />
+                <span className="text-sm">{sid}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
       <div>
-        <label>Signature</label>
+        <Label>Signature</Label>
         <div>
           <canvas
             ref={canvasRef}
-            width={400}
-            height={160}
-            style={{ border: "1px solid #ccc" }}
+            width={800}
+            height={320}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            style={{
+              border: "1px solid #ccc",
+              width: "100%",
+              height: 160,
+              touchAction: "none",
+            }}
           />
-          <div>
-            <button type="button" onClick={clearCanvas}>
+          <div className="mt-2 flex gap-2">
+            <Button type="button" variant="outline" onClick={clearCanvas}>
               Clear
-            </button>
+            </Button>
           </div>
         </div>
       </div>
-      <button type="submit">Submit</button>
+
+      <div>
+        <Button type="submit">Submit</Button>
+      </div>
     </form>
   );
 }

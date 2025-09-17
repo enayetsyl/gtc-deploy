@@ -26,12 +26,13 @@ export default function AdminNav() {
     items.unshift(
       { href: "/admin/leads", label: "Leads" },
       { href: "/admin/conventions", label: "Conventions" },
+      { href: "/admin/points-onboarding", label: "Points Onboarding" }
     );
   } else if (user?.role === "GTC_POINT") {
     // Point users see My Conventions + Point Leads
     items.unshift(
       { href: "/point/leads", label: "Leads" },
-      { href: "/point/conventions", label: "My Conventions" },
+      { href: "/point/conventions", label: "My Conventions" }
     );
   } else if (user?.role === "SECTOR_OWNER") {
     // Sector owners see Owner Leads
