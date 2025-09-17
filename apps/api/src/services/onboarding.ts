@@ -2,7 +2,7 @@ import { prisma } from "../lib/prisma";
 import { randomBytes } from "node:crypto";
 import { enqueueEmail } from "../queues/email";
 import { storage } from "../storage/provider";
-import { notifyUsers } from "./notifications";
+import { notifyUsers, notifyUser } from "./notifications";
 import { env } from "../config/env";
 
 function token(len = 24) {
@@ -79,13 +79,25 @@ export async function submitOnboardingForm(onboardingToken: string, payload: Sub
     },
   });
 
-  // notify admins (all users with role ADMIN)
-  const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
-  await notifyUsers(admins.map((a) => a.id), {
-    type: "GENERIC",
-    subject: "New GTC Point onboarding submitted",
-    contentHtml: `<p>Point: ${ob.name} (${ob.email}) submitted onboarding details.</p>`,
-  });
+  // notify admins (all users with role ADMIN) and sector owners
+  const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true, email: true } });
+  const owners = await prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true, email: true } });
+
+  const adminIds = admins.map((a) => a.id);
+  const ownerIds = owners.map((o) => o.id);
+
+  const adminAndOwners = Array.from(new Set([...adminIds, ...ownerIds]));
+
+  const adminLink = `${env.webBaseUrl.replace(/\/$/, "")}/admin/points/onboarding/${ob.id}`;
+
+  if (adminAndOwners.length) {
+    await notifyUsers(adminAndOwners, {
+      type: "GENERIC",
+      subject: "New GTC Point onboarding submitted",
+      contentHtml: `<p>Point <strong>${ob.name}</strong> &lt;${ob.email}&gt; submitted onboarding details. Review: <a href=\"${adminLink}\">Review onboarding</a></p>`,
+      email: { subject: "New GTC Point onboarding submitted", html: `<p>Point <strong>${ob.name}</strong> &lt;${ob.email}&gt; submitted onboarding details. Review: <a href=\"${adminLink}\">${adminLink}</a></p>` },
+    });
+  }
 }
 
 export async function approveOnboarding(id: string, adminUserId: string) {
@@ -118,6 +130,24 @@ export async function approveOnboarding(id: string, adminUserId: string) {
   const link = `${env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/register/${registrationToken}`;
   await enqueueEmail({ to: ob.email, subject: "Your GTC Point registration link", html: `<p>Your onboarding was approved. Complete your account by setting password: <a href=\"${link}\">${link}</a></p>` });
 
+  // notify admins and sector owners about approval
+  const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
+  const owners = await prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true } });
+  const recipients = Array.from(new Set([...admins.map((a) => a.id), ...owners.map((o) => o.id)]));
+
+  // fetch service names if any
+  let serviceNames: string[] = [];
+  if (ob.includeServices && ob.services && ob.services.length) {
+    const serviceIds = ob.services.map((s: any) => s.serviceId);
+    const services = await prisma.service.findMany({ where: { id: { in: serviceIds } }, select: { name: true } });
+    serviceNames = services.map((s) => s.name);
+  }
+
+  if (recipients.length) {
+    const html = `<p>GTC Point <strong>${ob.name}</strong> (&lt;${ob.email}&gt;) was approved by admin.</p>${serviceNames.length ? `<p>Enabled services: <strong>${serviceNames.join(", ")}</strong></p>` : ""}<p>View point: <a href=\"${env.webBaseUrl.replace(/\/$/, "")}/admin/points/${point.id}\">Open point</a></p>`;
+    await notifyUsers(recipients, { type: "GENERIC", subject: "GTC Point approved", contentHtml: html, email: { subject: "GTC Point approved", html } });
+  }
+
   return { pointId: point.id };
 }
 
@@ -128,6 +158,14 @@ export async function declineOnboarding(id: string, adminUserId: string) {
 
   await (prisma as any).pointOnboarding.update({ where: { id: ob.id }, data: { status: "DECLINED", approvedByUserId: adminUserId, approvedAt: new Date() } });
   await enqueueEmail({ to: ob.email, subject: "Your onboarding was declined", html: `<p>Your onboarding request was declined by admin.</p>` });
+
+  // notify admins and owners that it was declined
+  const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
+  const owners = await prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true } });
+  const recipients = Array.from(new Set([...admins.map((a) => a.id), ...owners.map((o) => o.id)]));
+  if (recipients.length) {
+    await notifyUsers(recipients, { type: "GENERIC", subject: "GTC Point onboarding declined", contentHtml: `<p>Onboarding for <strong>${ob.name}</strong> (&lt;${ob.email}&gt;) was declined by admin.</p>` });
+  }
 }
 
 export async function completeRegistration(registrationToken: string, passwordHash: string) {
@@ -149,6 +187,12 @@ export async function completeRegistration(registrationToken: string, passwordHa
   if (recipients.length) {
     await notifyUsers(recipients, { type: "GENERIC", subject: "New GTC Point registered", contentHtml: `<p>${ob.name} (${ob.email}) completed registration.</p>` });
   }
+
+  // send welcome email to the newly created user
+  await enqueueEmail({ to: user.email, subject: "Welcome — your account is ready", html: `<p>Your account has been created and you can now login with your email.</p>` });
+
+  // create an in-app welcome notification for the new user
+  await notifyUser({ userId: user.id, subject: "Welcome to GTC", contentHtml: `<p>Welcome ${user.name}! Your account is now active.</p>` });
 
   return user;
 }
