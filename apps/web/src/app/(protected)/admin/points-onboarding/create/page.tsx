@@ -15,7 +15,10 @@ import { api } from "@/lib/axios";
 
 type Sector = { id: string; name: string };
 
+import { useI18n } from "@/providers/i18n-provider";
+
 export default function CreateInvite() {
+  const { t } = useI18n();
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [sector, setSector] = useState("");
   const [email, setEmail] = useState("");
@@ -42,7 +45,7 @@ export default function CreateInvite() {
           "/api/admin/services"
         );
         setServices(data || []);
-      } catch (err) {
+      } catch {
         // ignore — services list is optional
       }
     })();
@@ -62,12 +65,12 @@ export default function CreateInvite() {
         serviceIds: includeServices ? selectedServices : undefined,
       });
       // use a basic toast via browser alert (sonner Toaster can be mounted globally)
-      alert("Invite created");
+      alert(t("admin.onboarding.inviteCreated"));
       setEmail("");
       setName("");
       setIncludeServices(false);
     } catch {
-      alert("Create failed");
+      alert(t("ui.createFailed"));
     } finally {
       setLoading(false);
     }
@@ -77,7 +80,9 @@ export default function CreateInvite() {
     <div>
       <Toaster />
       <form onSubmit={submit} className="max-w-xl space-y-4">
-        <h2 className="text-lg font-semibold">Create invite</h2>
+        <h2 className="text-lg font-semibold">
+          {t("admin.onboarding.createInvite")}
+        </h2>
 
         <div>
           <label className="block text-sm text-muted-foreground mb-1">
@@ -85,7 +90,7 @@ export default function CreateInvite() {
           </label>
           <Select value={sector} onValueChange={(v) => setSector(v)}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select sector" />
+              <SelectValue placeholder={t("ui.selectSector")} />
             </SelectTrigger>
             <SelectContent>
               {sectors.map((s) => (
@@ -99,14 +104,14 @@ export default function CreateInvite() {
 
         <div>
           <label className="block text-sm text-muted-foreground mb-1">
-            Name
+            {t("form.name")}
           </label>
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </div>
 
         <div>
           <label className="block text-sm text-muted-foreground mb-1">
-            Email
+            {t("form.email")}
           </label>
           <Input
             type="email"
@@ -120,7 +125,9 @@ export default function CreateInvite() {
             checked={includeServices}
             onCheckedChange={(c) => setIncludeServices(Boolean(c))}
           />
-          <label className="text-sm">Include services</label>
+          <label className="text-sm">
+            {t("admin.onboarding.includeServices")}
+          </label>
         </div>
 
         {includeServices && (
@@ -155,7 +162,7 @@ export default function CreateInvite() {
                 })
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No services available
+                  {t("ui.noServices")}
                 </p>
               )}
             </div>
@@ -164,7 +171,7 @@ export default function CreateInvite() {
 
         <div>
           <Button type="submit" disabled={loading}>
-            {loading ? "Creating…" : "Create invite"}
+            {loading ? t("ui.creating") : t("admin.onboarding.createInvite")}
           </Button>
         </div>
       </form>

@@ -4,17 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
+import { useI18n } from "@/providers/i18n-provider";
 
-// Base admin items (kept as-is)
+// Base admin items (use translation keys)
 const baseItems = [
-  { href: "/admin/sectors", label: "Sectors" },
-  { href: "/admin/points", label: "GTC Points" },
-  { href: "/admin/services", label: "Services" },
+  { href: "/admin/sectors", labelKey: "nav.sectors" },
+  { href: "/admin/points", labelKey: "nav.points" },
+  { href: "/admin/services", labelKey: "nav.services" },
 ];
 
 export default function AdminNav() {
   const pathname = usePathname();
   const { logout, user } = useAuth();
+  const { t, setLocale } = useI18n();
 
   // Show base admin items only to ADMIN users
   const items = user?.role === "ADMIN" ? [...baseItems] : [];
@@ -23,25 +25,40 @@ export default function AdminNav() {
   if (user?.role === "ADMIN") {
     // Admin sees Admin Leads + Admin Conventions
     items.unshift(
-      { href: "/admin/leads", label: "Leads" },
-      { href: "/admin/conventions", label: "Conventions" },
-      { href: "/admin/points-onboarding", label: "Points Onboarding" }
+      { href: "/admin/leads", labelKey: "nav.leads" },
+      { href: "/admin/conventions", labelKey: "nav.conventions" },
+      { href: "/admin/points-onboarding", labelKey: "nav.pointsOnboarding" }
     );
   } else if (user?.role === "GTC_POINT") {
     // Point users see My Conventions + Point Leads
     items.unshift(
-      { href: "/point/leads", label: "Leads" },
-      { href: "/point/conventions", label: "My Conventions" },
-      { href: "/point/services", label: "Services" },
-      { href: "/point/sectors", label: "Sectors" }
+      { href: "/point/leads", labelKey: "nav.leads" },
+      { href: "/point/conventions", labelKey: "nav.myConventions" },
+      { href: "/point/services", labelKey: "nav.services" },
+      { href: "/point/sectors", labelKey: "nav.sectors" }
     );
   } else if (user?.role === "SECTOR_OWNER") {
     // Sector owners see Owner Leads
-    items.unshift({ href: "/owner/leads", label: "Leads" });
+    items.unshift({ href: "/owner/leads", labelKey: "nav.leads" });
   }
 
   return (
     <nav className="flex gap-2">
+      {/* language switcher */}
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setLocale?.("en")}
+          className="rounded-md border px-2 py-1 text-xs"
+        >
+          EN
+        </button>
+        <button
+          onClick={() => setLocale?.("it")}
+          className="rounded-md border px-2 py-1 text-xs"
+        >
+          IT
+        </button>
+      </div>
       {items.map((it) => {
         // Avoid '/admin/points' matching '/admin/points-onboarding'
         const active =
@@ -58,7 +75,7 @@ export default function AdminNav() {
               active && "bg-black text-white hover:bg-black"
             )}
           >
-            {it.label}
+            {it.labelKey ? t(it.labelKey) : it.href}
           </Link>
         );
       })}
@@ -67,7 +84,7 @@ export default function AdminNav() {
         onClick={logout}
         className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
       >
-        Logout
+        {t("nav.logout")}
       </button>
     </nav>
   );

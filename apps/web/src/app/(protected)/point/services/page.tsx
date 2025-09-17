@@ -20,8 +20,10 @@ import {
 import ServiceStatusBadge from "@/components/services/ServiceStatusBadge";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
+import { useI18n } from "@/providers/i18n-provider";
 
 export default function PointServicesPage() {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const { data, isLoading, isError } = useQuery<ServiceLink[]>({
     queryKey: qk.pointServices,
@@ -35,30 +37,34 @@ export default function PointServicesPage() {
   >({
     mutationFn: (serviceId: string) => requestServiceById(serviceId),
     onSuccess: () => {
-      toast.success("Request sent to Admins");
+      toast.success(t("point.services.requestSent"));
       qc.invalidateQueries({ queryKey: qk.pointServices });
     },
     onError: (err) =>
-      toast.error(err.response?.data?.error ?? "Failed to request service"),
+      toast.error(err.response?.data?.error ?? t("ui.requestFailed")),
   });
 
   return (
     <div className="container mx-auto py-6 space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>My Services</CardTitle>
+          <CardTitle>{t("point.services.title")}</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading && <p>Loading…</p>}
-          {isError && <p className="text-destructive">Failed to load.</p>}
+          {isLoading && <p>{t("ui.loading")}</p>}
+          {isError && (
+            <p className="text-destructive">{t("ui.failedToLoad")}</p>
+          )}
           {!isLoading && data && (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[44%]">Service</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                  <TableHead className="w-[44%]">
+                    {t("table.service")}
+                  </TableHead>
+                  <TableHead>{t("table.code")}</TableHead>
+                  <TableHead>{t("table.status")}</TableHead>
+                  <TableHead className="text-right">{t("ui.action")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -82,9 +88,9 @@ export default function PointServicesPage() {
                           onClick={() => requestMut.mutate(row.serviceId)}
                         >
                           {canRequest
-                            ? "Request"
+                            ? t("point.services.request")
                             : row.status === "PENDING_REQUEST"
-                            ? "Pending…"
+                            ? t("ui.pending")
                             : "—"}
                         </Button>
                       </TableCell>

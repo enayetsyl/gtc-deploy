@@ -1,13 +1,15 @@
+"use client";
 import React from "react";
 import Link from "next/link";
+import { useI18n } from "@/providers/i18n-provider";
 
 export const metadata = {
   title: "Thanks — Onboarding",
-  description:
-    "Your onboarding request was submitted. Download, sign and upload the pre-filled form; an administrator will review it shortly.",
+  description: "Onboarding request received",
 };
 
 export default function OnboardingThanksPage() {
+  const { t } = useI18n();
   return (
     <main
       style={{
@@ -20,13 +22,12 @@ export default function OnboardingThanksPage() {
     >
       <div style={{ maxWidth: 760, textAlign: "center" }}>
         <h1 style={{ fontSize: "1.75rem", marginBottom: "0.5rem" }}>
-          Thank you — request received
+          {t("onboarding.thanksTitle")}
         </h1>
         <p style={{ color: "#444", lineHeight: 1.6 }}>
-          We have received your onboarding request for a GTC point. Please
-          download the pre-filled convention form, sign it, and re-upload it in
-          your dashboard. An administrator will review your submission and
-          notify you by email when it is processed.
+          {t("onboarding.thanksMessagePart1")}{" "}
+          {t("onboarding.instructionsPart1")}{" "}
+          {t("onboarding.thanksMessagePart2")}
         </p>
 
         <p style={{ color: "#444", lineHeight: 1.6, marginTop: "1rem" }}>

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
+import { useI18n } from "@/providers/i18n-provider";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/axios";
 import { Input } from "@/components/ui/input";
@@ -182,21 +183,27 @@ export default function OnboardingFormClient({ token }: { token: string }) {
     }
   }
 
-  if (loading) return <div>Loading…</div>;
-  if (!prefill) return <div>Invalid or expired link</div>;
+  const { t } = useI18n();
+
+  if (loading) return <div>{t("ui.loading")}</div>;
+  if (!prefill) return <div>{t("onboarding.invalidLink")}</div>;
 
   return (
     <form onSubmit={submit} className="max-w-2xl space-y-4 mx-auto">
-      <h1 className="text-xl font-semibold">Onboarding for {prefill.name}</h1>
-      <p className="text-sm text-muted-foreground">Email: {prefill.email}</p>
+      <h1 className="text-xl font-semibold">
+        {t("onboarding.title", { name: prefill.name })}
+      </h1>
+      <p className="text-sm text-muted-foreground">
+        {t("onboarding.email", { email: prefill.email })}
+      </p>
 
       <div>
-        <Label>VAT / Tax number</Label>
+        <Label>{t("onboarding.vatLabel")}</Label>
         <Input value={vat} onChange={(e) => setVat(e.target.value)} />
       </div>
 
       <div>
-        <Label>Phone</Label>
+        <Label>{t("onboarding.phoneLabel")}</Label>
         <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
       </div>
 
@@ -207,13 +214,13 @@ export default function OnboardingFormClient({ token }: { token: string }) {
           variant="ghost"
           onClick={() => setTermsOpen(true)}
         >
-          Terms and Conditions
+          {t("onboarding.terms")}
         </Button>
       </div>
 
       {prefill.includeServices && (
         <div>
-          <Label>Services (preselected)</Label>
+          <Label>{t("onboarding.servicesPreselected")}</Label>
           <div className="space-y-2">
             {prefill.serviceIds?.map((sid: string) => (
               <div key={sid} className="flex items-center gap-2">
@@ -234,7 +241,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       )}
 
       <div>
-        <Label>Signature</Label>
+        <Label>{t("onboarding.signature")}</Label>
         <div>
           <canvas
             ref={canvasRef}
@@ -253,14 +260,14 @@ export default function OnboardingFormClient({ token }: { token: string }) {
           />
           <div className="mt-2 flex gap-2">
             <Button type="button" variant="outline" onClick={clearCanvas}>
-              Clear
+              {t("onboarding.clear")}
             </Button>
           </div>
         </div>
       </div>
 
       <div>
-        <Button type="submit">Submit</Button>
+        <Button type="submit">{t("onboarding.submit")}</Button>
       </div>
 
       {/* Terms modal (simple overlay) */}
@@ -271,23 +278,13 @@ export default function OnboardingFormClient({ token }: { token: string }) {
             onClick={() => setTermsOpen(false)}
           />
           <div className="relative max-w-2xl w-full bg-popover text-popover-foreground rounded-xl shadow-lg p-6 mx-4">
-            <h2 className="text-lg font-semibold mb-2">Terms and Conditions</h2>
+            <h2 className="text-lg font-semibold mb-2">
+              {t("onboarding.termsTitle")}
+            </h2>
             <div className="text-sm text-muted-foreground space-y-3 mb-4 max-h-60 overflow-auto">
-              <p>
-                These are imaginary terms and conditions for demo purposes. By
-                signing below you agree to allow the platform to process your
-                onboarding request, contact you by email or phone, and store
-                submitted documents for administrative review.
-              </p>
-              <p>
-                You confirm that the information provided is accurate and that
-                you have authority to act on behalf of the organization. This
-                demo text is not legally binding.
-              </p>
-              <p>
-                If you disagree with any clause, do not submit the onboarding
-                request. Contact support for help.
-              </p>
+              <p>{t("onboarding.termsParagraph1")}</p>
+              <p>{t("onboarding.termsParagraph2")}</p>
+              <p>{t("onboarding.termsParagraph3")}</p>
             </div>
 
             <div className="flex items-center gap-4">
@@ -297,9 +294,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
                   checked={agreed}
                   onChange={(e) => setAgreed(e.target.checked)}
                 />
-                <span className="text-sm">
-                  I agree to the terms and conditions
-                </span>
+                <span className="text-sm">{t("onboarding.agreeLabel")}</span>
               </label>
 
               <div className="ml-auto flex gap-2">
@@ -308,25 +303,21 @@ export default function OnboardingFormClient({ token }: { token: string }) {
                   variant="outline"
                   onClick={() => setTermsOpen(false)}
                 >
-                  Close
+                  {t("onboarding.close")}
                 </Button>
                 <Button
                   type="button"
                   onClick={() => {
                     if (!agreed) {
-                      toast.error(
-                        "You must agree to the terms before signing."
-                      );
+                      toast.error(t("onboarding.mustAgree"));
                       return;
                     }
                     // close modal — signature is already captured on canvas; agreement recorded locally
                     setTermsOpen(false);
-                    toast.success(
-                      "Terms accepted. You can now sign and submit."
-                    );
+                    toast.success(t("onboarding.termsAccepted"));
                   }}
                 >
-                  Sign and accept
+                  {t("onboarding.signAndAccept")}
                 </Button>
               </div>
             </div>

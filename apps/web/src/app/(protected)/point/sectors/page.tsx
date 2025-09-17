@@ -2,8 +2,10 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useI18n } from "@/providers/i18n-provider";
 
 export default function Page() {
+  const { t } = useI18n();
   const [sectors, setSectors] = useState<Array<{ id: string; name: string }>>(
     []
   );
@@ -23,13 +25,11 @@ export default function Page() {
     <div className="p-4">
       <Card>
         <CardHeader>
-          <CardTitle>Available Sectors</CardTitle>
+          <CardTitle>{t("point.sectors.title")}</CardTitle>
         </CardHeader>
         <CardContent>
           {sectors.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No sectors available.
-            </p>
+            <p className="text-sm text-muted-foreground">{t("ui.noSectors")}</p>
           ) : (
             <ul className="list-disc pl-6 space-y-1">
               {sectors.map((s) => (

@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useI18n } from "@/providers/i18n-provider";
 import { Button } from "../../components/ui/button";
 
 type Props = {
-  accept?: string | string[];       // e.g. "application/pdf" or [".pdf","image/*"]
-  maxSizeMB?: number;                // e.g. 10
+  accept?: string | string[]; // e.g. "application/pdf" or [".pdf","image/*"]
+  maxSizeMB?: number; // e.g. 10
   value?: File | null;
   onSelect: (file: File | null) => void;
   disabled?: boolean;
@@ -41,6 +42,7 @@ export default function UploadWidget({
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { t } = useI18n();
 
   const validateAndSet = useCallback(
     (file: File) => {
@@ -98,12 +100,12 @@ export default function UploadWidget({
             </div>
           ) : (
             <div className="text-muted-foreground">
-              Drop a file here or <span className="underline">browse</span>
+              {t("file.dropOrBrowse", { browse: "browse" })}
             </div>
           )}
         </div>
         <Button type="button" variant="outline" size="sm">
-          Choose file
+          {t("file.choose")}
         </Button>
         <input
           ref={inputRef}
@@ -117,7 +119,11 @@ export default function UploadWidget({
 
       <div className="mt-2 flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
-          {hint ?? `Accepted: ${toArray(accept).join(", ") || "any"} · Max ${maxSizeMB}MB`}
+          {hint ??
+            t("file.accepted", {
+              types: toArray(accept).join(", ") || "any",
+              max: String(maxSizeMB),
+            })}
         </span>
         {error && <span className="text-xs text-red-600">{error}</span>}
       </div>

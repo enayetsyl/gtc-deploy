@@ -8,11 +8,13 @@ import {
 import PrefillForm from "./PrefillForm";
 import UploadSigned from "./UploadSigned";
 import { Button } from "../../components/ui/button";
+import { useI18n } from "@/providers/i18n-provider";
 
 export default function PointConventionsPage() {
   const [page] = useState(1);
   const { data, isLoading } = useMyConventions(page, 20);
   const createConvention = useCreateConvention();
+  const { t } = useI18n();
 
   async function handleDownload(
     conventionId: string,
@@ -32,14 +34,14 @@ export default function PointConventionsPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">My Conventions</h1>
+        <h1 className="text-2xl font-semibold">{t("nav.myConventions")}</h1>
         <Button onClick={() => createConvention.mutate()}>
-          Create convention
+          {t("convention.create")}
         </Button>
       </div>
 
       <section className="rounded-2xl border p-4 space-y-4">
-        <h2 className="font-medium">Step 1: Prefill & download</h2>
+        <h2 className="font-medium">{t("convention.step1")}</h2>
         <PrefillForm />
       </section>
 
@@ -50,11 +52,11 @@ export default function PointConventionsPage() {
             <thead>
               <tr className="bg-muted/30 text-left">
                 <th className="p-3">#</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Point</th>
-                <th className="p-3">Sector</th>
-                <th className="p-3">Documents</th>
-                <th className="p-3">Actions</th>
+                <th className="p-3">{t("table.status")}</th>
+                <th className="p-3">{t("table.point")}</th>
+                <th className="p-3">{t("table.sector")}</th>
+                <th className="p-3">{t("table.documents")}</th>
+                <th className="p-3">{t("table.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -87,7 +89,7 @@ export default function PointConventionsPage() {
                                 handleDownload(c.id, d.id, d.fileName)
                               }
                             >
-                              Download
+                              {t("convention.download")}
                             </Button>
                             <span className="text-xs text-muted-foreground">
                               {d.fileName}
