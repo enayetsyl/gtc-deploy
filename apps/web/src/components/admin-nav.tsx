@@ -42,7 +42,12 @@ export default function AdminNav() {
   return (
     <nav className="flex gap-2">
       {items.map((it) => {
-        const active = pathname?.startsWith(it.href);
+        // Avoid '/admin/points' matching '/admin/points-onboarding'
+        const active =
+          pathname === it.href ||
+          (it.href.endsWith("/")
+            ? pathname?.startsWith(it.href)
+            : pathname?.startsWith(it.href + "/"));
         return (
           <Link
             key={it.href}

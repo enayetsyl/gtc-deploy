@@ -1,6 +1,18 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import axios from "axios";
+import { api } from "@/lib/axios";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 export default function RegisterPage() {
   const params = useParams() as { regToken?: string } | undefined;
@@ -14,58 +26,91 @@ export default function RegisterPage() {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(
-        `/api/public/onboarding/points/register/${token}`
-      );
-      if (!res.ok) return setPrefill(null);
-      setPrefill(await res.json());
+      if (!token) return;
+      try {
+        const { data } = await api.get<{
+          email: string;
+          name: string;
+          role: string;
+        }>(`/api/public/onboarding/points/register/${token}`);
+        setPrefill(data);
+      } catch (err: unknown) {
+        // treat not found / expired or any error as invalid link for this UI
+        if (axios.isAxiosError(err)) {
+          // optional: could inspect err.response?.status
+        }
+        setPrefill(null);
+      }
     })();
   }, [token]);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (password !== confirm) return alert("Passwords do not match");
-    const res = await fetch(`/api/public/onboarding/points/register/${token}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password, confirm }),
-    });
-    if (res.ok) router.push("/auth/login");
-    else alert("Registration failed");
+    try {
+      await api.post(`/api/public/onboarding/points/register/${token}`, {
+        password,
+        confirm,
+      });
+      router.push("/login");
+    } catch {
+      alert("Registration failed");
+    }
   }
 
   if (prefill === null) return <div>Invalid or expired link</div>;
   if (!prefill) return <div>Loading…</div>;
 
   return (
-    <form onSubmit={submit}>
-      <h1>Register account</h1>
-      <div>
-        Email: <input value={prefill.email} disabled />
-      </div>
-      <div>
-        Name: <input value={prefill.name} disabled />
-      </div>
-      <div>
-        Role: <input value={prefill.role} disabled />
-      </div>
-      <div>
-        <label>Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </div>
-      <div>
-        <label>Confirm</label>
-        <input
-          type="password"
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-        />
-      </div>
-      <button type="submit">Create account</button>
+    <form onSubmit={submit} className="max-w-md mx-auto">
+      <Card>
+        <CardHeader>
+          <CardTitle>Register account</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4">
+            <div>
+              <Label>Email</Label>
+              <Input value={prefill.email} disabled />
+            </div>
+
+            <div>
+              <Label>Name</Label>
+              <Input value={prefill.name} disabled />
+            </div>
+
+            <div>
+              <Label>Role</Label>
+              <Input value={prefill.role} disabled />
+            </div>
+
+            <div>
+              <Label>Password</Label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <Label>Confirm password</Label>
+              <Input
+                type="password"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <div className="w-full flex justify-end">
+            <Button type="submit">Create account</Button>
+          </div>
+        </CardFooter>
+      </Card>
     </form>
   );
 }
