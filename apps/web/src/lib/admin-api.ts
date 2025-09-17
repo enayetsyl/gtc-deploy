@@ -56,3 +56,45 @@ export async function deleteService(id: string) {
   const { data } = await api.delete(`/api/admin/services/${id}`);
   return data;
 }
+
+// Onboarding
+export async function createPointOnboarding(payload: { sectorId: string; email: string; name: string; includeServices?: boolean; serviceIds?: string[] }) {
+  const { data } = await api.post(`/api/admin/points/onboarding`, payload);
+  return data;
+}
+
+export async function listPointOnboardings(status?: string) {
+  const { data } = await api.get(`/api/admin/points/onboarding`, { params: { status } });
+  return data;
+}
+
+export async function approvePointOnboarding(id: string) {
+  const { data } = await api.post(`/api/admin/points/onboarding/${id}/approve`);
+  return data;
+}
+
+export async function declinePointOnboarding(id: string) {
+  const { data } = await api.post(`/api/admin/points/onboarding/${id}/decline`);
+  return data;
+}
+
+// Public
+export async function getPublicOnboarding(token: string) {
+  const { data } = await api.get(`/api/public/onboarding/points/${token}`);
+  return data;
+}
+
+export async function submitPublicOnboarding(token: string, formData: FormData) {
+  const { data } = await api.post(`/api/public/onboarding/points/${token}/submit`, formData, { headers: { "Content-Type": "multipart/form-data" } });
+  return data;
+}
+
+export async function getRegistrationPrefill(regToken: string) {
+  const { data } = await api.get(`/api/public/onboarding/points/register/${regToken}`);
+  return data;
+}
+
+export async function completeRegistration(regToken: string, payload: { password: string; confirm: string }) {
+  const { data } = await api.post(`/api/public/onboarding/points/register/${regToken}`, payload);
+  return data;
+}

@@ -3,14 +3,25 @@
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys/services";
-import { getAdminPointServices, ServiceLink, toggleAdminPointService } from "@/lib/clients/servicesClient";
+import {
+  getAdminPointServices,
+  ServiceLink,
+  toggleAdminPointService,
+} from "@/lib/clients/servicesClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import ServiceStatusBadge from "@/components/services/ServiceStatusBadge";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
-import Link from "next/link";
+// Link is intentionally not used in this page; keep import removed to satisfy linter
 
 type ToggleVars = { serviceId: string; action: "ENABLE" | "DISABLE" };
 type ApiError = AxiosError<{ error?: string }>;
@@ -26,9 +37,14 @@ export default function AdminPointServicesPage() {
     queryFn: () => getAdminPointServices(pointId),
   });
 
-  const toggle = useMutation<ServiceLink, ApiError, ToggleVars,  MutCtx>({
-    mutationFn: ({ serviceId, action }: { serviceId: string; action: "ENABLE" | "DISABLE" }) =>
-      toggleAdminPointService(pointId, serviceId, action),
+  const toggle = useMutation<ServiceLink, ApiError, ToggleVars, MutCtx>({
+    mutationFn: ({
+      serviceId,
+      action,
+    }: {
+      serviceId: string;
+      action: "ENABLE" | "DISABLE";
+    }) => toggleAdminPointService(pointId, serviceId, action),
     onMutate: async ({ serviceId, action }) => {
       await qc.cancelQueries({ queryKey: qk.adminPointServices(pointId) });
       const prev = qc.getQueryData<ServiceLink[]>(
@@ -36,13 +52,21 @@ export default function AdminPointServicesPage() {
       );
 
       if (prev) {
-        const next: ServiceLink[] = prev.map((x) => (x.serviceId === serviceId ? { ...x, status: action === "ENABLE" ? "ENABLED" : "DISABLED" } : x));
+        const next: ServiceLink[] = prev.map((x) =>
+          x.serviceId === serviceId
+            ? { ...x, status: action === "ENABLE" ? "ENABLED" : "DISABLED" }
+            : x
+        );
         qc.setQueryData(qk.adminPointServices(pointId), next);
       }
       return { prev };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData<ServiceLink[]>(qk.adminPointServices(pointId), ctx.prev);
+      if (ctx?.prev)
+        qc.setQueryData<ServiceLink[]>(
+          qk.adminPointServices(pointId),
+          ctx.prev
+        );
       toast.error("Update failed");
     },
     onSuccess: (link) => {
@@ -73,15 +97,26 @@ export default function AdminPointServicesPage() {
               <TableBody>
                 {data.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell className="font-medium">{row.service.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{row.service.code}</TableCell>
-                    <TableCell><ServiceStatusBadge status={row.status} /></TableCell>
+                    <TableCell className="font-medium">
+                      {row.service.name}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {row.service.code}
+                    </TableCell>
+                    <TableCell>
+                      <ServiceStatusBadge status={row.status} />
+                    </TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={toggle.isPending || row.status === "ENABLED"}
-                        onClick={() => toggle.mutate({ serviceId: row.serviceId, action: "ENABLE" })}
+                        onClick={() =>
+                          toggle.mutate({
+                            serviceId: row.serviceId,
+                            action: "ENABLE",
+                          })
+                        }
                       >
                         Enable
                       </Button>
@@ -89,11 +124,15 @@ export default function AdminPointServicesPage() {
                         size="sm"
                         variant="secondary"
                         disabled={toggle.isPending || row.status === "DISABLED"}
-                        onClick={() => toggle.mutate({ serviceId: row.serviceId, action: "DISABLE" })}
+                        onClick={() =>
+                          toggle.mutate({
+                            serviceId: row.serviceId,
+                            action: "DISABLE",
+                          })
+                        }
                       >
                         Disable
                       </Button>
-                
                     </TableCell>
                   </TableRow>
                 ))}
