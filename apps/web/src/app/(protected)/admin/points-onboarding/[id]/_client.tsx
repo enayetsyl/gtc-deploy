@@ -14,10 +14,14 @@ type OnboardDetail = {
   phone?: string;
   signaturePath?: string;
   sector?: { id: string; name?: string } | null;
+  services?: Array<{ id: string; serviceId: string }>;
 };
 
 export default function Client({ id }: { id: string }) {
   const [item, setItem] = useState<OnboardDetail | null>(null);
+  const [servicesList, setServicesList] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
 
   const router = useRouter();
   useEffect(() => {
@@ -32,6 +36,18 @@ export default function Client({ id }: { id: string }) {
         setItem(found);
       } catch (err) {
         console.error(err);
+      }
+    })();
+    // fetch services to map serviceId -> name for display
+    (async () => {
+      try {
+        const r = await api.get<{ id: string; name: string }[]>(
+          `/api/admin/services`
+        );
+        const data = r.data || [];
+        setServicesList(data.map((s) => ({ id: s.id, name: s.name })));
+      } catch {
+        // ignore
       }
     })();
   }, [id]);
@@ -63,6 +79,17 @@ export default function Client({ id }: { id: string }) {
       {item.sector && <p>Sector: {item.sector.name}</p>}
       <p>VAT: {item.vatOrTaxNumber}</p>
       <p>Phone: {item.phone}</p>
+      {item.services && item.services.length > 0 && (
+        <div>
+          <p className="font-medium">Requested services:</p>
+          <ul className="list-disc pl-6">
+            {item.services.map((s) => {
+              const svc = servicesList.find((x) => x.id === s.serviceId);
+              return <li key={s.id}>{svc ? svc.name : s.serviceId}</li>;
+            })}
+          </ul>
+        </div>
+      )}
       <div>
         {item.signaturePath ? (
           // Use a plain <img> with the API base URL so the browser requests the file

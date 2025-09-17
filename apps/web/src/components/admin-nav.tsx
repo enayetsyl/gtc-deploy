@@ -16,9 +16,8 @@ export default function AdminNav() {
   const pathname = usePathname();
   const { logout, user } = useAuth();
 
-  // If you want to HIDE admin-only items for non-admins, flip this:
-  // const items = user?.role === "ADMIN" ? [...baseItems] : [];
-  const items = [...baseItems];
+  // Show base admin items only to ADMIN users
+  const items = user?.role === "ADMIN" ? [...baseItems] : [];
 
   // Role-aware prepend items
   if (user?.role === "ADMIN") {
@@ -32,7 +31,9 @@ export default function AdminNav() {
     // Point users see My Conventions + Point Leads
     items.unshift(
       { href: "/point/leads", label: "Leads" },
-      { href: "/point/conventions", label: "My Conventions" }
+      { href: "/point/conventions", label: "My Conventions" },
+      { href: "/point/services", label: "Services" },
+      { href: "/point/sectors", label: "Sectors" }
     );
   } else if (user?.role === "SECTOR_OWNER") {
     // Sector owners see Owner Leads
