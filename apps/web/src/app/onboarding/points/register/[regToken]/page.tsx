@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function RegisterPage() {
   const params = useParams() as { regToken?: string } | undefined;
@@ -47,6 +48,10 @@ export default function RegisterPage() {
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (password !== confirm) return alert("Passwords do not match");
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters long.");
+      return;
+    }
     try {
       await api.post(`/api/public/onboarding/points/register/${token}`, {
         password,
