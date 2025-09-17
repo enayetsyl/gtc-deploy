@@ -219,11 +219,12 @@ export default function OnboardingFormClient({ token }: { token: string }) {
               <div key={sid} className="flex items-center gap-2">
                 <Checkbox
                   checked={services.includes(sid)}
-                  onCheckedChange={(c) =>
-                    setServices((s) =>
-                      c ? [...s, sid] : s.filter((x) => x !== sid)
-                    )
-                  }
+                  // onCheckedChange={(c) =>
+                  //   setServices((s) =>
+                  //     c ? [...s, sid] : s.filter((x) => x !== sid)
+                  //   )
+                  // }
+                  aria-readonly
                 />
                 <span className="text-sm">{sid}</span>
               </div>

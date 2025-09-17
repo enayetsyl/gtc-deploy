@@ -21,6 +21,10 @@ export default function CreateInvite() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [includeServices, setIncludeServices] = useState(false);
+  const [services, setServices] = useState<Array<{ id: string; name: string }>>(
+    []
+  );
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -30,6 +34,16 @@ export default function CreateInvite() {
         setSectors(data);
       } catch {
         // ignore
+      }
+    })();
+    (async () => {
+      try {
+        const { data } = await api.get<{ id: string; name: string }[]>(
+          "/api/admin/services"
+        );
+        setServices(data || []);
+      } catch (err) {
+        // ignore — services list is optional
       }
     })();
   }, []);
@@ -45,6 +59,7 @@ export default function CreateInvite() {
         email,
         name,
         includeServices,
+        serviceIds: includeServices ? selectedServices : undefined,
       });
       // use a basic toast via browser alert (sonner Toaster can be mounted globally)
       alert("Invite created");
@@ -107,6 +122,45 @@ export default function CreateInvite() {
           />
           <label className="text-sm">Include services</label>
         </div>
+
+        {includeServices && (
+          <div className="p-2 border rounded bg-background">
+            <p className="text-sm text-muted-foreground mb-2">
+              Select services to include for this onboarding:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {services.length ? (
+                services.map((s) => {
+                  const checked = selectedServices.includes(s.id);
+                  return (
+                    <label
+                      key={s.id}
+                      className="flex items-center gap-2 p-2 border rounded cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          if (e.target.checked)
+                            setSelectedServices((prev) => [...prev, s.id]);
+                          else
+                            setSelectedServices((prev) =>
+                              prev.filter((id) => id !== s.id)
+                            );
+                        }}
+                      />
+                      <span className="text-sm">{s.name}</span>
+                    </label>
+                  );
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No services available
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         <div>
           <Button type="submit" disabled={loading}>
