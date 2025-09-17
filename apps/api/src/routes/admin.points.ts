@@ -22,6 +22,47 @@ adminPoints.get("/", async (req, res) => {
   res.json({ items, total, page, pageSize });
 });
 
+// Onboarding routes (moved from admin.points.onboarding.ts)
+import { createOnboardingLink, approveOnboarding, declineOnboarding } from "../services/onboarding";
+
+const onboardingCreateSchema = z.object({
+  sectorId: z.string().min(1),
+  email: z.string().email(),
+  name: z.string().min(2),
+  includeServices: z.boolean().default(false),
+  serviceIds: z.array(z.string().min(1)).optional(),
+});
+
+// GET /api/admin/points/onboarding
+adminPoints.get("/onboarding", async (req, res) => {
+  const status = (req.query.status as string | undefined) ?? undefined;
+  const where: any = {};
+  if (status) where.status = status;
+  const items = await prisma.pointOnboarding.findMany({ where, orderBy: { createdAt: "desc" }, include: { services: true, sector: true } });
+  res.json({ items });
+});
+
+// POST /api/admin/points/onboarding
+adminPoints.post("/onboarding", async (req, res) => {
+  const parsed = onboardingCreateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
+  const ob = await createOnboardingLink(parsed.data);
+  res.status(201).json(ob);
+});
+
+// POST /api/admin/points/onboarding/:id/approve
+adminPoints.post("/onboarding/:id/approve", async (req, res) => {
+  const { id } = z.object({ id: z.string().min(1) }).parse(req.params);
+  const result = await approveOnboarding(id, req.user!.id);
+  res.json(result);
+});
+
+// POST /api/admin/points/onboarding/:id/decline
+adminPoints.post("/onboarding/:id/decline", async (req, res) => {
+  const { id } = z.object({ id: z.string().min(1) }).parse(req.params);
+  await declineOnboarding(id, req.user!.id);
+  res.json({ ok: true });
+});
 const createSchema = z.object({
   name: z.string().min(2).max(200),
   email: z.string().email(),

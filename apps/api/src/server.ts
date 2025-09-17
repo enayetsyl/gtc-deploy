@@ -20,7 +20,6 @@ import { meLeads } from "./routes/me.leads";
 import { leadsPublic } from "./routes/leads.public";
 import { leadFiles } from "./routes/leads.files";
 import { sectorsPublic } from "./routes/sectors.public";
-import { adminPointsOnboarding } from "./routes/admin.points.onboarding";
 import { pointsOnboardingPublic } from "./routes/points.onboarding.public";
 
 export const app = express();
@@ -49,7 +48,6 @@ app.use("/api/leads", leadFiles);
 app.use("/api/me/leads", meLeads);
 app.use("/api/admin/leads", adminLeads);
 app.use("/api/sectors/public", sectorsPublic);
-app.use("/api/admin/points/onboarding", adminPointsOnboarding);
 app.use("/api/public/onboarding/points", pointsOnboardingPublic);
 
 
