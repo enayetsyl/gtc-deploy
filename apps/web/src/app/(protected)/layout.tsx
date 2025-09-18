@@ -1,8 +1,6 @@
-"use client/";
-import Image from "next/image";
-import AdminNav from "@/components/admin-nav";
+"use client";
 import Protected from "@/components/protected";
-import NotificationBell from "@/components/notification-bell";
+import Navbar from "@/components/navbar";
 
 export default function AdminLayout({
   children,
@@ -11,23 +9,8 @@ export default function AdminLayout({
 }) {
   return (
     <Protected>
-      <div className="p-6 space-y-6">
-        <header className="flex items-center justify-between">
-          <Image
-            src="/logo.jpg"
-            alt="GTC Logo"
-            width={160}
-            height={80}
-            priority
-            className="object-contain"
-          />
-          <div className="flex items-center gap-2">
-            <NotificationBell />
-            <AdminNav />
-          </div>
-        </header>
-        {children}
-      </div>
+      <Navbar />
+      <div className="p-6">{children}</div>
     </Protected>
   );
 }

@@ -5,6 +5,12 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { useI18n } from "@/providers/i18n-provider";
+import { Button } from "@/components/ui/button";
+
+type AdminNavProps = {
+  variant?: "desktop" | "mobile";
+  onNavigate?: () => void;
+};
 
 // Base admin items (use translation keys)
 const baseItems = [
@@ -13,7 +19,10 @@ const baseItems = [
   { href: "/admin/services", labelKey: "nav.services" },
 ];
 
-export default function AdminNav() {
+export default function AdminNav({
+  variant = "desktop",
+  onNavigate,
+}: AdminNavProps) {
   const pathname = usePathname();
   const { logout, user } = useAuth();
   const { t, setLocale } = useI18n();
@@ -43,23 +52,42 @@ export default function AdminNav() {
     items.unshift({ href: "/owner/leads", labelKey: "nav.leads" });
   }
 
+  const isMobile = variant === "mobile";
+
   return (
-    <nav className="flex gap-2">
+    <nav
+      className={cn(
+        isMobile ? "flex flex-col gap-2" : "flex items-center gap-2"
+      )}
+      aria-label="Primary"
+    >
       {/* language switcher */}
-      <div className="flex items-center gap-1">
-        <button
+      <div
+        className={cn("flex items-center gap-1", isMobile && "order-last pt-2")}
+        aria-label={t("nav.languageSwitcher")}
+      >
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => setLocale?.("en")}
-          className="rounded-md border px-2 py-1 text-xs"
+          className={cn(
+            "px-2 py-1 text-xs",
+            isMobile ? "w-min" : "",
+            "bg-white/5 border-white/20 text-white hover:bg-white/10"
+          )}
         >
           EN
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => setLocale?.("it")}
-          className="rounded-md border px-2 py-1 text-xs"
+          className="px-2 py-1 text-xs bg-white/5 border-white/20 text-white hover:bg-white/10"
         >
           IT
-        </button>
+        </Button>
       </div>
+
       {items.map((it) => {
         // Avoid '/admin/points' matching '/admin/points-onboarding'
         const active =
@@ -67,26 +95,36 @@ export default function AdminNav() {
           (it.href.endsWith("/")
             ? pathname?.startsWith(it.href)
             : pathname?.startsWith(it.href + "/"));
+        const linkClass = cn(
+          "rounded-md px-3 py-2 text-sm",
+          isMobile
+            ? "block w-full text-left text-white/90 hover:text-white hover:bg-white/10"
+            : "text-white/90 hover:text-white hover:bg-white/10"
+        );
         return (
           <Link
             key={it.href}
             href={it.href}
-            className={cn(
-              "rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50",
-              active && "bg-black text-white hover:bg-black"
-            )}
+            onClick={onNavigate}
+            className={cn(linkClass, active && "text-white bg-white/10")}
           >
             {it.labelKey ? t(it.labelKey) : it.href}
           </Link>
         );
       })}
 
-      <button
+      <Button
         onClick={logout}
-        className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
+        variant={isMobile ? "secondary" : "ghost"}
+        className={cn(
+          isMobile
+            ? "w-full bg-brand-blue-500 hover:bg-brand-blue-600 text-white cursor-pointer"
+            : "text-white hover:bg-white/10 bg-transparent border-0 cursor-pointer"
+        )}
+        size={isMobile ? "lg" : "sm"}
       >
         {t("nav.logout")}
-      </button>
+      </Button>
     </nav>
   );
 }

@@ -20,13 +20,13 @@ export default function NotificationBell() {
   return (
     <Link
       href="/notifications"
-      className="relative inline-flex items-center justify-center rounded-md border px-3 py-1.5 hover:bg-gray-50"
+      className="relative inline-flex items-center justify-center rounded-md px-3 py-1.5 text-white/90 hover:text-white hover:bg-white/10 focus-visible:ring-2 ring-focus outline-none"
       aria-label={t("nav.notifications")}
     >
       <Bell className="h-5 w-5" />
       {count > 0 && (
         <span
-          className="absolute -top-1 -right-1 min-w-5 h-5 rounded-full bg-red-600 text-white text-xs px-1 flex items-center justify-center"
+          className="absolute -top-1 -right-1 min-w-5 h-5 rounded-full bg-alert-error text-white text-xs px-1 flex items-center justify-center"
           aria-label={t("nav.unreadNotifications", { count: String(count) })}
         >
           {count > 99 ? "99+" : count}
