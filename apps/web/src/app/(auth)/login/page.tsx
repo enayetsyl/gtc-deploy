@@ -79,35 +79,43 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <main className="min-h-screen flex items-center justify-center bg-page-bg p-4">
       <form
         onSubmit={onSubmit}
-        className="w-full max-w-sm bg-white rounded-xl shadow p-6 space-y-4"
+        className="w-full max-w-sm bg-card-bg border border-card-border rounded-xl shadow p-6 space-y-5"
       >
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">{t("auth.login.title")}</h1>
-          <p className="text-sm text-gray-500">{t("auth.login.subtitle")}</p>
+          <h1 className="text-2xl font-semibold text-heading">
+            {t("auth.login.title")}
+          </h1>
+          <p className="text-sm text-muted-text">{t("auth.login.subtitle")}</p>
         </div>
 
         <div>
-          <label className="block text-sm mb-1">{t("form.email")}</label>
+          <label htmlFor="email" className="block text-sm mb-1 text-body">
+            {t("form.email")}
+          </label>
           <input
             type="email"
-            className="w-full rounded-md border px-3 py-2"
+            id="email"
+            className="w-full rounded-md border border-divider bg-card-bg text-body placeholder:text-muted-text px-3 py-2 focus-visible:ring-2 ring-focus outline-none"
             value={form.email}
             onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
             autoComplete="email"
           />
           {errors.email && (
-            <p className="text-xs text-red-600 mt-1">{errors.email}</p>
+            <p className="text-xs text-alert-error mt-1">{errors.email}</p>
           )}
         </div>
 
         <div>
-          <label className="block text-sm mb-1">{t("form.password")}</label>
+          <label htmlFor="password" className="block text-sm mb-1 text-body">
+            {t("form.password")}
+          </label>
           <input
             type="password"
-            className="w-full rounded-md border px-3 py-2"
+            id="password"
+            className="w-full rounded-md border border-divider bg-card-bg text-body placeholder:text-muted-text px-3 py-2 focus-visible:ring-2 ring-focus outline-none"
             value={form.password}
             onChange={(e) =>
               setForm((s) => ({ ...s, password: e.target.value }))
@@ -115,17 +123,19 @@ export default function LoginPage() {
             autoComplete="current-password"
           />
           {errors.password && (
-            <p className="text-xs text-red-600 mt-1">{errors.password}</p>
+            <p className="text-xs text-alert-error mt-1">{errors.password}</p>
           )}
         </div>
 
         {errors.root && (
-          <div className="text-sm text-red-600">{errors.root}</div>
+          <div className="text-sm text-alert-error bg-alert-error/10 border border-alert-error/20 rounded-md px-3 py-2">
+            {errors.root}
+          </div>
         )}
 
         <button
           type="submit"
-          className="w-full rounded-md bg-black text-white py-2 font-medium disabled:opacity-60"
+          className="cursor-pointer w-full rounded-md bg-button-primary hover:bg-button-primary-hover text-white py-2 font-medium focus-visible:ring-2 ring-focus outline-none disabled:opacity-60"
           disabled={mutate.isPending}
         >
           {mutate.isPending
