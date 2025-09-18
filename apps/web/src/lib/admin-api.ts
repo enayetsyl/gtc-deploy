@@ -73,6 +73,12 @@ export async function listPointOnboardings(status?: string) {
   return data;
 }
 
+// Me: my points for sector owners or point users
+export async function listMyPoints(page = 1, pageSize = 200) {
+  const { data } = await api.get(`/api/me/points`, { params: { page, pageSize } });
+  return data as { items: Array<{ id: string; name: string; email: string; sectorId: string; createdAt: string }>; total: number; page: number; pageSize: number };
+}
+
 export async function approvePointOnboarding(id: string) {
   const { data } = await api.post(`/api/admin/points/onboarding/${id}/approve`);
   return data;

@@ -49,7 +49,10 @@ export default function AdminNav({
     );
   } else if (user?.role === "SECTOR_OWNER") {
     // Sector owners see Owner Leads
-    items.unshift({ href: "/owner/leads", labelKey: "nav.leads" });
+    items.unshift(
+      { href: "/owner/leads", labelKey: "nav.leads" },
+      { href: "/owner/points", labelKey: "nav.points" }
+    );
   }
 
   const isMobile = variant === "mobile";
