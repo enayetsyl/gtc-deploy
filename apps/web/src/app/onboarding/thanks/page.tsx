@@ -3,11 +3,6 @@ import React from "react";
 import Link from "next/link";
 import { useI18n } from "@/providers/i18n-provider";
 
-export const metadata = {
-  title: "Thanks — Onboarding",
-  description: "Onboarding request received",
-};
-
 export default function OnboardingThanksPage() {
   const { t } = useI18n();
   return (

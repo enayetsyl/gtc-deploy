@@ -5,6 +5,8 @@ import { useState } from "react";
 import { z } from "zod";
 import { createSectorOwner, listSectors, type Sector } from "@/lib/admin-api";
 import { useI18n } from "@/providers/i18n-provider";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const schema = z.object({
   name: z.string().min(2).max(120),
@@ -38,7 +40,6 @@ export default function AdminSectorOwnersPage() {
       setSendInvite(true);
     },
     onError: (e: unknown) => {
-      // best-effort error message
       const m = (e as { response?: { data?: { error?: string } } }).response
         ?.data?.error;
       setErr(m ?? t("ui.createFailed"));
@@ -48,8 +49,14 @@ export default function AdminSectorOwnersPage() {
 
   return (
     <main className="space-y-6">
-      <section className="rounded-xl border p-6 space-y-4">
-        <h2 className="text-lg font-semibold">
+      <section
+        className="rounded-xl border bg-card p-6 space-y-4"
+        aria-labelledby="create-sector-owner"
+      >
+        <h2
+          id="create-sector-owner"
+          className="text-lg font-semibold text-heading"
+        >
           {t("admin.sectorOwners.createTitle")}
         </h2>
         <form
@@ -72,25 +79,19 @@ export default function AdminSectorOwnersPage() {
           }}
         >
           <label className="text-sm">
-            <div className="mb-1">{t("form.name")}</div>
-            <input
-              className="w-full rounded-md border px-3 py-2"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <div className="mb-1 text-muted-text">{t("form.name")}</div>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
           </label>
+
           <label className="text-sm">
-            <div className="mb-1">{t("form.email")}</div>
-            <input
-              className="w-full rounded-md border px-3 py-2"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+            <div className="mb-1 text-muted-text">{t("form.email")}</div>
+            <Input value={email} onChange={(e) => setEmail(e.target.value)} />
           </label>
+
           <label className="text-sm">
-            <div className="mb-1">{t("form.sector")}</div>
+            <div className="mb-1 text-muted-text">{t("form.sector")}</div>
             <select
-              className="w-full rounded-md border px-3 py-2"
+              className="w-full rounded-md border px-3 py-2 bg-transparent"
               value={sectorId}
               onChange={(e) => setSectorId(e.target.value)}
             >
@@ -104,26 +105,32 @@ export default function AdminSectorOwnersPage() {
               ))}
             </select>
           </label>
+
           <label className="text-sm inline-flex items-center gap-2">
             <input
               type="checkbox"
               checked={sendInvite}
               onChange={(e) => setSendInvite(e.target.checked)}
             />
-            <span>{t("admin.sectorOwners.sendInvite")}</span>
+            <span className="text-body">
+              {t("admin.sectorOwners.sendInvite")}
+            </span>
           </label>
+
           <div className="flex gap-2">
-            <button
-              className="rounded-md bg-black text-white px-3 py-2"
+            <Button
+              className="bg-button-primary text-button-on-primary"
+              type="submit"
               disabled={createMut.isPending}
             >
               {createMut.isPending
                 ? t("ui.creating")
                 : t("admin.sectorOwners.createTitle")}
-            </button>
+            </Button>
           </div>
-          {msg && <p className="text-sm text-green-600">{msg}</p>}
-          {err && <p className="text-sm text-red-600">{err}</p>}
+
+          {msg && <p className="text-sm text-[var(--color-teal-500)]">{msg}</p>}
+          {err && <p className="text-sm text-danger">{err}</p>}
         </form>
       </section>
     </main>

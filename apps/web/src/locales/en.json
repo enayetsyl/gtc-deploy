@@ -86,6 +86,9 @@
 
   "ui.create": "Create",
   "ui.creating": "Creating…",
+  "ui.save": "Save",
+  "ui.saving": "Saving…",
+  "ui.cancel": "Cancel",
   "ui.selectSector": "Select sector",
   "ui.noServices": "No services available",
   "ui.createFailed": "Create failed",

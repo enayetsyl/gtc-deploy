@@ -11,6 +11,8 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 import { useI18n } from "@/providers/i18n-provider";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const sectorSchema = z.object({ name: z.string().min(2).max(100) });
 
@@ -53,8 +55,8 @@ export default function SectorsPage() {
 
   return (
     <main className="space-y-6">
-      <section className="rounded-xl border p-6 space-y-4">
-        <h2 className="text-lg font-semibold">
+      <section className="rounded-xl border bg-card p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-heading">
           {t("admin.sectors.createTitle")}
         </h2>
         <form
@@ -70,24 +72,25 @@ export default function SectorsPage() {
           }}
           className="flex gap-2"
         >
-          <input
+          <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="rounded-md border px-3 py-2"
             placeholder={t("admin.sectors.examplePlaceholder")}
           />
-          <button
-            className="rounded-md bg-black text-white px-3 py-2"
+          <Button
+            type="submit"
             disabled={createMut.isPending}
+            size="sm"
+            className="bg-button-primary text-button-on-primary"
           >
             {createMut.isPending ? t("ui.creating") : t("ui.create")}
-          </button>
+          </Button>
         </form>
-        {err && <p className="text-sm text-red-600">{err}</p>}
+        {err && <p className="text-sm text-danger">{err}</p>}
       </section>
 
-      <section className="rounded-xl border p-6">
-        <h2 className="text-lg font-semibold mb-4">
+      <section className="rounded-xl border bg-card p-6">
+        <h2 className="text-lg font-semibold mb-4 text-heading">
           {t("admin.sectors.title")}
         </h2>
         {q.isLoading ? (
@@ -111,44 +114,54 @@ export default function SectorsPage() {
                     }}
                     className="flex-1 flex gap-2"
                   >
-                    <input
-                      className="rounded-md border px-3 py-2 flex-1"
+                    <Input
+                      className="flex-1"
                       value={editing.name}
                       onChange={(e) =>
                         setEditing({ ...editing, name: e.target.value })
                       }
                     />
-                    <button
-                      className="rounded-md border px-3 py-2"
+                    <Button
+                      variant="ghost"
                       type="button"
                       onClick={() => setEditing(null)}
+                      size="sm"
                     >
-                      Cancel
-                    </button>
-                    <button className="rounded-md bg-black text-white px-3 py-2">
-                      {updateMut.isPending ? "Saving..." : "Save"}
-                    </button>
+                      {t("ui.cancel") ?? "Cancel"}
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      className="bg-button-primary text-button-on-primary"
+                    >
+                      {updateMut.isPending
+                        ? t("ui.saving") ?? "Saving..."
+                        : t("ui.save") ?? "Save"}
+                    </Button>
                   </form>
                 ) : (
                   <>
                     <div className="flex-1">
-                      <div className="font-medium">{s.name}</div>
-                      <div className="text-xs text-gray-500">{s.id}</div>
+                      <div className="font-medium text-body">{s.name}</div>
+                      <div className="text-xs text-muted-text">{s.id}</div>
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        className="rounded-md border px-3 py-1.5"
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => setEditing(s)}
+                        className="text-body border-border"
                       >
                         {t("ui.edit")}
-                      </button>
-                      <button
-                        className="rounded-md border px-3 py-1.5"
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
                         onClick={() => deleteMut.mutate(s.id)}
                         disabled={deleteMut.isPending}
                       >
                         {t("ui.delete")}
-                      </button>
+                      </Button>
                     </div>
                   </>
                 )}
