@@ -133,5 +133,20 @@
   "form.password": "Password",
   "dashboard.title": "Dashboard",
   "dashboard.welcome": "Benvenuto, {name}.",
-  "dashboard.role": "Il tuo ruolo: {role}"
+  "dashboard.role": "Il tuo ruolo: {role}",
+  "nav.sectorOwners": "Referenti di Settore",
+  "form.sector": "Settore",
+  "admin.sectorOwners.createTitle": "Crea referente di settore",
+  "admin.sectorOwners.sendInvite": "Invia email di invito",
+  "admin.sectorOwners.created": "Referente di settore creato",
+  "auth.invite.acceptTitle": "Accetta invito",
+  "auth.invite.newPassword": "Nuova password",
+  "auth.invite.confirmPassword": "Conferma password",
+  "auth.invite.submitting": "Invio in corso…",
+  "auth.invite.setPassword": "Imposta password",
+  "auth.invite.passwordTooShort": "La password deve avere almeno 8 caratteri",
+  "auth.invite.passwordsMismatch": "Le password non coincidono",
+  "auth.invite.missingToken": "Token di invito mancante",
+  "auth.invite.success": "Password impostata — ora puoi accedere.",
+  "auth.invite.invalidOrExpired": "Invito non valido o scaduto"
 }

@@ -133,5 +133,20 @@
   "form.password": "Password",
   "dashboard.title": "Dashboard",
   "dashboard.welcome": "Welcome, {name}.",
-  "dashboard.role": "Your role: {role}"
+  "dashboard.role": "Your role: {role}",
+  "nav.sectorOwners": "Sector Owners",
+  "form.sector": "Sector",
+  "admin.sectorOwners.createTitle": "Create sector owner",
+  "admin.sectorOwners.sendInvite": "Send invite email",
+  "admin.sectorOwners.created": "Sector owner created",
+  "auth.invite.acceptTitle": "Accept Invite",
+  "auth.invite.newPassword": "New password",
+  "auth.invite.confirmPassword": "Confirm password",
+  "auth.invite.submitting": "Submitting…",
+  "auth.invite.setPassword": "Set password",
+  "auth.invite.passwordTooShort": "Password must be at least 8 characters",
+  "auth.invite.passwordsMismatch": "Passwords do not match",
+  "auth.invite.missingToken": "Missing invite token",
+  "auth.invite.success": "Password set — you can now log in.",
+  "auth.invite.invalidOrExpired": "Invalid or expired invite"
 }

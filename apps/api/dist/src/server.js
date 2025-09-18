@@ -27,7 +27,6 @@ const me_leads_1 = require("./routes/me.leads");
 const leads_public_1 = require("./routes/leads.public");
 const leads_files_1 = require("./routes/leads.files");
 const sectors_public_1 = require("./routes/sectors.public");
-const admin_points_onboarding_1 = require("./routes/admin.points.onboarding");
 const points_onboarding_public_1 = require("./routes/points.onboarding.public");
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)({
@@ -53,6 +52,5 @@ exports.app.use("/api/leads", leads_files_1.leadFiles);
 exports.app.use("/api/me/leads", me_leads_1.meLeads);
 exports.app.use("/api/admin/leads", admin_leads_1.adminLeads);
 exports.app.use("/api/sectors/public", sectors_public_1.sectorsPublic);
-exports.app.use("/api/admin/points/onboarding", admin_points_onboarding_1.adminPointsOnboarding);
 exports.app.use("/api/public/onboarding/points", points_onboarding_public_1.pointsOnboardingPublic);
 exports.app.use(error_1.errorHandler);

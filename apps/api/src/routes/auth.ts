@@ -10,6 +10,8 @@ import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
+  verifyInviteToken,
+  revokeInviteToken,
 } from "../lib/jwt";
 
 export const authRouter = Router();
@@ -76,4 +78,27 @@ authRouter.post("/logout", async (req, res) => {
   }
   clearRefreshCookie(res);
   return res.json({ ok: true });
+});
+
+// Accept an invite and set password
+const inviteAcceptSchema = z.object({ token: z.string().min(10), password: z.string().min(8).max(200) });
+
+authRouter.post("/invite/accept", async (req, res) => {
+  const parsed = inviteAcceptSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
+  const { token, password } = parsed.data;
+
+  try {
+    const decoded = await verifyInviteToken(token);
+    const user = await prisma.user.findUnique({ where: { id: decoded.sub } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const hash = await argon2.hash(password);
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash: hash } });
+    await revokeInviteToken(decoded.jti);
+
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(400).json({ error: "Invalid or expired invite" });
+  }
 });

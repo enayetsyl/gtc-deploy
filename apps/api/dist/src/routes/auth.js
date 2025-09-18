@@ -69,3 +69,24 @@ exports.authRouter.post("/logout", async (req, res) => {
     (0, jwt_1.clearRefreshCookie)(res);
     return res.json({ ok: true });
 });
+// Accept an invite and set password
+const inviteAcceptSchema = zod_1.z.object({ token: zod_1.z.string().min(10), password: zod_1.z.string().min(8).max(200) });
+exports.authRouter.post("/invite/accept", async (req, res) => {
+    const parsed = inviteAcceptSchema.safeParse(req.body);
+    if (!parsed.success)
+        return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
+    const { token, password } = parsed.data;
+    try {
+        const decoded = await (0, jwt_1.verifyInviteToken)(token);
+        const user = await prisma_1.prisma.user.findUnique({ where: { id: decoded.sub } });
+        if (!user)
+            return res.status(404).json({ error: "User not found" });
+        const hash = await argon2_1.default.hash(password);
+        await prisma_1.prisma.user.update({ where: { id: user.id }, data: { passwordHash: hash } });
+        await (0, jwt_1.revokeInviteToken)(decoded.jti);
+        return res.json({ ok: true });
+    }
+    catch (e) {
+        return res.status(400).json({ error: "Invalid or expired invite" });
+    }
+});

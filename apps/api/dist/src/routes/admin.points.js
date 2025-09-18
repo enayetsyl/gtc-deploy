@@ -22,6 +22,44 @@ exports.adminPoints.get("/", async (req, res) => {
     ]);
     res.json({ items, total, page, pageSize });
 });
+// Onboarding routes (moved from admin.points.onboarding.ts)
+const onboarding_1 = require("../services/onboarding");
+const onboardingCreateSchema = zod_1.z.object({
+    sectorId: zod_1.z.string().min(1),
+    email: zod_1.z.string().email(),
+    name: zod_1.z.string().min(2),
+    includeServices: zod_1.z.boolean().default(false),
+    serviceIds: zod_1.z.array(zod_1.z.string().min(1)).optional(),
+});
+// GET /api/admin/points/onboarding
+exports.adminPoints.get("/onboarding", async (req, res) => {
+    const status = req.query.status ?? undefined;
+    const where = {};
+    if (status)
+        where.status = status;
+    const items = await prisma_1.prisma.pointOnboarding.findMany({ where, orderBy: { createdAt: "desc" }, include: { services: true, sector: true } });
+    res.json({ items });
+});
+// POST /api/admin/points/onboarding
+exports.adminPoints.post("/onboarding", async (req, res) => {
+    const parsed = onboardingCreateSchema.safeParse(req.body);
+    if (!parsed.success)
+        return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
+    const ob = await (0, onboarding_1.createOnboardingLink)(parsed.data);
+    res.status(201).json(ob);
+});
+// POST /api/admin/points/onboarding/:id/approve
+exports.adminPoints.post("/onboarding/:id/approve", async (req, res) => {
+    const { id } = zod_1.z.object({ id: zod_1.z.string().min(1) }).parse(req.params);
+    const result = await (0, onboarding_1.approveOnboarding)(id, req.user.id);
+    res.json(result);
+});
+// POST /api/admin/points/onboarding/:id/decline
+exports.adminPoints.post("/onboarding/:id/decline", async (req, res) => {
+    const { id } = zod_1.z.object({ id: zod_1.z.string().min(1) }).parse(req.params);
+    await (0, onboarding_1.declineOnboarding)(id, req.user.id);
+    res.json({ ok: true });
+});
 const createSchema = zod_1.z.object({
     name: zod_1.z.string().min(2).max(200),
     email: zod_1.z.string().email(),

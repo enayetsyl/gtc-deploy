@@ -69,7 +69,7 @@ async function submitOnboardingForm(onboardingToken, payload) {
     const adminIds = admins.map((a) => a.id);
     const ownerIds = owners.map((o) => o.id);
     const adminAndOwners = Array.from(new Set([...adminIds, ...ownerIds]));
-    const adminLink = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/admin/points/onboarding/${ob.id}`;
+    const adminLink = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/admin/points-onboarding/${ob.id}`;
     if (adminAndOwners.length) {
         await (0, notifications_1.notifyUsers)(adminAndOwners, {
             type: "GENERIC",

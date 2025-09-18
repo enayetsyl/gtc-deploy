@@ -10,6 +10,9 @@ exports.clearRefreshCookie = clearRefreshCookie;
 exports.verifyAccessToken = verifyAccessToken;
 exports.verifyRefreshToken = verifyRefreshToken;
 exports.revokeRefreshToken = revokeRefreshToken;
+exports.signInviteToken = signInviteToken;
+exports.verifyInviteToken = verifyInviteToken;
+exports.revokeInviteToken = revokeInviteToken;
 // src/lib/jwt.ts
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const redis_1 = require("./redis");
@@ -18,6 +21,7 @@ const ACCESS_TTL = process.env.ACCESS_TOKEN_TTL ?? "15m";
 const REFRESH_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 7);
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev_supersecret_change_me";
 const REFRESH_COOKIE = "rt";
+const INVITE_TTL_DAYS = Number(process.env.INVITE_TOKEN_TTL_DAYS ?? 7);
 function signAccessToken(payload) {
     return jsonwebtoken_1.default.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TTL });
 }
@@ -53,4 +57,24 @@ async function verifyRefreshToken(token) {
 }
 async function revokeRefreshToken(jti) {
     await redis_1.redis.del(`refresh:${jti}`);
+}
+// One-time invite tokens for account activation / password set
+async function signInviteToken(userId) {
+    const jti = (0, crypto_1.randomUUID)();
+    const token = jsonwebtoken_1.default.sign({ sub: userId, jti, kind: "invite" }, JWT_SECRET, { expiresIn: `${INVITE_TTL_DAYS}d` });
+    const ttlSecs = INVITE_TTL_DAYS * 24 * 60 * 60;
+    await redis_1.redis.set(`invite:${jti}`, userId, "EX", ttlSecs);
+    return { token, jti };
+}
+async function verifyInviteToken(token) {
+    const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+    if (decoded.kind !== "invite")
+        throw new Error("invalid_invite_kind");
+    const exists = await redis_1.redis.get(`invite:${decoded.jti}`);
+    if (!exists)
+        throw new Error("invite_revoked");
+    return decoded;
+}
+async function revokeInviteToken(jti) {
+    await redis_1.redis.del(`invite:${jti}`);
 }

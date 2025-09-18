@@ -23,6 +23,11 @@ export async function deleteSector(id: string) {
   return data;
 }
 
+export async function createSectorOwner(payload: { name: string; email: string; sectorId: string; sendInvite?: boolean }) {
+  const { data } = await api.post(`/api/admin/sectors/sector-owners`, payload);
+  return data as { id: string; name: string; email: string; role: string; sectorId: string; createdAt: string };
+}
+
 export async function listPoints(page = 1, pageSize = 50) {
   const { data } = await api.get<Paged<Point>>(`/api/admin/points`, { params: { page, pageSize } });
   return data;

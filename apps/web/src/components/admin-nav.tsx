@@ -27,7 +27,8 @@ export default function AdminNav() {
     items.unshift(
       { href: "/admin/leads", labelKey: "nav.leads" },
       { href: "/admin/conventions", labelKey: "nav.conventions" },
-      { href: "/admin/points-onboarding", labelKey: "nav.pointsOnboarding" }
+      { href: "/admin/points-onboarding", labelKey: "nav.pointsOnboarding" },
+      { href: "/admin/sector-owners", labelKey: "nav.sectorOwners" }
     );
   } else if (user?.role === "GTC_POINT") {
     // Point users see My Conventions + Point Leads
