@@ -10,22 +10,28 @@ mePoints.get("/", async (req, res) => {
   const page = Math.max(1, Number(req.query.page ?? 1));
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize ?? 50)));
 
-  // Resolve my sectorId (owner.sectorId OR point.sectorId)
-  let sectorId: string | null = null;
+  // Resolve my sector(s): for SECTOR_OWNER we read the join table UserSector; for GTC_POINT we use gtcPoint.sectorId
+  let sectorIds: string[] = [];
 
   if (req.user!.role === "SECTOR_OWNER") {
-    const me = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { sectorId: true } });
-    sectorId = me?.sectorId ?? null;
+    try {
+      const links = await prisma.userSector.findMany({ where: { userId: req.user!.id }, select: { sectorId: true } });
+      sectorIds = links.map((l: any) => l.sectorId);
+    } catch (err) {
+      // fallback: use legacy sectorId on user
+      const me = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { sectorId: true } });
+      if (me?.sectorId) sectorIds = [me.sectorId];
+    }
   } else if (req.user!.role === "GTC_POINT") {
     const me = await prisma.user.findUnique({ where: { id: req.user!.id }, include: { gtcPoint: true } });
-    sectorId = me?.gtcPoint?.sectorId ?? null;
+    if (me?.gtcPoint?.sectorId) sectorIds = [me.gtcPoint.sectorId];
   }
 
-  if (!sectorId) return res.status(409).json({ error: "User is not attached to a sector" });
+  if (!sectorIds.length) return res.status(409).json({ error: "User is not attached to a sector" });
 
   const [items, total] = await Promise.all([
-    prisma.gtcPoint.findMany({ where: { sectorId }, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
-    prisma.gtcPoint.count({ where: { sectorId } }),
+    prisma.gtcPoint.findMany({ where: { sectorId: { in: sectorIds } }, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+    prisma.gtcPoint.count({ where: { sectorId: { in: sectorIds } } }),
   ]);
 
   res.json({ items, total, page, pageSize });

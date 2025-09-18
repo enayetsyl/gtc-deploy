@@ -25,6 +25,7 @@ model User {
   gtcPointId    String? // for GTC_POINT
   sector        Sector?        @relation("SectorUsers", fields: [sectorId], references: [id])
   gtcPoint      GtcPoint?      @relation("PointUsers", fields: [gtcPointId], references: [id])
+  userSectors   UserSector[]
   notifications Notification[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -49,9 +50,24 @@ model Sector {
 
   // Optional: sector owners (Users with sectorId referencing this)
   users       User[]       @relation("SectorUsers")
+  userSectors UserSector[]
   conventions Convention[]
   leads       Lead[]
   pointOnboardings PointOnboarding[]
+}
+
+// Join table to allow many-to-many relationship between Users and Sectors
+model UserSector {
+  id        String   @id @default(cuid())
+  userId    String
+  sectorId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  sector Sector @relation(fields: [sectorId], references: [id])
+
+  @@unique([userId, sectorId])
+  @@index([sectorId])
 }
 
 model GtcPoint {

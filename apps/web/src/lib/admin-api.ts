@@ -23,7 +23,7 @@ export async function deleteSector(id: string) {
   return data;
 }
 
-export async function createSectorOwner(payload: { name: string; email: string; sectorId: string; sendInvite?: boolean }) {
+export async function createSectorOwner(payload: { name: string; email: string; sectorId?: string; sectorIds?: string[]; sendInvite?: boolean }) {
   const { data } = await api.post(`/api/admin/sectors/sector-owners`, payload);
   return data as { id: string; name: string; email: string; role: string; sectorId: string; createdAt: string };
 }

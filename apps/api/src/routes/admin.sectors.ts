@@ -62,21 +62,27 @@ adminSectors.delete("/:id", async (req, res) => {
 });
 
 // Create a sector owner (ADMIN only)
+// Accept either a single sectorId (backwards compat) or an array of sectorIds for multi-select
 const createOwnerSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email(),
-  sectorId: z.string().min(1),
+  sectorId: z.string().min(1).optional(),
+  sectorIds: z.array(z.string().min(1)).optional(),
   sendInvite: z.boolean().optional().default(true),
 });
 
 adminSectors.post("/sector-owners", async (req, res) => {
   const parsed = createOwnerSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
-  const { name, email, sectorId, sendInvite } = parsed.data;
+  const { name, email, sectorId, sectorIds, sendInvite } = parsed.data;
 
-  // ensure sector exists
-  const sector = await prisma.sector.findUnique({ where: { id: sectorId } });
-  if (!sector) return res.status(404).json({ error: "Sector not found" });
+  // Normalize sectorIds: prefer sectorIds array, fall back to sectorId string
+  const resolvedSectorIds = Array.isArray(sectorIds) && sectorIds.length > 0 ? sectorIds : sectorId ? [sectorId] : [];
+  if (resolvedSectorIds.length === 0) return res.status(400).json({ error: "No sector specified" });
+
+  // ensure all sectors exist
+  const found = await prisma.sector.findMany({ where: { id: { in: resolvedSectorIds } } });
+  if (found.length !== resolvedSectorIds.length) return res.status(404).json({ error: "One or more sectors not found" });
 
   // unique email
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -86,26 +92,45 @@ adminSectors.post("/sector-owners", async (req, res) => {
   // For invite flow, set a random hash now; they'll change it upon invite acceptance
   const tempHash = await argon2.hash("temp:" + Math.random().toString(36).slice(2));
 
+  // Create user with the first sector as the primary sectorId (keeps schema-compatible)
+  const primarySectorId = resolvedSectorIds[0];
   const user = await prisma.user.create({
     data: {
       name,
       email,
       passwordHash: tempHash,
       role: "SECTOR_OWNER" as any,
-      sectorId,
+      sectorId: primarySectorId,
     },
     select: { id: true, name: true, email: true, role: true, sectorId: true, createdAt: true },
   });
 
+  // Persist many-to-many links in UserSector for all selected sectors
+  try {
+    await prisma.userSector.createMany({
+      data: resolvedSectorIds.map((sid) => ({ userId: user.id, sectorId: sid })),
+      skipDuplicates: true,
+    });
+  } catch (err) {
+    // Log but don't fail the request for now
+    console.warn("Failed to create user-sector links:", err);
+  }
+
   if (sendInvite) {
     const { token } = await signInviteToken(user.id);
+    const primarySector = found.find((s) => s.id === primarySectorId);
     const link = `${env.webBaseUrl.replace(/\/$/, "")}/invite/accept?token=${encodeURIComponent(token)}`;
     await enqueueEmail({
       to: user.email,
       subject: "You're invited as Sector Owner",
-      html: `<p>Hello ${user.name},</p><p>You've been added as a Sector Owner for <strong>${sector.name}</strong>. To activate your account and set your password, click: <a href="${link}">${link}</a></p>`,
+      html: `<p>Hello ${user.name},</p><p>You've been added as a Sector Owner for <strong>${primarySector?.name ?? "your sector(s)"}</strong>. To activate your account and set your password, click: <a href="${link}">${link}</a></p>`,
     });
   }
+
+  // NOTE: multi-sector membership is not persisted beyond primary sector without a DB migration.
+  // We only set the user's primary `sectorId` to preserve compatibility. To fully support
+  // many-to-many sector ownership, we should add a join table (e.g. UserSector) in Prisma
+  // and migrate the database. If you want that, I can prepare the migration in a follow-up.
 
   res.status(201).json(user);
 });

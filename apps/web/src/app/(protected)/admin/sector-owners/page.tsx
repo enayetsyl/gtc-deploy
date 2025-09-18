@@ -20,6 +20,7 @@ export default function AdminSectorOwnersPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [sectorId, setSectorId] = useState("");
+  const [sectorIds, setSectorIds] = useState<string[]>([]);
   const [sendInvite, setSendInvite] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -30,7 +31,13 @@ export default function AdminSectorOwnersPage() {
   });
 
   const createMut = useMutation({
-    mutationFn: () => createSectorOwner({ name, email, sectorId, sendInvite }),
+    mutationFn: (payload: {
+      name: string;
+      email: string;
+      sectorId?: string;
+      sectorIds?: string[];
+      sendInvite?: boolean;
+    }) => createSectorOwner(payload),
     onSuccess: () => {
       setMsg(t("admin.sectorOwners.created"));
       setErr(null);
@@ -69,13 +76,27 @@ export default function AdminSectorOwnersPage() {
               name,
               email,
               sectorId,
+              sectorIds,
               sendInvite,
             });
             if (!parsed.success) {
               setErr(parsed.error.issues[0]?.message ?? "Validation error");
               return;
             }
-            createMut.mutate();
+            const payload: {
+              name: string;
+              email: string;
+              sectorId?: string;
+              sectorIds?: string[];
+              sendInvite?: boolean;
+            } = {
+              name,
+              email,
+              sendInvite,
+            };
+            if (sectorIds && sectorIds.length) payload.sectorIds = sectorIds;
+            else if (sectorId) payload.sectorId = sectorId;
+            createMut.mutate(payload);
           }}
         >
           <label className="text-sm">
@@ -90,20 +111,31 @@ export default function AdminSectorOwnersPage() {
 
           <label className="text-sm">
             <div className="mb-1 text-muted-text">{t("form.sector")}</div>
-            <select
-              className="w-full rounded-md border px-3 py-2 bg-transparent"
-              value={sectorId}
-              onChange={(e) => setSectorId(e.target.value)}
-            >
-              <option value="" disabled>
-                {sectorsQ.isLoading ? t("ui.loading") : t("ui.selectSector")}
-              </option>
+            <div className="space-y-2 max-h-56 overflow-auto rounded-md border p-2">
+              {sectorsQ.isLoading && (
+                <div className="text-sm text-muted-text">{t("ui.loading")}</div>
+              )}
               {sectorsQ.data?.items.map((s: Sector) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
+                <label key={s.id} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={sectorIds.includes(s.id)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSectorIds((prev) => {
+                        const next = checked
+                          ? [...prev, s.id]
+                          : prev.filter((id) => id !== s.id);
+                        // keep primary sectorId in sync with the first selected
+                        setSectorId(next[0] ?? "");
+                        return next;
+                      });
+                    }}
+                  />
+                  <span className="text-body">{s.name}</span>
+                </label>
               ))}
-            </select>
+            </div>
           </label>
 
           <label className="text-sm inline-flex items-center gap-2">
