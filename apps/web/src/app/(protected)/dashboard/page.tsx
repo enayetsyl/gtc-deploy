@@ -18,10 +18,10 @@ export default function Dashboard() {
 
         <section className="rounded-xl border p-6">
           <p className="text-lg">
-            {t("dashboard.welcome", { name: user?.name })}
+            {t("dashboard.welcome", { name: user?.name || "" })}
           </p>
           <p className="text-gray-600 mt-2">
-            {t("dashboard.role", { role: user?.role })}
+            {t("dashboard.role", { role: user?.role || "" })}
           </p>
         </section>
       </main>

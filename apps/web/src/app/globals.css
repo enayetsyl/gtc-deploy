@@ -41,6 +41,62 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Brand palette — Tailwind v4 tokens (HEX) */
+  /* Navy ramp */
+  --color-brand-navy-900: #0b1d33;
+  --color-brand-navy-800: #0f2747; /* Primary Navy (brand base, headers, nav) */
+  --color-brand-navy-700: #17355e;
+  --color-brand-navy-600: #1e4173;
+
+  /* Blue ramp */
+  --color-brand-blue-700: #184a8c; /* Primary Blue (links, active states) */
+  --color-brand-blue-600: #1f66b0;
+  --color-brand-blue-500: #2081c3; /* Accent Blue (buttons, CTAs) */
+  --color-brand-blue-400: #47a0d9;
+
+  /* Teal ramp */
+  --color-brand-teal-600: #0fa0bf;
+  --color-brand-teal-500: #11b4d4; /* Teal Accent (secondary CTA, badges) */
+  --color-brand-teal-400: #49c9e1;
+
+  /* Neutrals */
+  --color-neutral-100: #f5f7fb; /* Page Background (light canvas) */
+  --color-neutral-200: #e6ecf4; /* Subtle Divider (borders, table lines) */
+  --color-neutral-400: #c7d2e2;
+  --color-neutral-700: #3c4858; /* Body Text (default) */
+  --color-muted-text: #9aa9bc; /* Muted Text (meta, captions) */
+
+  /* Role tokens (usage guidelines) */
+  --color-link: var(--color-brand-blue-700);
+  --color-link-hover: var(--color-brand-blue-500);
+  --color-focus: var(--color-brand-teal-500);
+
+  --color-page-bg: var(--color-neutral-100);
+  --color-divider: var(--color-neutral-200);
+
+  --color-heading: var(--color-brand-navy-800);
+  --color-body: var(--color-neutral-700);
+
+  /* Buttons */
+  --color-button-primary: var(--color-brand-blue-500);
+  --color-button-primary-hover: var(--color-brand-blue-600);
+  --color-button-on-primary: #ffffff;
+  --color-button-secondary-outline: var(--color-brand-blue-700);
+  --color-button-secondary-hover-bg: var(--color-neutral-200);
+
+  /* Cards & surfaces */
+  --color-card-bg: #ffffff;
+  --color-card-border: var(--color-neutral-200);
+
+  /* Alerts */
+  --color-alert-info: #2081c3;
+  --color-alert-warning: #f4b400;
+  --color-alert-error: #e05252;
+
+  /* Misc */
+  --color-highlight: #f4b400;
+  --color-danger: #e05252;
 }
 
 :root {
