@@ -6,6 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
 import { useAuth, User } from "@/providers/auth-provider";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/providers/i18n-provider";
 
 const schema = z.object({
   email: z.string().email(),
@@ -14,13 +15,23 @@ const schema = z.object({
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
-  const [errors, setErrors] = useState<{ email?: string; password?: string; root?: string }>({});
+  const [errors, setErrors] = useState<{
+    email?: string;
+    password?: string;
+    root?: string;
+  }>({});
 
   const loginResponseSchema = z.object({
     accessToken: z.string(),
-    user: z.object({ id: z.string(), name: z.string(), email: z.string(), role: z.string() }),
+    user: z.object({
+      id: z.string(),
+      name: z.string(),
+      email: z.string(),
+      role: z.string(),
+    }),
   });
 
   const mutate = useMutation({
@@ -38,7 +49,9 @@ export default function LoginPage() {
       const getErrMsg = (err: unknown): string => {
         if (typeof err === "object" && err !== null) {
           const maybe = err as Record<string, unknown>;
-          const response = maybe.response as Record<string, unknown> | undefined;
+          const response = maybe.response as
+            | Record<string, unknown>
+            | undefined;
           const data = response?.data as Record<string, unknown> | undefined;
           const error = data?.error;
           if (typeof error === "string") return error;
@@ -72,12 +85,12 @@ export default function LoginPage() {
         className="w-full max-w-sm bg-white rounded-xl shadow p-6 space-y-4"
       >
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold">Sign in</h1>
-          <p className="text-sm text-gray-500">Use your admin or point credentials.</p>
+          <h1 className="text-2xl font-semibold">{t("auth.login.title")}</h1>
+          <p className="text-sm text-gray-500">{t("auth.login.subtitle")}</p>
         </div>
 
         <div>
-          <label className="block text-sm mb-1">Email</label>
+          <label className="block text-sm mb-1">{t("form.email")}</label>
           <input
             type="email"
             className="w-full rounded-md border px-3 py-2"
@@ -85,19 +98,25 @@ export default function LoginPage() {
             onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))}
             autoComplete="email"
           />
-          {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
+          {errors.email && (
+            <p className="text-xs text-red-600 mt-1">{errors.email}</p>
+          )}
         </div>
 
         <div>
-          <label className="block text-sm mb-1">Password</label>
+          <label className="block text-sm mb-1">{t("form.password")}</label>
           <input
             type="password"
             className="w-full rounded-md border px-3 py-2"
             value={form.password}
-            onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))}
+            onChange={(e) =>
+              setForm((s) => ({ ...s, password: e.target.value }))
+            }
             autoComplete="current-password"
           />
-          {errors.password && <p className="text-xs text-red-600 mt-1">{errors.password}</p>}
+          {errors.password && (
+            <p className="text-xs text-red-600 mt-1">{errors.password}</p>
+          )}
         </div>
 
         {errors.root && (
@@ -109,7 +128,9 @@ export default function LoginPage() {
           className="w-full rounded-md bg-black text-white py-2 font-medium disabled:opacity-60"
           disabled={mutate.isPending}
         >
-          {mutate.isPending ? "Signing in..." : "Sign in"}
+          {mutate.isPending
+            ? t("auth.login.signingIn")
+            : t("auth.login.signIn")}
         </button>
       </form>
     </main>

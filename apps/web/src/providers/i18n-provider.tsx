@@ -42,13 +42,19 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const t = (key: string, vars?: Record<string, string | number>) => {
+  const t = (
+    key: string,
+    vars?: Record<string, string | number | undefined>
+  ) => {
     const txt = map[locale][key] ?? map["en"][key] ?? key;
     if (!vars) return txt;
-    return Object.keys(vars).reduce(
-      (s, k) => s.replace(new RegExp(`{{\\s*${k}\\s*}}`, "g"), String(vars[k])),
-      txt
-    );
+    return Object.keys(vars).reduce((s, k) => {
+      const value = vars[k];
+      const safe = value === null || value === undefined ? "" : String(value);
+      // support both {name} and {{name}} placeholders (optional spaces)
+      const re = new RegExp(`\\{\\{?\\s*${k}\\s*\\}?\\}`, "g");
+      return s.replace(re, safe);
+    }, txt);
   };
 
   const value: I18nCtx = { locale, setLocale, t };

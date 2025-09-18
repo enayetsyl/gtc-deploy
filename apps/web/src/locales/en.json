@@ -29,6 +29,8 @@
   "table.actions": "Actions",
   "ui.loading": "Loading…",
   "form.applicantName": "Applicant name",
+  "form.email": "Email",
+  "form.name": "Name",
   "form.applicantPlaceholder": "Jane Doe",
   "form.internalSalesRep": "Internal Sales Rep (optional)",
   "admin.conventionsTitle": "Admin · Conventions",
@@ -77,6 +79,8 @@
 
   "admin.onboarding.submitted": "Submitted Onboardings",
   "admin.onboarding.createInvite": "Create invite",
+  "admin.onboarding.includeServices": "Include services",
+  "admin.onboarding.selectServices": "Select services to include for this onboarding:",
   "admin.onboarding.listItem": "Name: {name} — Email: {email} — Status: {status}",
   "admin.onboarding.inviteCreated": "Invite created",
 
@@ -121,5 +125,13 @@
   "admin.services.title": "Services",
   "ui.enable": "Enable",
   "ui.disable": "Disable",
-  "ui.failedToLoad": "Failed to load."
+  "ui.failedToLoad": "Failed to load.",
+  "auth.login.title": "Sign in",
+  "auth.login.subtitle": "Use your admin or point credentials.",
+  "auth.login.signIn": "Sign in",
+  "auth.login.signingIn": "Signing in...",
+  "form.password": "Password",
+  "dashboard.title": "Dashboard",
+  "dashboard.welcome": "Welcome, {name}.",
+  "dashboard.role": "Your role: {role}"
 }

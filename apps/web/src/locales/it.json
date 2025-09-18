@@ -29,6 +29,8 @@
   "table.pointSector": "Punto / Settore",
   "ui.loading": "Caricamento…",
   "form.applicantName": "Nome richiedente",
+  "form.email": "Email",
+  "form.name": "Nome",
   "form.applicantPlaceholder": "Mario Rossi",
   "form.internalSalesRep": "Rappresentante commerciale interno (opzionale)",
   "admin.conventionsTitle": "Admin · Convenzioni",
@@ -77,6 +79,8 @@
 
   "admin.onboarding.submitted": "Onboarding inviati",
   "admin.onboarding.createInvite": "Crea invito",
+  "admin.onboarding.includeServices": "Includi servizi",
+  "admin.onboarding.selectServices": "Seleziona i servizi da includere per questo onboarding:",
   "admin.onboarding.listItem": "Nome: {name} — Email: {email} — Stato: {status}",
   "admin.onboarding.inviteCreated": "Invito creato",
 
@@ -121,5 +125,13 @@
   "admin.services.title": "Servizi",
   "ui.enable": "Abilita",
   "ui.disable": "Disabilita",
-  "ui.failedToLoad": "Caricamento fallito."
+  "ui.failedToLoad": "Caricamento fallito.",
+  "auth.login.title": "Accedi",
+  "auth.login.subtitle": "Usa le credenziali di amministratore o del punto.",
+  "auth.login.signIn": "Accedi",
+  "auth.login.signingIn": "Accesso in corso...",
+  "form.password": "Password",
+  "dashboard.title": "Dashboard",
+  "dashboard.welcome": "Benvenuto, {name}.",
+  "dashboard.role": "Il tuo ruolo: {role}"
 }

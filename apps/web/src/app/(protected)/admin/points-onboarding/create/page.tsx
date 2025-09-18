@@ -133,7 +133,7 @@ export default function CreateInvite() {
         {includeServices && (
           <div className="p-2 border rounded bg-background">
             <p className="text-sm text-muted-foreground mb-2">
-              Select services to include for this onboarding:
+              {t("admin.onboarding.selectServices")}
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {services.length ? (
