@@ -1,10 +1,21 @@
 import { prisma } from "../lib/prisma";
 import { notifyUsers } from "./notifications";
+import { enqueueEmail } from "../queues/email";
 
-/** Users with role SECTOR_OWNER for the sector */
+/** Users with role SECTOR_OWNER for the sector.
+ *
+ * Owners can be assigned in two ways in this schema:
+ *  - via the `user.sectorId` field (legacy / simple)
+ *  - via the many-to-many `UserSector` join table
+ *
+ * We include both so all owners receive notifications.
+ */
 async function getSectorOwners(sectorId: string) {
   const owners = await prisma.user.findMany({
-    where: { role: "SECTOR_OWNER" as any, sectorId },
+    where: {
+      role: "SECTOR_OWNER" as any,
+      OR: [{ sectorId }, { userSectors: { some: { sectorId } } }],
+    },
     select: { id: true },
   });
   return owners.map((u) => u.id);
@@ -51,12 +62,43 @@ export async function onLeadCreated(leadId: string) {
     getSectorPointUsers(lead.sectorId),
   ]);
 
-  const unique = Array.from(new Set([...owners, ...pointUsers]));
-  if (unique.length) {
-    await notifyUsers(unique, {
+  console.log('owner', owners)
+  console.log('point user', pointUsers)
+
+  const userIds = Array.from(new Set([...owners, ...pointUsers]));
+
+  // Build a deduped list of email addresses: users' emails + gtc point emails
+  const [usersWithEmails, points] = await Promise.all([
+    userIds.length
+      ? prisma.user.findMany({ where: { id: { in: userIds } }, select: { email: true } })
+      : Promise.resolve([] as { email: string | null }[]),
+    prisma.gtcPoint.findMany({ where: { sectorId: lead.sectorId }, select: { email: true } }),
+  ]);
+
+  const emails = new Set<string>();
+  for (const u of usersWithEmails) if (u.email) emails.add(u.email);
+  for (const p of points) if (p.email) emails.add(p.email);
+
+  // Create in-app notifications and socket emits for all relevant users but
+  // disable per-user email sending (we'll send a single combined email below)
+  if (userIds.length) {
+    await notifyUsers(userIds, {
       type: "LEAD_NEW",
       subject,
       contentHtml: html,
+      email: false,
     });
+  }
+
+  // Enqueue one email job per recipient so each GTC point receives its own send
+  const to = Array.from(emails);
+  if (to.length) {
+    // debug log so we can see who's being emailed in server logs
+    console.debug("[leads] emailing recipients:", to);
+    for (const addr of to) {
+      // enqueue one job per address to avoid mailing list filtering and to
+      // keep recipients private (one-to-one sends)
+      await enqueueEmail({ to: addr, subject, html });
+    }
   }
 }
