@@ -1,6 +1,7 @@
 "use client";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useLeadsMe } from "@/hooks/useLeads";
+import { useI18n } from "@/providers/i18n-provider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -31,6 +32,7 @@ type LeadsPage = {
 };
 
 export default function OwnerLeadsPage() {
+  const { t } = useI18n();
   const sp = useSearchParams();
   const router = useRouter();
   const page = Number(sp.get("page") || 1);
@@ -47,37 +49,37 @@ export default function OwnerLeadsPage() {
   return (
     <div className="p-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Leads (My Sector)</CardTitle>
+        <CardHeader className="flex items-center justify-between">
+          <CardTitle className="text-heading text-xl font-semibold">
+            {t("nav.leads")} ({t("table.sector")})
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <p>Loading…</p>
+            <p>{t("ui.loading")}</p>
           ) : (
             <>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Message</TableHead>
-                    <TableHead>Attachments</TableHead>
+                    <TableHead className="text-sm text-muted-foreground">{t("table.created")}</TableHead>
+                    <TableHead className="text-sm text-muted-foreground">{t("table.name")}</TableHead>
+                    <TableHead className="text-sm text-muted-foreground">{t("table.email")}</TableHead>
+                    <TableHead className="text-sm text-muted-foreground">{t("table.phone")}</TableHead>
+                    <TableHead className="text-sm text-muted-foreground">{t("table.message")}</TableHead>
+                    <TableHead className="text-sm text-muted-foreground">{t("table.attachments")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {leads?.items.map((l: Lead) => (
+                  {(leads?.items || []).map((l: Lead) => (
                     <TableRow key={l.id}>
-                      <TableCell>
+                      <TableCell className="text-sm text-body">
                         {new Date(l.createdAt).toLocaleString()}
                       </TableCell>
-                      <TableCell>{l.name}</TableCell>
-                      <TableCell>{l.email || "—"}</TableCell>
-                      <TableCell>{l.phone || "—"}</TableCell>
-                      <TableCell className="max-w-[320px] truncate">
-                        {l.message || "—"}
-                      </TableCell>
+                      <TableCell className="text-sm text-body">{l.name}</TableCell>
+                      <TableCell className="text-sm text-body">{l.email || "—"}</TableCell>
+                      <TableCell className="text-sm text-body">{l.phone || "—"}</TableCell>
+                      <TableCell className="max-w-[320px] truncate text-sm text-body">{l.message || "—"}</TableCell>
                       <TableCell className="space-x-2">
                         {l.attachments?.length ? (
                           l.attachments.map((a) => (
@@ -89,7 +91,7 @@ export default function OwnerLeadsPage() {
                             />
                           ))
                         ) : (
-                          <span className="text-muted-foreground">None</span>
+                          <span className="text-muted-foreground">{t("ui.none")}</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -97,9 +99,7 @@ export default function OwnerLeadsPage() {
                 </TableBody>
               </Table>
               <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Total: {leads?.total ?? 0}
-                </div>
+                <div className="text-sm text-muted-foreground">{t("table.total", { total: leads?.total ?? 0 })}</div>
                 <div className="space-x-2">
                   <Button
                     variant="outline"
@@ -107,7 +107,7 @@ export default function OwnerLeadsPage() {
                     onClick={() => go(Math.max(1, page - 1))}
                     disabled={page <= 1}
                   >
-                    Prev
+                    {t("pagination.prev")}
                   </Button>
                   <Button
                     variant="outline"
@@ -118,7 +118,7 @@ export default function OwnerLeadsPage() {
                       (leads?.total ?? 0)
                     }
                   >
-                    Next
+                    {t("pagination.next")}
                   </Button>
                 </div>
               </div>
