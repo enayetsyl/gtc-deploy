@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectTrigger,
@@ -77,104 +78,119 @@ export default function CreateInvite() {
   }
 
   return (
-    <div>
+    <div className="min-h-[60vh] flex items-center justify-center p-6">
       <Toaster />
-      <form onSubmit={submit} className="max-w-xl space-y-4">
-        <h2 className="text-lg font-semibold">
-          {t("admin.onboarding.createInvite")}
-        </h2>
+      <div className="w-full max-w-2xl">
+        <Card>
+          <div className="p-6">
+            <form onSubmit={submit} className="space-y-4">
+              <h2 className="text-lg font-semibold">
+                {t("admin.onboarding.createInvite")}
+              </h2>
 
-        <div>
-          <label className="block text-sm text-muted-foreground mb-1">
-            Sector
-          </label>
-          <Select value={sector} onValueChange={(v) => setSector(v)}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={t("ui.selectSector")} />
-            </SelectTrigger>
-            <SelectContent>
-              {sectors.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1">
+                  {t("ui.sector")}
+                </label>
+                <Select value={sector} onValueChange={(v) => setSector(v)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={t("ui.selectSector")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sectors.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-        <div>
-          <label className="block text-sm text-muted-foreground mb-1">
-            {t("form.name")}
-          </label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1">
+                  {t("form.name")}
+                </label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
 
-        <div>
-          <label className="block text-sm text-muted-foreground mb-1">
-            {t("form.email")}
-          </label>
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
+              <div>
+                <label className="block text-sm text-muted-foreground mb-1">
+                  {t("form.email")}
+                </label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
 
-        <div className="flex items-center gap-2">
-          <Checkbox
-            checked={includeServices}
-            onCheckedChange={(c) => setIncludeServices(Boolean(c))}
-          />
-          <label className="text-sm">
-            {t("admin.onboarding.includeServices")}
-          </label>
-        </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={includeServices}
+                  onCheckedChange={(c) => setIncludeServices(Boolean(c))}
+                />
+                <label className="text-sm">
+                  {t("admin.onboarding.includeServices")}
+                </label>
+              </div>
 
-        {includeServices && (
-          <div className="p-2 border rounded bg-background">
-            <p className="text-sm text-muted-foreground mb-2">
-              {t("admin.onboarding.selectServices")}
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {services.length ? (
-                services.map((s) => {
-                  const checked = selectedServices.includes(s.id);
-                  return (
-                    <label
-                      key={s.id}
-                      className="flex items-center gap-2 p-2 border rounded cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          if (e.target.checked)
-                            setSelectedServices((prev) => [...prev, s.id]);
-                          else
-                            setSelectedServices((prev) =>
-                              prev.filter((id) => id !== s.id)
-                            );
-                        }}
-                      />
-                      <span className="text-sm">{s.name}</span>
-                    </label>
-                  );
-                })
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {t("ui.noServices")}
-                </p>
+              {includeServices && (
+                <div className="p-2 border rounded bg-background">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {t("admin.onboarding.selectServices")}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {services.length ? (
+                      services.map((s) => {
+                        const checked = selectedServices.includes(s.id);
+                        return (
+                          <label
+                            key={s.id}
+                            className="flex items-center gap-2 p-2 border rounded cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                if (e.target.checked)
+                                  setSelectedServices((prev) => [
+                                    ...prev,
+                                    s.id,
+                                  ]);
+                                else
+                                  setSelectedServices((prev) =>
+                                    prev.filter((id) => id !== s.id)
+                                  );
+                              }}
+                            />
+                            <span className="text-sm">{s.name}</span>
+                          </label>
+                        );
+                      })
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        {t("ui.noServices")}
+                      </p>
+                    )}
+                  </div>
+                </div>
               )}
-            </div>
-          </div>
-        )}
 
-        <div>
-          <Button type="submit" disabled={loading}>
-            {loading ? t("ui.creating") : t("admin.onboarding.createInvite")}
-          </Button>
-        </div>
-      </form>
+              <div>
+                <Button
+                  type="submit"
+                  className="bg-brand-blue-500 hover:bg-brand-blue-600 text-white"
+                  disabled={loading}
+                >
+                  {loading
+                    ? t("ui.creating")
+                    : t("admin.onboarding.createInvite")}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
