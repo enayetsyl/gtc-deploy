@@ -85,6 +85,9 @@
   "table.attachments": "Allegati",
   "ui.none": "Nessuno",
   "table.total": "Totale: {total}",
+  "notifications.empty": "Nessuna notifica al momento.",
+  "notifications.markRead": "Segna come letta",
+  "notifications.loadMore": "Carica altro",
 
   "admin.onboarding.submitted": "Onboarding inviati",
   "admin.onboarding.createInvite": "Crea invito",

@@ -25,15 +25,22 @@ export default function Page() {
     <div className="p-4">
       <Card>
         <CardHeader>
-          <CardTitle>{t("point.sectors.title")}</CardTitle>
+          <CardTitle className="text-heading text-xl font-semibold">
+            {t("point.sectors.title")}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {sectors.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("ui.noSectors")}</p>
           ) : (
-            <ul className="list-disc pl-6 space-y-1">
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {sectors.map((s) => (
-                <li key={s.id}>{s.name}</li>
+                <li
+                  key={s.id}
+                  className="p-3 rounded-md border border-divider bg-card-bg text-body"
+                >
+                  {s.name}
+                </li>
               ))}
             </ul>
           )}

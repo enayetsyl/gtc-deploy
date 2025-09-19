@@ -85,6 +85,9 @@
   "table.attachments": "Attachments",
   "ui.none": "None",
   "table.total": "Total: {total}",
+  "notifications.empty": "No notifications yet.",
+  "notifications.markRead": "Mark read",
+  "notifications.loadMore": "Load more",
 
   "admin.onboarding.submitted": "Submitted Onboardings",
   "admin.onboarding.createInvite": "Create invite",
