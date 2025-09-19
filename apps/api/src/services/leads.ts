@@ -62,8 +62,7 @@ export async function onLeadCreated(leadId: string) {
     getSectorPointUsers(lead.sectorId),
   ]);
 
-  console.log('owner', owners)
-  console.log('point user', pointUsers)
+
 
   const userIds = Array.from(new Set([...owners, ...pointUsers]));
 
@@ -94,7 +93,7 @@ export async function onLeadCreated(leadId: string) {
   const to = Array.from(emails);
   if (to.length) {
     // debug log so we can see who's being emailed in server logs
-    console.debug("[leads] emailing recipients:", to);
+ 
     for (const addr of to) {
       // enqueue one job per address to avoid mailing list filtering and to
       // keep recipients private (one-to-one sends)
