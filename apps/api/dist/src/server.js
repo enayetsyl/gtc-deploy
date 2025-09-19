@@ -14,6 +14,7 @@ const error_1 = require("./middleware/error");
 const health_js_1 = require("./routes/health.js");
 const auth_1 = require("./routes/auth");
 const me_1 = require("./routes/me");
+const me_points_1 = require("./routes/me.points");
 const admin_sectors_1 = require("./routes/admin.sectors");
 const admin_points_1 = require("./routes/admin.points");
 const admin_services_1 = require("./routes/admin.services");
@@ -39,6 +40,7 @@ exports.app.use("/uploads", express_1.default.static(node_path_1.default.resolve
 exports.app.use("/api/health", health_js_1.router);
 exports.app.use("/api/auth", auth_1.authRouter);
 exports.app.use("/api/me", me_1.meRouter);
+exports.app.use("/api/me/points", me_points_1.mePoints);
 exports.app.use("/api/admin/sectors", admin_sectors_1.adminSectors);
 exports.app.use("/api/admin/points", admin_points_1.adminPoints);
 exports.app.use("/api/admin/services", admin_services_1.adminServices);

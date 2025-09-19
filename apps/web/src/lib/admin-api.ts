@@ -3,6 +3,15 @@ import { api } from "./axios";
 export type Sector = { id: string; name: string; createdAt: string; updatedAt: string };
 export type Point = { id: string; name: string; email: string; sectorId: string; createdAt: string; updatedAt: string; sector?: Sector };
 export type Service = { id: string; code: string; name: string; active: boolean; createdAt: string; updatedAt: string };
+export type SectorOwner = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  sectorId: string | null;
+  createdAt: string;
+  sectors: Sector[];
+};
 
 export type Paged<T> = { items: T[]; total: number; page: number; pageSize: number };
 
@@ -26,6 +35,16 @@ export async function deleteSector(id: string) {
 export async function createSectorOwner(payload: { name: string; email: string; sectorId?: string; sectorIds?: string[]; sendInvite?: boolean }) {
   const { data } = await api.post(`/api/admin/sectors/sector-owners`, payload);
   return data as { id: string; name: string; email: string; role: string; sectorId: string; createdAt: string };
+}
+
+export async function listSectorOwners(page = 1, pageSize = 50) {
+  const { data } = await api.get<Paged<SectorOwner>>(`/api/admin/sectors/sector-owners`, { params: { page, pageSize } });
+  return data;
+}
+
+export async function updateSectorOwner(id: string, payload: Partial<{ name: string; email: string; sectorIds: string[] }>) {
+  const { data } = await api.patch<SectorOwner>(`/api/admin/sectors/sector-owners/${id}`, payload);
+  return data;
 }
 
 export async function listPoints(page = 1, pageSize = 50) {

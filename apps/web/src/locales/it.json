@@ -95,6 +95,9 @@
   "ui.selectSector": "Seleziona settore",
   "ui.noServices": "Nessun servizio disponibile",
   "ui.createFailed": "Creazione fallita",
+  "ui.save": "Salva",
+  "ui.saving": "Salvataggio…",
+  "ui.cancel": "Annulla",
 
   "admin.sectors.createTitle": "Crea settore",
   "admin.sectors.examplePlaceholder": "es. Formazione",
