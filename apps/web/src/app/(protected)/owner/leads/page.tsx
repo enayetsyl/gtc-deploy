@@ -62,12 +62,24 @@ export default function OwnerLeadsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-sm text-muted-foreground">{t("table.created")}</TableHead>
-                    <TableHead className="text-sm text-muted-foreground">{t("table.name")}</TableHead>
-                    <TableHead className="text-sm text-muted-foreground">{t("table.email")}</TableHead>
-                    <TableHead className="text-sm text-muted-foreground">{t("table.phone")}</TableHead>
-                    <TableHead className="text-sm text-muted-foreground">{t("table.message")}</TableHead>
-                    <TableHead className="text-sm text-muted-foreground">{t("table.attachments")}</TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.created")}
+                    </TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.name")}
+                    </TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.email")}
+                    </TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.phone")}
+                    </TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.message")}
+                    </TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.attachments")}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -76,10 +88,18 @@ export default function OwnerLeadsPage() {
                       <TableCell className="text-sm text-body">
                         {new Date(l.createdAt).toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-sm text-body">{l.name}</TableCell>
-                      <TableCell className="text-sm text-body">{l.email || "—"}</TableCell>
-                      <TableCell className="text-sm text-body">{l.phone || "—"}</TableCell>
-                      <TableCell className="max-w-[320px] truncate text-sm text-body">{l.message || "—"}</TableCell>
+                      <TableCell className="text-sm text-body">
+                        {l.name}
+                      </TableCell>
+                      <TableCell className="text-sm text-body">
+                        {l.email || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-body">
+                        {l.phone || "—"}
+                      </TableCell>
+                      <TableCell className="max-w-[320px] truncate text-sm text-body">
+                        {l.message || "—"}
+                      </TableCell>
                       <TableCell className="space-x-2">
                         {l.attachments?.length ? (
                           l.attachments.map((a) => (
@@ -91,7 +111,9 @@ export default function OwnerLeadsPage() {
                             />
                           ))
                         ) : (
-                          <span className="text-muted-foreground">{t("ui.none")}</span>
+                          <span className="text-muted-foreground">
+                            {t("ui.none")}
+                          </span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -99,7 +121,9 @@ export default function OwnerLeadsPage() {
                 </TableBody>
               </Table>
               <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-muted-foreground">{t("table.total", { total: leads?.total ?? 0 })}</div>
+                <div className="text-sm text-muted-foreground">
+                  {t("table.total", { total: leads?.total ?? 0 })}
+                </div>
                 <div className="space-x-2">
                   <Button
                     variant="outline"
