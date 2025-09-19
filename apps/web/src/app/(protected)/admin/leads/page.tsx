@@ -78,15 +78,20 @@ export default function AdminLeadsPage() {
     <div className="p-6">
       <Card>
         <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <CardTitle>{t("admin.leads.title")}</CardTitle>
+          <CardTitle className="text-heading text-2xl font-semibold">
+            {t("admin.leads.title")}
+          </CardTitle>
           <div className="flex gap-2 items-center">
             <Input
               placeholder={t("admin.leads.filterPlaceholder")}
               value={sectorId}
               onChange={(e) => setSectorId(e.target.value)}
-              className="w-[260px]"
+              className="w-[260px] bg-page-bg border border-divider focus-visible:ring-2 ring-focus"
             />
-            <Button variant="outline" onClick={applyFilter}>
+            <Button
+              className="bg-brand-blue-500 hover:bg-brand-blue-600 text-white"
+              onClick={applyFilter}
+            >
               {t("ui.apply")}
             </Button>
           </div>
@@ -99,26 +104,48 @@ export default function AdminLeadsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{t("table.created")}</TableHead>
-                    <TableHead>{t("table.sector")}</TableHead>
-                    <TableHead>{t("table.name")}</TableHead>
-                    <TableHead>{t("table.email")}</TableHead>
-                    <TableHead>{t("table.phone")}</TableHead>
-                    <TableHead>{t("table.message")}</TableHead>
-                    <TableHead>{t("table.attachments")}</TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.created")}
+                    </TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.sector")}
+                    </TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.name")}
+                    </TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.email")}
+                    </TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.phone")}
+                    </TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.message")}
+                    </TableHead>
+                    <TableHead className="text-sm text-muted-foreground">
+                      {t("table.attachments")}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {leads?.items.map((l) => (
+                  {(leads?.items || []).map((l) => (
                     <TableRow key={l.id}>
-                      <TableCell>
+                      <TableCell className="text-sm text-body">
                         {new Date(l.createdAt).toLocaleString()}
                       </TableCell>
-                      <TableCell>{l.sectorId}</TableCell>
-                      <TableCell>{l.name}</TableCell>
-                      <TableCell>{l.email || "—"}</TableCell>
-                      <TableCell>{l.phone || "—"}</TableCell>
-                      <TableCell className="max-w-[320px] truncate">
+                      <TableCell className="text-sm text-body">
+                        {l.sectorId}
+                      </TableCell>
+                      <TableCell className="text-sm text-body">
+                        {l.name}
+                      </TableCell>
+                      <TableCell className="text-sm text-body">
+                        {l.email || "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-body">
+                        {l.phone || "—"}
+                      </TableCell>
+                      <TableCell className="max-w-[320px] truncate text-sm text-body">
                         {l.message || "—"}
                       </TableCell>
                       <TableCell className="space-x-2">
@@ -132,9 +159,7 @@ export default function AdminLeadsPage() {
                             />
                           ))
                         ) : (
-                          <span className="text-muted-foreground">
-                            {t("ui.none")}
-                          </span>
+                          <span className="text-muted-foreground">Nessuno</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -144,7 +169,7 @@ export default function AdminLeadsPage() {
 
               <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-muted-foreground">
-                  Total: {total}
+                  {t("table.total", { total })}
                 </div>
                 <div className="space-x-2">
                   <Button
@@ -153,7 +178,7 @@ export default function AdminLeadsPage() {
                     onClick={() => go(Math.max(1, currentPage - 1))}
                     disabled={currentPage <= 1}
                   >
-                    Prev
+                    {t("pagination.prev")}
                   </Button>
                   <Button
                     variant="outline"
@@ -161,7 +186,7 @@ export default function AdminLeadsPage() {
                     onClick={() => go(currentPage + 1)}
                     disabled={currentPage * currentPageSize >= total}
                   >
-                    Next
+                    {t("pagination.next")}
                   </Button>
                 </div>
               </div>

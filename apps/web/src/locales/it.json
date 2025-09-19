@@ -66,8 +66,8 @@
   "onboarding.mustAgree": "Devi accettare i termini prima di firmare.",
   "onboarding.termsAccepted": "Termini accettati. Ora puoi firmare e inviare.",
   "onboarding.signAndAccept": "Firma e accetta",
-  "admin.leads.title": "Tutti i Lead",
-  "admin.leads.filterPlaceholder": "Filtra per sectorId",
+  "admin.leads.title": "Richieste di contatto",
+  "admin.leads.filterPlaceholder": "Filtra per settore...",
   "ui.apply": "Applica",
   "table.created": "Creato",
   "table.name": "Nome",
@@ -84,6 +84,7 @@
   "table.message": "Messaggio",
   "table.attachments": "Allegati",
   "ui.none": "Nessuno",
+  "table.total": "Totale: {total}",
 
   "admin.onboarding.submitted": "Onboarding inviati",
   "admin.onboarding.createInvite": "Crea invito",

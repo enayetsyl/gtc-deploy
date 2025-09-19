@@ -66,8 +66,8 @@
   "onboarding.mustAgree": "You must agree to the terms before signing.",
   "onboarding.termsAccepted": "Terms accepted. You can now sign and submit.",
   "onboarding.signAndAccept": "Sign and accept",
-  "admin.leads.title": "All Leads",
-  "admin.leads.filterPlaceholder": "Filter by sectorId",
+  "admin.leads.title": "Leads",
+  "admin.leads.filterPlaceholder": "Filter by sector",
   "ui.apply": "Apply",
   "table.created": "Created",
   "table.name": "Name",
@@ -84,6 +84,7 @@
   "table.message": "Message",
   "table.attachments": "Attachments",
   "ui.none": "None",
+  "table.total": "Total: {total}",
 
   "admin.onboarding.submitted": "Submitted Onboardings",
   "admin.onboarding.createInvite": "Create invite",
