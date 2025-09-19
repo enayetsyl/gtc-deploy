@@ -78,6 +78,8 @@
   "pagination.prev": "Precedente",
   "pagination.page": "Pagina",
   "pagination.next": "Successiva",
+  "ui.show": "Mostra",
+  "ui.hide": "Nascondi",
   "table.phone": "Telefono",
   "table.message": "Messaggio",
   "table.attachments": "Allegati",

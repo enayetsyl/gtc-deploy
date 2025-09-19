@@ -11,11 +11,17 @@ type PointRow = {
   createdAt: string;
 };
 import { useI18n } from "@/providers/i18n-provider";
+import {
+  getAdminPointServices,
+  ServiceLink,
+} from "@/lib/clients/servicesClient";
+import ServiceStatusBadge from "@/components/services/ServiceStatusBadge";
 
 export default function OwnerPointsPage() {
   const { t } = useI18n();
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
+  const [expandedPoint, setExpandedPoint] = useState<string | null>(null);
 
   const q = useQuery<
     { items: PointRow[]; total: number; page: number; pageSize: number },
@@ -66,17 +72,38 @@ export default function OwnerPointsPage() {
                   <th className="text-left">{t("table.name")}</th>
                   <th className="text-left">{t("table.email")}</th>
                   <th className="text-left">{t("table.created")}</th>
+                  <th className="text-left">Services</th>
                 </tr>
               </thead>
               <tbody>
                 {q.data?.items.map((p: PointRow) => (
-                  <tr key={p.id} className="border-t">
-                    <td className="py-2">{p.name}</td>
-                    <td className="py-2">{p.email}</td>
-                    <td className="py-2 text-sm text-gray-500">
-                      {new Date(p.createdAt).toLocaleString()}
-                    </td>
-                  </tr>
+                  <>
+                    <tr key={p.id} className="border-t">
+                      <td className="py-2">{p.name}</td>
+                      <td className="py-2">{p.email}</td>
+                      <td className="py-2 text-sm text-gray-500">
+                        {new Date(p.createdAt).toLocaleString()}
+                      </td>
+                      <td className="py-2">
+                        <button
+                          className="text-sm underline"
+                          onClick={() =>
+                            setExpandedPoint((s) => (s === p.id ? null : p.id))
+                          }
+                        >
+                          {expandedPoint === p.id ? t("ui.hide") : t("ui.show")}
+                        </button>
+                      </td>
+                    </tr>
+
+                    {expandedPoint === p.id && (
+                      <tr key={`${p.id}-services`} className="bg-card-bg">
+                        <td colSpan={4} className="px-4 py-3">
+                          <PointServices pointId={p.id} />
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>
@@ -113,5 +140,42 @@ export default function OwnerPointsPage() {
         )}
       </section>
     </main>
+  );
+}
+
+function PointServices({ pointId }: { pointId: string }) {
+  const { data, isLoading, isError } = useQuery<ServiceLink[]>({
+    queryKey: ["admin", "points", pointId, "services"],
+    queryFn: () => getAdminPointServices(pointId),
+  });
+
+  if (isLoading) return <div className="text-sm">Loading services…</div>;
+  if (isError)
+    return (
+      <div className="text-sm text-destructive">Failed to load services.</div>
+    );
+
+  if (!data || data.length === 0)
+    return (
+      <div className="text-sm text-muted-text">No services configured.</div>
+    );
+
+  return (
+    <div className="space-y-2">
+      {data.map((s) => (
+        <div
+          key={s.id}
+          className="flex items-center justify-between border rounded px-3 py-2"
+        >
+          <div>
+            <div className="font-medium">{s.service.name}</div>
+            <div className="text-sm text-muted-text">{s.service.code}</div>
+          </div>
+          <div className="flex items-center gap-3">
+            <ServiceStatusBadge status={s.status} />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

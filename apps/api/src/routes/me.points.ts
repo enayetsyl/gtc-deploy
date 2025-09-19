@@ -17,6 +17,7 @@ mePoints.get("/", async (req, res) => {
     try {
       const links = await prisma.userSector.findMany({ where: { userId: req.user!.id }, select: { sectorId: true } });
       sectorIds = links.map((l: any) => l.sectorId);
+      console.log('sector ids', sectorIds)
     } catch (err) {
       // fallback: use legacy sectorId on user
       const me = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { sectorId: true } });

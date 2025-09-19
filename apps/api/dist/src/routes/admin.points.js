@@ -7,8 +7,8 @@ const prisma_1 = require("../lib/prisma");
 const auth_1 = require("../middleware/auth");
 const services_1 = require("../services/services");
 exports.adminPoints = (0, express_1.Router)();
-exports.adminPoints.use(auth_1.requireAuth, (0, auth_1.requireRole)("ADMIN"));
-exports.adminPoints.get("/", async (req, res) => {
+exports.adminPoints.use(auth_1.requireAuth);
+exports.adminPoints.get("/", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const page = Math.max(1, Number(req.query.page ?? 1));
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 20)));
     const [items, total] = await Promise.all([
@@ -32,7 +32,7 @@ const onboardingCreateSchema = zod_1.z.object({
     serviceIds: zod_1.z.array(zod_1.z.string().min(1)).optional(),
 });
 // GET /api/admin/points/onboarding
-exports.adminPoints.get("/onboarding", async (req, res) => {
+exports.adminPoints.get("/onboarding", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const status = req.query.status ?? undefined;
     const where = {};
     if (status)
@@ -41,7 +41,7 @@ exports.adminPoints.get("/onboarding", async (req, res) => {
     res.json({ items });
 });
 // POST /api/admin/points/onboarding
-exports.adminPoints.post("/onboarding", async (req, res) => {
+exports.adminPoints.post("/onboarding", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const parsed = onboardingCreateSchema.safeParse(req.body);
     if (!parsed.success)
         return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
@@ -49,13 +49,13 @@ exports.adminPoints.post("/onboarding", async (req, res) => {
     res.status(201).json(ob);
 });
 // POST /api/admin/points/onboarding/:id/approve
-exports.adminPoints.post("/onboarding/:id/approve", async (req, res) => {
+exports.adminPoints.post("/onboarding/:id/approve", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const { id } = zod_1.z.object({ id: zod_1.z.string().min(1) }).parse(req.params);
     const result = await (0, onboarding_1.approveOnboarding)(id, req.user.id);
     res.json(result);
 });
 // POST /api/admin/points/onboarding/:id/decline
-exports.adminPoints.post("/onboarding/:id/decline", async (req, res) => {
+exports.adminPoints.post("/onboarding/:id/decline", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const { id } = zod_1.z.object({ id: zod_1.z.string().min(1) }).parse(req.params);
     await (0, onboarding_1.declineOnboarding)(id, req.user.id);
     res.json({ ok: true });
@@ -65,7 +65,7 @@ const createSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
     sectorId: zod_1.z.string().min(1),
 });
-exports.adminPoints.post("/", async (req, res) => {
+exports.adminPoints.post("/", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success)
         return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
@@ -78,14 +78,14 @@ const updateSchema = zod_1.z.object({
     email: zod_1.z.string().email().optional(),
     sectorId: zod_1.z.string().min(1).optional(),
 });
-exports.adminPoints.get("/:id", async (req, res) => {
+exports.adminPoints.get("/:id", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const { id } = idParam.parse(req.params);
     const point = await prisma_1.prisma.gtcPoint.findUnique({ where: { id }, include: { sector: true, services: true } });
     if (!point)
         return res.status(404).json({ error: "Not found" });
     res.json(point);
 });
-exports.adminPoints.patch("/:id", async (req, res) => {
+exports.adminPoints.patch("/:id", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const { id } = idParam.parse(req.params);
     const body = updateSchema.safeParse(req.body);
     if (!body.success)
@@ -93,7 +93,7 @@ exports.adminPoints.patch("/:id", async (req, res) => {
     const point = await prisma_1.prisma.gtcPoint.update({ where: { id }, data: body.data });
     res.json(point);
 });
-exports.adminPoints.delete("/:id", async (req, res) => {
+exports.adminPoints.delete("/:id", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const { id } = idParam.parse(req.params);
     const svcCount = await prisma_1.prisma.gtcPointService.count({ where: { gtcPointId: id } });
     if (svcCount > 0)
@@ -101,19 +101,33 @@ exports.adminPoints.delete("/:id", async (req, res) => {
     await prisma_1.prisma.gtcPoint.delete({ where: { id } });
     res.json({ ok: true });
 });
-// list services for a point (optional helper)
 exports.adminPoints.get("/:id/services", async (req, res) => {
     const { id } = idParam.parse(req.params);
+    // allow ADMIN or allow SECTOR_OWNER when the point belongs to one of their sectors
+    const user = req.user;
+    console.log('user', user);
+    if (user.role !== 'ADMIN') {
+        // must be a sector owner
+        if (user.role !== 'SECTOR_OWNER')
+            return res.status(403).json({ error: 'Forbidden' });
+        // check point's sector
+        const point = await prisma_1.prisma.gtcPoint.findUnique({ where: { id }, select: { sectorId: true } });
+        if (!point)
+            return res.status(404).json({ error: 'Not found' });
+        const owns = await prisma_1.prisma.userSector.findFirst({ where: { userId: user.id, sectorId: point.sectorId } });
+        if (!owns)
+            return res.status(403).json({ error: 'Forbidden' });
+    }
     const items = await prisma_1.prisma.gtcPointService.findMany({
         where: { gtcPointId: id },
         include: { service: true },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
     });
     res.json({ items });
 });
 const svcActionSchema = zod_1.z.object({ action: zod_1.z.enum(["ENABLE", "DISABLE"]) });
 /** PATCH /api/admin/points/:id/services/:serviceId  { action: "ENABLE"|"DISABLE" } */
-exports.adminPoints.patch("/:id/services/:serviceId", async (req, res) => {
+exports.adminPoints.patch("/:id/services/:serviceId", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const { id } = idParam.parse(req.params);
     const serviceId = zod_1.z.string().min(1).parse(req.params.serviceId);
     const body = svcActionSchema.safeParse(req.body);

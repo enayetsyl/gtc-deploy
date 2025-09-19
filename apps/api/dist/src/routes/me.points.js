@@ -35,6 +35,10 @@ exports.mePoints.get("/", async (req, res) => {
         prisma_1.prisma.gtcPoint.findMany({ where: { sectorId: { in: sectorIds } }, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
         prisma_1.prisma.gtcPoint.count({ where: { sectorId: { in: sectorIds } } }),
     ]);
+    // debug helper: return resolved sectorIds and counts when debug=1
+    if (String(req.query.debug) === "1" || String(req.query.debug) === "true") {
+        return res.json({ items, total, page, pageSize, debug: { userId: req.user.id, role: req.user.role, sectorIds } });
+    }
     res.json({ items, total, page, pageSize });
 });
 exports.default = exports.mePoints;
