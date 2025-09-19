@@ -96,7 +96,7 @@ export default function PointsPage() {
               }
               disabled={sectorsQ.isLoading}
             >
-              <option value="">Select a sector…</option>
+              <option value="">{t("ui.selectSector")}</option>
               {sectorOptions.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
