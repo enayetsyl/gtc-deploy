@@ -4,4 +4,12 @@ export const env = {
   db: process.env.DATABASE_URL!,
   redis: process.env.REDIS_URL!,
   webBaseUrl: process.env.WEB_BASE_URL || "http://localhost:3000",
+  corsOrigins: (() => {
+    const raw = process.env.CORS_ORIGIN || process.env.WEB_BASE_URL || "http://localhost:3000";
+    // Allow comma or space separated list
+    return raw
+      .split(/[,\s]+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+  })(),
 };

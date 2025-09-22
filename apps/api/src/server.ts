@@ -2,6 +2,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { env } from "./config/env";
 import cookieParser from "cookie-parser";
 import path from "node:path";
 import { errorHandler } from "./middleware/error";
@@ -26,7 +27,12 @@ import { pointsOnboardingPublic } from "./routes/points.onboarding.public";
 export const app = express();
 
 app.use(cors({
-  origin: ["http://localhost:3000"],
+  origin: (origin, callback) => {
+    // Allow REST tools / same-origin requests (no origin header) and any configured origin list
+    if (!origin) return callback(null, true);
+    if (env.corsOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error("CORS: Origin not allowed"));
+  },
   credentials: true,
 }));
 app.use(cookieParser());
