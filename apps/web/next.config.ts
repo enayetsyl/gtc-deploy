@@ -7,7 +7,8 @@ const nextConfig: NextConfig = {
   experimental: {
     // Ensure Next's file tracing starts at the monorepo root so nft paths are consistent on Vercel
     // @ts-expect-error: Not yet in published Next.js type defs
-    outputFileTracingRoot: path.join(__dirname, "../../.."),
+    // apps/web is two levels below repo root (repo/apps/web)
+    outputFileTracingRoot: path.join(__dirname, "../.."),
   },
 };
 

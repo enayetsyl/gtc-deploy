@@ -1,5 +1,5 @@
 {
   "installCommand": "pnpm install --frozen-lockfile && pnpm approve-builds",
-  "buildCommand": "pnpm build -w @gtc/web",
+  "buildCommand": "pnpm run build",
   "framework": "nextjs"
 }
