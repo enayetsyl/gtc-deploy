@@ -1,2 +1,15 @@
 packages:
-  - "apps/*"
+  - apps/*
+
+ignoredBuiltDependencies:
+  - msgpackr-extract
+
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@tailwindcss/oxide'
+  - argon2
+  - esbuild
+  - prisma
+  - sharp
+  - unrs-resolver
