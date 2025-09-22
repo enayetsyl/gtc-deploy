@@ -1,0 +1,6 @@
+{
+  "buildCommand": "pnpm install --frozen-lockfile && pnpm build -w @gtc/web",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "rootDirectory": "apps/web",
+  "framework": "nextjs"
+}

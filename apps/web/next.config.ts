@@ -1,4 +1,14 @@
 // apps/web/next.config.ts
 import type { NextConfig } from "next";
-const nextConfig: NextConfig = { reactStrictMode: true };
+import path from "path";
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  experimental: {
+    // Ensure Next's file tracing starts at the monorepo root so nft paths are consistent on Vercel
+    // @ts-expect-error: Not yet in published Next.js type defs
+    outputFileTracingRoot: path.join(__dirname, "../../.."),
+  },
+};
+
 export default nextConfig;
