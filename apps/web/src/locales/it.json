@@ -99,6 +99,7 @@
 
   "ui.create": "Crea",
   "ui.creating": "Creazione…",
+  "ui.view": "Visualizza",
   "ui.selectSector": "Seleziona settore",
   "ui.noServices": "Nessun servizio disponibile",
   "ui.createFailed": "Creazione fallita",

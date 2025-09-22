@@ -99,6 +99,7 @@
 
   "ui.create": "Create",
   "ui.creating": "Creating…",
+  "ui.view": "View",
   "ui.save": "Save",
   "ui.saving": "Saving…",
   "ui.cancel": "Cancel",
