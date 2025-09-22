@@ -1,6 +1,5 @@
-"use client";
-import Protected from "@/components/protected";
 import Navbar from "@/components/navbar";
+import ProtectedShell from "./protected-shell";
 
 export default function AdminLayout({
   children,
@@ -8,9 +7,9 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Protected>
+    <ProtectedShell>
       <Navbar />
       <div className="p-6">{children}</div>
-    </Protected>
+    </ProtectedShell>
   );
 }
