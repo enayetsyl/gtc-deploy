@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
@@ -14,7 +14,7 @@ const schema = z.object({
 });
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, isAuthed, initialized } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
@@ -62,6 +62,13 @@ export default function LoginPage() {
     },
   });
 
+  // Redirect away if user is already authenticated
+  useEffect(() => {
+    if (initialized && isAuthed) {
+      router.replace("/dashboard");
+    }
+  }, [initialized, isAuthed, router]);
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
@@ -77,6 +84,9 @@ export default function LoginPage() {
     }
     mutate.mutate(parsed.data);
   };
+
+  // While initializing auth state or already authed (redirect pending), render nothing
+  if (!initialized || isAuthed) return null;
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-page-bg p-4">
