@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 export default function AdminHome() {
   return (
     <main className="rounded-xl border p-6">
