@@ -6,7 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.conventionsRouter = void 0;
 const express_1 = require("express");
 const zod_1 = require("zod");
-const multer_1 = __importDefault(require("multer"));
+// Upload feature flag wrapper
+const upload_1 = require("../middleware/upload");
 const auth_1 = require("../middleware/auth");
 const prisma_1 = require("../lib/prisma");
 const provider_1 = require("../storage/provider");
@@ -68,9 +69,11 @@ exports.conventionsRouter.post("/prefill", (0, auth_1.requireRole)("GTC_POINT", 
     res.setHeader("Content-Disposition", `attachment; filename="convention-prefill.pdf"`);
     res.send(pdf);
 });
-// 4.3 Upload signed convention file → stores file + creates ConventionDocument + update status + notify admins
-const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } }); // 15MB
-exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"), upload.single("file"), async (req, res) => {
+// 4.3 Upload signed convention file (feature-flagged). When UPLOADS_ENABLED!=='true', this becomes a no-op
+exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"), (0, upload_1.upload)({ multiple: false, fieldName: "file" }), async (req, res) => {
+    if (process.env.UPLOADS_ENABLED !== "true") {
+        return res.status(503).json({ error: "UploadsDisabled", message: "File uploads are disabled on this deployment." });
+    }
     const id = req.params.id;
     const conv = await prisma_1.prisma.convention.findUnique({ where: { id }, include: { gtcPoint: true, sector: true } });
     if (!conv)
@@ -157,7 +160,7 @@ exports.conventionsRouter.get("/:id/documents", (0, auth_1.requireRole)("GTC_POI
     if (!docConv)
         return res.status(404).json({ error: "Convention not found" });
     if (req.user.role !== "ADMIN") {
-        const allowed = docConv.gtcPoint.users.some(u => u.id === req.user.id);
+        const allowed = docConv.gtcPoint.users.some((u) => u.id === req.user.id);
         if (!allowed)
             return res.status(403).json({ error: "Forbidden" });
     }
@@ -173,7 +176,7 @@ exports.conventionsRouter.get("/:id/documents/:docId/download", (0, auth_1.requi
     if (!doc || doc.conventionId !== id)
         return res.status(404).json({ error: "Document not found" });
     if (req.user.role !== "ADMIN") {
-        const allowed = doc.convention.gtcPoint.users.some(u => u.id === req.user.id);
+        const allowed = doc.convention.gtcPoint.users.some((u) => u.id === req.user.id);
         if (!allowed)
             return res.status(403).json({ error: "Forbidden" });
     }

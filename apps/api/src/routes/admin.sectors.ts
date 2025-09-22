@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { Prisma } from "@prisma/client";
 import { requireAuth, requireRole } from "../middleware/auth";
 import argon2 from "argon2";
 import { enqueueEmail } from "../queues/email";
@@ -62,14 +63,14 @@ adminSectors.get("/sector-owners", async (req, res) => {
     prisma.user.count({ where: { role: "SECTOR_OWNER" } }),
   ]);
 
-  const shaped = items.map((u) => ({
+  const shaped = items.map((u: any) => ({
     id: u.id,
     name: u.name,
     email: u.email,
     role: u.role,
     sectorId: u.sectorId, // primary sector
     createdAt: u.createdAt,
-    sectors: u.userSectors.map((us) => us.sector),
+    sectors: u.userSectors.map((us: any) => us.sector),
   }));
   res.json({ items: shaped, total, page, pageSize });
 });
@@ -121,7 +122,7 @@ adminSectors.post("/sector-owners", async (req, res) => {
 
   if (sendInvite) {
     const { token } = await signInviteToken(user.id);
-    const primarySector = found.find((s) => s.id === primarySectorId);
+    const primarySector = found.find((s: any) => s.id === primarySectorId);
     const link = `${env.webBaseUrl.replace(/\/$/, "")}/invite/accept?token=${encodeURIComponent(token)}`;
     await enqueueEmail({
       to: user.email,
@@ -201,7 +202,7 @@ adminSectors.patch("/sector-owners/:id", async (req, res) => {
     const found = await prisma.sector.findMany({ where: { id: { in: sectorIds } } });
     if (found.length !== sectorIds.length) return res.status(404).json({ error: "One or more sectors not found" });
 
-    updatedUser = await prisma.$transaction(async (tx) => {
+    updatedUser = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Update primary sector on user (first in array) + name/email if provided
       const u = await tx.user.update({
         where: { id },
@@ -248,6 +249,6 @@ adminSectors.patch("/sector-owners/:id", async (req, res) => {
     role: withSectors.role,
     sectorId: withSectors.sectorId,
     createdAt: withSectors.createdAt,
-    sectors: withSectors.userSectors.map((us) => us.sector),
+    sectors: withSectors.userSectors.map((us: any) => us.sector),
   });
 });

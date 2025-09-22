@@ -1,8 +1,10 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { z } from "zod";
-import multer from "multer";
+// Upload feature flag wrapper
+import { upload as flaggedUpload } from "../middleware/upload";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
+import { Prisma } from "@prisma/client";
 import { storage } from "../storage/provider";
 import { buildPrefillPdf } from "../utils/pdf";
 import { onConventionUploaded } from "../services/conventions";
@@ -66,10 +68,11 @@ conventionsRouter.post("/prefill", requireRole("GTC_POINT", "ADMIN"), async (req
   res.send(pdf);
 });
 
-// 4.3 Upload signed convention file → stores file + creates ConventionDocument + update status + notify admins
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } }); // 15MB
-
-conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), upload.single("file"), async (req, res) => {
+// 4.3 Upload signed convention file (feature-flagged). When UPLOADS_ENABLED!=='true', this becomes a no-op
+conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flaggedUpload({ multiple: false, fieldName: "file" }), async (req: Request, res: Response) => {
+  if (process.env.UPLOADS_ENABLED !== "true") {
+    return res.status(503).json({ error: "UploadsDisabled", message: "File uploads are disabled on this deployment." });
+  }
   const id = req.params.id;
   const conv = await prisma.convention.findUnique({ where: { id }, include: { gtcPoint: true, sector: true } });
   if (!conv) return res.status(404).json({ error: "Convention not found" });
@@ -104,7 +107,7 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), upload.
 
   const stored = await storage.put({ buffer: file.buffer, mime: String(mime), originalName: file.originalname });
 
-  const { doc, statusChanged } = await prisma.$transaction(async (tx) => {
+  const { doc, statusChanged } = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const created = await tx.conventionDocument.create({
       data: {
         conventionId: conv.id,
@@ -142,8 +145,8 @@ conventionsRouter.get("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) =
     req.user!.role === "ADMIN"
       ? {}
       : {
-          gtcPoint: { users: { some: { id: req.user!.id } } },
-        };
+        gtcPoint: { users: { some: { id: req.user!.id } } },
+      };
 
   const [items, total] = await Promise.all([
     prisma.convention.findMany({
@@ -170,7 +173,7 @@ conventionsRouter.get("/:id/documents", requireRole("GTC_POINT", "ADMIN"), async
   if (!docConv) return res.status(404).json({ error: "Convention not found" });
 
   if (req.user!.role !== "ADMIN") {
-    const allowed = docConv.gtcPoint.users.some(u => u.id === req.user!.id);
+    const allowed = docConv.gtcPoint.users.some((u: { id: string }) => u.id === req.user!.id);
     if (!allowed) return res.status(403).json({ error: "Forbidden" });
   }
 
@@ -187,7 +190,7 @@ conventionsRouter.get("/:id/documents/:docId/download", requireRole("GTC_POINT",
   if (!doc || doc.conventionId !== id) return res.status(404).json({ error: "Document not found" });
 
   if (req.user!.role !== "ADMIN") {
-    const allowed = doc.convention.gtcPoint.users.some(u => u.id === req.user!.id);
+    const allowed = doc.convention.gtcPoint.users.some((u: { id: string }) => u.id === req.user!.id);
     if (!allowed) return res.status(403).json({ error: "Forbidden" });
   }
 

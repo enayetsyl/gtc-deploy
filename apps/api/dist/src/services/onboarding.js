@@ -108,7 +108,10 @@ async function approveOnboarding(id, adminUserId) {
     // notify admins and sector owners about approval
     const admins = await prisma_1.prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
     const owners = await prisma_1.prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true } });
-    const recipients = Array.from(new Set([...admins.map((a) => a.id), ...owners.map((o) => o.id)]));
+    const recipients = Array.from(new Set([
+        ...admins.map((a) => a.id),
+        ...owners.map((o) => o.id),
+    ]));
     // fetch service names if any
     let serviceNames = [];
     if (ob.includeServices && ob.services && ob.services.length) {
@@ -133,7 +136,10 @@ async function declineOnboarding(id, adminUserId) {
     // notify admins and owners that it was declined
     const admins = await prisma_1.prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
     const owners = await prisma_1.prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true } });
-    const recipients = Array.from(new Set([...admins.map((a) => a.id), ...owners.map((o) => o.id)]));
+    const recipients = Array.from(new Set([
+        ...admins.map((a) => a.id),
+        ...owners.map((o) => o.id),
+    ]));
     if (recipients.length) {
         await (0, notifications_1.notifyUsers)(recipients, { type: "GENERIC", subject: "GTC Point onboarding declined", contentHtml: `<p>Onboarding for <strong>${ob.name}</strong> (&lt;${ob.email}&gt;) was declined by admin.</p>` });
     }

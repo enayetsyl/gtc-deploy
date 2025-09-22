@@ -18,7 +18,7 @@ async function getSectorOwners(sectorId: string) {
     },
     select: { id: true },
   });
-  return owners.map((u) => u.id);
+  return owners.map((u: { id: string }) => u.id);
 }
 
 /** All GTC point users in the sector */
@@ -27,13 +27,13 @@ async function getSectorPointUsers(sectorId: string) {
     where: { sectorId },
     select: { id: true },
   });
-  const pointIds = points.map((p) => p.id);
+  const pointIds = points.map((p: { id: string }) => p.id);
   if (pointIds.length === 0) return [];
   const users = await prisma.user.findMany({
     where: { gtcPointId: { in: pointIds } },
     select: { id: true },
   });
-  return users.map((u) => u.id);
+  return users.map((u: { id: string }) => u.id);
 }
 
 /** Fan-out when a new public lead is submitted */
@@ -93,7 +93,7 @@ export async function onLeadCreated(leadId: string) {
   const to = Array.from(emails);
   if (to.length) {
     // debug log so we can see who's being emailed in server logs
- 
+
     for (const addr of to) {
       // enqueue one job per address to avoid mailing list filtering and to
       // keep recipients private (one-to-one sends)

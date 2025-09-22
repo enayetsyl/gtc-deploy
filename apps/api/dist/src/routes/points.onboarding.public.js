@@ -32,19 +32,16 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.pointsOnboardingPublic = void 0;
 const express_1 = require("express");
-const multer_1 = __importDefault(require("multer"));
+const upload_1 = require("../middleware/upload");
 const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 const onboarding_1 = require("../services/onboarding");
 const argon2 = __importStar(require("argon2"));
 exports.pointsOnboardingPublic = (0, express_1.Router)();
-const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB
+// Feature-flagged signature upload (disabled on free tier)
 // Preload for the form (name, email, includeServices, sectorId; DO NOT expose status)
 exports.pointsOnboardingPublic.get("/:token", async (req, res) => {
     const token = zod_1.z.string().min(10).parse(req.params.token);
@@ -54,7 +51,11 @@ exports.pointsOnboardingPublic.get("/:token", async (req, res) => {
     res.json({ name: ob.name, email: ob.email, includeServices: ob.includeServices, sector: { id: ob.sectorId, name: ob.sector?.name }, serviceIds: ob.services.map((s) => s.serviceId) });
 });
 // Submit details + signature + optional services
-exports.pointsOnboardingPublic.post("/:token/submit", upload.single("signature"), async (req, res) => {
+exports.pointsOnboardingPublic.post("/:token/submit", (0, upload_1.upload)({ fieldName: "signature" }), async (req, res) => {
+    if (process.env.UPLOADS_ENABLED !== "true") {
+        // Still allow submission without signature when disabled
+        // or you could return 503 similar to conventions route.
+    }
     const token = zod_1.z.string().min(10).parse(req.params.token);
     const body = zod_1.z.object({
         vatOrTaxNumber: zod_1.z.string().min(2).optional(),

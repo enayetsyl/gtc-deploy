@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { Prisma } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { enqueueEmail } from "../queues/email";
 import { storage } from "../storage/provider";
@@ -29,7 +30,7 @@ export async function createOnboardingLink(input: CreateOnboardingInput) {
       includeServices: input.includeServices ?? false,
       onboardingToken,
       tokenExpiresAt: expires,
-      services: input.serviceIds && input.serviceIds.length ? { create: input.serviceIds.map((s) => ({ serviceId: s })) } : undefined,
+      services: input.serviceIds && input.serviceIds.length ? { create: input.serviceIds.map((s: string) => ({ serviceId: s })) } : undefined,
     },
   });
 
@@ -83,8 +84,8 @@ export async function submitOnboardingForm(onboardingToken: string, payload: Sub
   const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true, email: true } });
   const owners = await prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true, email: true } });
 
-  const adminIds = admins.map((a) => a.id);
-  const ownerIds = owners.map((o) => o.id);
+  const adminIds = admins.map((a: { id: string }) => a.id);
+  const ownerIds = owners.map((o: { id: string }) => o.id);
 
   const adminAndOwners = Array.from(new Set([...adminIds, ...ownerIds]));
 
@@ -108,8 +109,8 @@ export async function approveOnboarding(id: string, adminUserId: string) {
   const point = await prisma.gtcPoint.create({ data: { name: ob.name, email: ob.email, sectorId: ob.sectorId } });
 
   if (ob.includeServices && ob.services && ob.services.length) {
-    await prisma.$transaction(async (tx) => {
-      for (const s of ob.services) {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      for (const s of ob.services as any[]) {
         await tx.gtcPointService.upsert({
           where: { gtcPointId_serviceId: { gtcPointId: point.id, serviceId: s.serviceId } },
           update: { status: "ENABLED" },
@@ -133,14 +134,17 @@ export async function approveOnboarding(id: string, adminUserId: string) {
   // notify admins and sector owners about approval
   const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
   const owners = await prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true } });
-  const recipients = Array.from(new Set([...admins.map((a) => a.id), ...owners.map((o) => o.id)]));
+  const recipients = Array.from(new Set([
+    ...admins.map((a: { id: string }) => a.id),
+    ...owners.map((o: { id: string }) => o.id),
+  ]));
 
   // fetch service names if any
   let serviceNames: string[] = [];
   if (ob.includeServices && ob.services && ob.services.length) {
-    const serviceIds = ob.services.map((s: any) => s.serviceId);
+    const serviceIds = (ob.services as any[]).map((s: any) => s.serviceId);
     const services = await prisma.service.findMany({ where: { id: { in: serviceIds } }, select: { name: true } });
-    serviceNames = services.map((s) => s.name);
+    serviceNames = services.map((s: { name: string }) => s.name);
   }
 
   if (recipients.length) {
@@ -162,7 +166,12 @@ export async function declineOnboarding(id: string, adminUserId: string) {
   // notify admins and owners that it was declined
   const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
   const owners = await prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true } });
-  const recipients = Array.from(new Set([...admins.map((a) => a.id), ...owners.map((o) => o.id)]));
+  const recipients = Array.from(
+    new Set([
+      ...admins.map((a: { id: string }) => a.id),
+      ...owners.map((o: { id: string }) => o.id),
+    ])
+  );
   if (recipients.length) {
     await notifyUsers(recipients, { type: "GENERIC", subject: "GTC Point onboarding declined", contentHtml: `<p>Onboarding for <strong>${ob.name}</strong> (&lt;${ob.email}&gt;) was declined by admin.</p>` });
   }
@@ -183,7 +192,7 @@ export async function completeRegistration(registrationToken: string, passwordHa
   const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
   const point = await prisma.gtcPoint.findUnique({ where: { id: ob.gtcPointId } });
   const owners = point ? await prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: point.sectorId }, select: { id: true } }) : [];
-  const recipients = Array.from(new Set([...admins.map((a) => a.id), ...owners.map((o) => o.id)]));
+  const recipients = Array.from(new Set([...admins.map((a: { id: string }) => a.id), ...owners.map((o: { id: string }) => o.id)]));
   if (recipients.length) {
     await notifyUsers(recipients, { type: "GENERIC", subject: "New GTC Point registered", contentHtml: `<p>${ob.name} (${ob.email}) completed registration.</p>` });
   }

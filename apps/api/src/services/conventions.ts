@@ -3,12 +3,12 @@ import { notifyUser, notifyUsers } from "./notifications";
 
 export async function getAdmins() {
   const admins = await prisma.user.findMany({ where: { role: "ADMIN" as any }, select: { id: true, email: true } });
-  return admins.map((a) => a.id);
+  return admins.map((a: { id: string }) => a.id);
 }
 
 export async function getPointUsers(gtcPointId: string) {
   const users = await prisma.user.findMany({ where: { gtcPointId }, select: { id: true } });
-  return users.map((u) => u.id);
+  return users.map((u: { id: string }) => u.id);
 }
 
 export async function onConventionUploaded(conventionId: string) {

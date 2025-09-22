@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: gtc-api
+    env: docker
+    plan: free
+    rootDir: apps/api
+    dockerfilePath: apps/api/Dockerfile
+    autoDeploy: true
+    healthCheckPath: /api/health
+    # Render automatically sets PORT env var; our server reads PORT
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: UPLOADS_ENABLED
+        value: false
+      # Required secrets below: set via dashboard (leave empty to fill in UI or use sync from env groups)
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: MAIL_HOST
+        sync: false
+      - key: MAIL_PORT
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_USER
+        sync: false
+      - key: MAIL_PASS
+        sync: false
+      - key: APP_BASE_URL
+        value: "https://your-web-app.example" # adjust
+      - key: WEB_BASE_URL
+        value: "https://your-web-app.example" # adjust
+      - key: QUEUE_CONCURRENCY
+        value: "4"
+      - key: CORS_ORIGIN
+        value: "https://your-web-app.example"
+      - key: FILE_STORAGE_ROOT
+        value: "DISABLED" # change if enabling uploads later

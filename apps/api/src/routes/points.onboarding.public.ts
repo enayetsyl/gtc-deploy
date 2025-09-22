@@ -1,15 +1,15 @@
-import { Router } from "express";
-import multer from "multer";
+import { Router, Request, Response } from "express";
+import { upload as flaggedUpload } from "../middleware/upload";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
 import { submitOnboardingForm, completeRegistration } from "../services/onboarding";
 import * as argon2 from "argon2";
 
 export const pointsOnboardingPublic = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB
+// Feature-flagged signature upload (disabled on free tier)
 
 // Preload for the form (name, email, includeServices, sectorId; DO NOT expose status)
-pointsOnboardingPublic.get("/:token", async (req, res) => {
+pointsOnboardingPublic.get("/:token", async (req: Request, res: Response) => {
   const token = z.string().min(10).parse(req.params.token);
   const ob = await (prisma as any).pointOnboarding.findUnique({ where: { onboardingToken: token }, include: { services: true, sector: true } });
   if (!ob || ob.status !== "DRAFT" || (ob.tokenExpiresAt && ob.tokenExpiresAt < new Date())) return res.status(404).json({ error: "Not found" });
@@ -17,7 +17,11 @@ pointsOnboardingPublic.get("/:token", async (req, res) => {
 });
 
 // Submit details + signature + optional services
-pointsOnboardingPublic.post("/:token/submit", upload.single("signature"), async (req, res) => {
+pointsOnboardingPublic.post("/:token/submit", flaggedUpload({ fieldName: "signature" }), async (req: Request, res: Response) => {
+  if (process.env.UPLOADS_ENABLED !== "true") {
+    // Still allow submission without signature when disabled
+    // or you could return 503 similar to conventions route.
+  }
   const token = z.string().min(10).parse(req.params.token);
   const body = z.object({
     vatOrTaxNumber: z.string().min(2).optional(),
@@ -35,7 +39,7 @@ pointsOnboardingPublic.post("/:token/submit", upload.single("signature"), async 
 });
 
 // Registration page prefill
-pointsOnboardingPublic.get("/register/:regToken", async (req, res) => {
+pointsOnboardingPublic.get("/register/:regToken", async (req: Request, res: Response) => {
   const regToken = z.string().min(10).parse(req.params.regToken);
   const ob = await (prisma as any).pointOnboarding.findFirst({ where: { registrationToken: regToken } });
   if (!ob || ob.status !== "APPROVED" || (ob.tokenExpiresAt && ob.tokenExpiresAt < new Date())) return res.status(404).json({ error: "Not found" });
@@ -43,7 +47,7 @@ pointsOnboardingPublic.get("/register/:regToken", async (req, res) => {
 });
 
 // Set password and finish
-pointsOnboardingPublic.post("/register/:regToken", async (req, res) => {
+pointsOnboardingPublic.post("/register/:regToken", async (req: Request, res: Response) => {
   const regToken = z.string().min(10).parse(req.params.regToken);
   const body = z.object({ password: z.string().min(8), confirm: z.string().min(8) }).parse(req.body);
   if (body.password !== body.confirm) return res.status(400).json({ error: "Passwords do not match" });

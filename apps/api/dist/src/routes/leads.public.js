@@ -1,12 +1,9 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.leadsPublic = void 0;
 const express_1 = require("express");
 const zod_1 = require("zod");
-const multer_1 = __importDefault(require("multer"));
+const upload_1 = require("../middleware/upload");
 const prisma_1 = require("../lib/prisma");
 const provider_1 = require("../storage/provider");
 const leads_1 = require("../services/leads");
@@ -35,10 +32,7 @@ async function throttle(req, res, next) {
         next();
     }
 }
-const upload = (0, multer_1.default)({
-    storage: multer_1.default.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024, files: 5 }, // 10MB/file, max 5 files
-});
+// Upload flag: when disabled, flaggedUpload is a no-op so req.files stays empty.
 const schema = zod_1.z.object({
     sectorId: zod_1.z.string().min(1),
     name: zod_1.z.string().min(2).max(200),
@@ -53,7 +47,7 @@ const ALLOWED = new Set([
     "image/png",
     "image/jpeg",
 ]);
-exports.leadsPublic.post("/", throttle, upload.array("files", 5), async (req, res) => {
+exports.leadsPublic.post("/", throttle, (0, upload_1.upload)({ multiple: true, fieldName: "files" }), async (req, res) => {
     const body = schema.safeParse(req.body);
     if (!body.success) {
         return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
