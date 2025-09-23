@@ -6,6 +6,8 @@ const socket_io_1 = require("socket.io");
 const sockets_1 = require("./sockets");
 const server_1 = require("./server");
 const io_1 = require("./sockets/io");
+// Import worker to start email processing
+require("./queues/worker");
 const server = (0, http_1.createServer)(server_1.app);
 const io = new socket_io_1.Server(server, { cors: { origin: ["http://localhost:3000"] } });
 (0, io_1.setIO)(io);

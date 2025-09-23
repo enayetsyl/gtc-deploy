@@ -8,6 +8,7 @@ exports.app = void 0;
 require("dotenv/config");
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const env_1 = require("./config/env");
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const node_path_1 = __importDefault(require("node:path"));
 const error_1 = require("./middleware/error");
@@ -31,7 +32,14 @@ const sectors_public_1 = require("./routes/sectors.public");
 const points_onboarding_public_1 = require("./routes/points.onboarding.public");
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)({
-    origin: ["http://localhost:3000"],
+    origin: (origin, callback) => {
+        // Allow REST tools / same-origin requests (no origin header) and any configured origin list
+        if (!origin)
+            return callback(null, true);
+        if (env_1.env.corsOrigins.includes(origin))
+            return callback(null, true);
+        return callback(new Error("CORS: Origin not allowed"));
+    },
     credentials: true,
 }));
 exports.app.use((0, cookie_parser_1.default)());
