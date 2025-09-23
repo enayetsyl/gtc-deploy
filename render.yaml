@@ -47,7 +47,7 @@ services:
     plan: free
     rootDir: apps/api
     dockerfilePath: apps/api/Dockerfile
-    dockerCommand: npm run worker
+    dockerCommand: npm run worker:prod
     autoDeploy: true
     envVars:
       - key: NODE_ENV
