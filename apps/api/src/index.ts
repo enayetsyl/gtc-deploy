@@ -5,12 +5,13 @@ import { initSockets } from "./sockets";
 import { app } from "./server";
 import { setIO } from "./sockets/io";
 
+// Import worker to start email processing
+import "./queues/worker";
 
 const server = createServer(app);
 const io = new Server(server, { cors: { origin: ["http://localhost:3000"] } });
 setIO(io);
 initSockets(io);
-
 
 // dev-only route
 const PORT = process.env.PORT || 4000;
