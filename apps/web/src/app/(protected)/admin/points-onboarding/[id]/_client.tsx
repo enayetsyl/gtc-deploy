@@ -90,17 +90,17 @@ export default function Client({ id }: { id: string }) {
       ? "bg-red-100 text-red-800"
       : "bg-gray-100 text-gray-800";
 
-  
-
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white/5 rounded-lg shadow-sm">
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-semibold">
-            {t("detail.gtcPointName")}: <span className="font-normal">{item.name}</span>
+            {t("detail.gtcPointName")}:{" "}
+            <span className="font-normal">{item.name}</span>
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {t("detail.emailLabel")}: <span className="font-medium">{item.email}</span>
+            {t("detail.emailLabel")}:{" "}
+            <span className="font-medium">{item.email}</span>
           </p>
         </div>
         <div className="flex items-center space-x-3">
