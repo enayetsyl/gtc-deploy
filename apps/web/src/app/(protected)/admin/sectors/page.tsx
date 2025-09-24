@@ -48,7 +48,7 @@ export default function SectorsPage() {
       qc.invalidateQueries({ queryKey: ["admin", "sectors"] });
     },
     onError: () => setErr("Failed to update"),
-  onMutate: (p: { id: string; name: string }) => setUpdatePendingId(p.id),
+    onMutate: (p: { id: string; name: string }) => setUpdatePendingId(p.id),
     onSettled: () => setUpdatePendingId(null),
   });
 

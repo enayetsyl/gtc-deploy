@@ -35,9 +35,10 @@ export default function AdminPointServicesPage() {
   const pointId = params.id!;
 
   const qc = useQueryClient();
-  const [togglePending, setTogglePending] = useState<
-    { serviceId: string; action: "ENABLE" | "DISABLE" } | null
-  >(null);
+  const [togglePending, setTogglePending] = useState<{
+    serviceId: string;
+    action: "ENABLE" | "DISABLE";
+  } | null>(null);
   const { data, isLoading, isError } = useQuery<ServiceLink[]>({
     queryKey: qk.adminPointServices(pointId),
     queryFn: () => getAdminPointServices(pointId),

@@ -153,8 +153,10 @@ export default function ServicesPage() {
                         <Spinner className="w-4 h-4 mr-2" />
                         {svc.active ? t("ui.disable") : t("ui.enable")}
                       </span>
+                    ) : svc.active ? (
+                      t("ui.disable")
                     ) : (
-                      svc.active ? t("ui.disable") : t("ui.enable")
+                      t("ui.enable")
                     )}
                   </button>
                   <button

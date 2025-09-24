@@ -1,4 +1,8 @@
-export default function Spinner({ className = "w-4 h-4 mr-2" }: { className?: string }) {
+export default function Spinner({
+  className = "w-4 h-4 mr-2",
+}: {
+  className?: string;
+}) {
   return (
     <svg
       className={className + " animate-spin"}
