@@ -214,12 +214,13 @@ adminSectors.patch("/sector-owners/:id", async (req, res) => {
       });
       // Remove memberships not in the new list
       await tx.userSector.deleteMany({ where: { userId: id, sectorId: { notIn: sectorIds } } });
-      // Upsert each membership
-      for (const sid of sectorIds) {
-        await tx.userSector.upsert({
-          where: { userId_sectorId: { userId: id, sectorId: sid } },
-          update: {},
-          create: { userId: id, sectorId: sid },
+      // Create remaining memberships in bulk. Use skipDuplicates to avoid unique constraint errors
+      // if some memberships already exist. This reduces many round-trips and avoids many awaits
+      // inside the transaction which can sometimes lead to stale transaction state.
+      if (sectorIds.length > 0) {
+        await tx.userSector.createMany({
+          data: sectorIds.map((sid) => ({ userId: id, sectorId: sid })),
+          skipDuplicates: true,
         });
       }
       return u;
