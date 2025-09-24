@@ -170,7 +170,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       const blob = await new Promise<Blob | null>((resolve) =>
         c.toBlob((b) => resolve(b), "image/png")
       );
-      if (blob) fd.append("signature", blob, "signature.png");
+      if (blob) fd.append("file", blob, "signature.png");
     }
     try {
       await api.post(`/api/public/onboarding/points/${token}/submit`, fd, {

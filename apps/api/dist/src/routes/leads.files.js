@@ -1,14 +1,9 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.leadFiles = void 0;
 const express_1 = require("express");
 const prisma_1 = require("../lib/prisma");
 const auth_1 = require("../middleware/auth");
-const node_path_1 = __importDefault(require("node:path"));
-const promises_1 = __importDefault(require("node:fs/promises"));
 exports.leadFiles = (0, express_1.Router)();
 /** GET /api/leads/:id/attachments/:attId/download  (ADMIN, SECTOR_OWNER, GTC_POINT) */
 exports.leadFiles.get("/:id/attachments/:attId/download", auth_1.requireAuth, (0, auth_1.requireRole)("ADMIN", "SECTOR_OWNER", "GTC_POINT"), async (req, res) => {
@@ -34,14 +29,14 @@ exports.leadFiles.get("/:id/attachments/:attId/download", auth_1.requireAuth, (0
             return res.status(403).json({ error: "Forbidden" });
         }
     }
-    const abs = node_path_1.default.resolve("uploads", "." + att.path);
-    try {
-        await promises_1.default.access(abs);
+    // With UploadThing, we redirect to the file URL instead of serving locally
+    // The 'path' field now contains the UploadThing URL
+    if (att.path.startsWith('http')) {
+        // UploadThing URL - redirect to it
+        return res.redirect(att.path);
     }
-    catch {
-        return res.status(410).json({ error: "File missing from storage" });
+    else {
+        // Legacy local file path - return 410 Gone
+        return res.status(410).json({ error: "File no longer available - migrated to cloud storage" });
     }
-    res.setHeader("Content-Type", att.mime);
-    res.setHeader("Content-Disposition", `attachment; filename="${att.fileName}"`);
-    res.sendFile(abs);
 });

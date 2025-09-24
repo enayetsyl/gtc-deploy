@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>UploadThing Test</title>
+  </head>
+  <body>
+    <h1>Test UploadThing Upload</h1>
+
+    <div>
+      <h2>Lead Files Upload Test</h2>
+      <input type="file" id="leadFile" accept=".pdf,.png,.jpg,.jpeg" />
+      <button onclick="uploadLeadFile()">Upload Lead File</button>
+      <div id="leadResult"></div>
+    </div>
+
+    <div>
+      <h2>Signature Upload Test</h2>
+      <input type="file" id="signatureFile" accept=".png,.jpg,.jpeg,.svg" />
+      <button onclick="uploadSignature()">Upload Signature</button>
+      <div id="signatureResult"></div>
+    </div>
+
+    <script>
+      async function uploadLeadFile() {
+        const fileInput = document.getElementById("leadFile");
+        const file = fileInput.files[0];
+        if (!file) {
+          alert("Please select a file");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("files", file);
+
+        try {
+          console.log("Uploading lead file:", file.name);
+
+          // First get presigned URL
+          const configResponse = await fetch("/api/uploadthing?slug=leadFiles");
+          const config = await configResponse.json();
+          console.log("Config response:", config);
+
+          // Now upload the file
+          const response = await fetch("/api/uploadthing", {
+            method: "POST",
+            body: formData,
+            headers: {
+              "x-uploadthing-slug": "leadFiles",
+            },
+          });
+
+          const result = await response.text();
+          console.log("Upload result:", result);
+          document.getElementById("leadResult").innerHTML = `
+                    <h3>Result:</h3>
+                    <pre>${result}</pre>
+                `;
+        } catch (error) {
+          console.error("Upload error:", error);
+          document.getElementById("leadResult").innerHTML = `
+                    <h3>Error:</h3>
+                    <p style="color: red;">${error.message}</p>
+                `;
+        }
+      }
+
+      async function uploadSignature() {
+        const fileInput = document.getElementById("signatureFile");
+        const file = fileInput.files[0];
+        if (!file) {
+          alert("Please select a file");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("files", file);
+
+        try {
+          console.log("Uploading signature file:", file.name);
+
+          const response = await fetch("/api/uploadthing", {
+            method: "POST",
+            body: formData,
+            headers: {
+              "x-uploadthing-slug": "signatureFiles",
+            },
+          });
+
+          const result = await response.text();
+          console.log("Upload result:", result);
+          document.getElementById("signatureResult").innerHTML = `
+                    <h3>Result:</h3>
+                    <pre>${result}</pre>
+                `;
+        } catch (error) {
+          console.error("Upload error:", error);
+          document.getElementById("signatureResult").innerHTML = `
+                    <h3>Error:</h3>
+                    <p style="color: red;">${error.message}</p>
+                `;
+        }
+      }
+    </script>
+  </body>
+</html>

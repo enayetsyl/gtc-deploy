@@ -8,9 +8,9 @@ exports.app = void 0;
 require("dotenv/config");
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const node_path_1 = __importDefault(require("node:path"));
 const env_1 = require("./config/env");
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
-const node_path_1 = __importDefault(require("node:path"));
 const error_1 = require("./middleware/error");
 const health_js_1 = require("./routes/health.js");
 const auth_1 = require("./routes/auth");
@@ -30,6 +30,8 @@ const leads_public_1 = require("./routes/leads.public");
 const leads_files_1 = require("./routes/leads.files");
 const sectors_public_1 = require("./routes/sectors.public");
 const points_onboarding_public_1 = require("./routes/points.onboarding.public");
+const uploadthing_1 = require("./routes/uploadthing");
+const debug_1 = require("./routes/debug");
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)({
     origin: (origin, callback) => {
@@ -44,7 +46,8 @@ exports.app.use((0, cors_1.default)({
 }));
 exports.app.use((0, cookie_parser_1.default)());
 exports.app.use(express_1.default.json());
-exports.app.use("/uploads", express_1.default.static(node_path_1.default.resolve("uploads")));
+// Note: /uploads static serving can be removed once fully migrated to UploadThing
+// app.use("/uploads", express.static(path.resolve("uploads")));
 exports.app.use("/api/health", health_js_1.router);
 exports.app.use("/api/auth", auth_1.authRouter);
 exports.app.use("/api/me", me_1.meRouter);
@@ -63,4 +66,10 @@ exports.app.use("/api/me/leads", me_leads_1.meLeads);
 exports.app.use("/api/admin/leads", admin_leads_1.adminLeads);
 exports.app.use("/api/sectors/public", sectors_public_1.sectorsPublic);
 exports.app.use("/api/public/onboarding/points", points_onboarding_public_1.pointsOnboardingPublic);
+exports.app.use("/api/uploadthing", uploadthing_1.uploadthingRouter);
+exports.app.use("/api/debug", debug_1.debugRouter);
+// Serve test file (remove in production)
+exports.app.get("/test-upload", (req, res) => {
+    res.sendFile(node_path_1.default.resolve("test-upload.html"));
+});
 exports.app.use(error_1.errorHandler);

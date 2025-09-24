@@ -51,24 +51,64 @@ exports.pointsOnboardingPublic.get("/:token", async (req, res) => {
     res.json({ name: ob.name, email: ob.email, includeServices: ob.includeServices, sector: { id: ob.sectorId, name: ob.sector?.name }, serviceIds: ob.services.map((s) => s.serviceId) });
 });
 // Submit details + signature + optional services
-exports.pointsOnboardingPublic.post("/:token/submit", (0, upload_1.upload)({ fieldName: "signature" }), async (req, res) => {
+exports.pointsOnboardingPublic.post("/:token/submit", (0, upload_1.upload)(), async (req, res) => {
     if (process.env.UPLOADS_ENABLED !== "true") {
         // Still allow submission without signature when disabled
         // or you could return 503 similar to conventions route.
     }
     const token = zod_1.z.string().min(10).parse(req.params.token);
+    // Parse form fields for validation
     const body = zod_1.z.object({
         vatOrTaxNumber: zod_1.z.string().min(2).optional(),
         phone: zod_1.z.string().min(5).optional(),
-        services: zod_1.z.array(zod_1.z.string().min(1)).optional(),
+        // Note: services comes as "services[]" array from FormData
     }).safeParse(req.body);
     if (!body.success)
         return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
+    // Parse services array from form data (sent as "services[]")
+    let services = [];
+    if (req.body["services[]"]) {
+        services = Array.isArray(req.body["services[]"])
+            ? req.body["services[]"]
+            : [req.body["services[]"]];
+    }
+    // Handle signature file from multipart upload
+    let signatureData;
+    if (process.env.UPLOADS_ENABLED === "true" && req.files) {
+        // Find signature file in uploaded files
+        const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+        const signatureFile = files.find((f) => f.fieldname === 'file' && f.mimetype?.startsWith('image/'));
+        if (signatureFile) {
+            try {
+                // Use the same storage provider pattern as leads route
+                const { storage } = await Promise.resolve().then(() => __importStar(require("../storage/provider")));
+                const mime = signatureFile.mimetype?.toLowerCase() || "image/png";
+                const stored = await storage.put({
+                    buffer: signatureFile.buffer,
+                    mime,
+                    originalName: signatureFile.originalname,
+                });
+                signatureData = {
+                    url: stored.path,
+                    key: stored.uploadthingKey || stored.fileName,
+                    originalName: signatureFile.originalname,
+                    mime: stored.mime,
+                };
+            }
+            catch (error) {
+                console.error("Error uploading signature file:", error);
+                return res.status(500).json({
+                    message: "Signature upload failed",
+                    error: error instanceof Error ? error.message : "Unknown error"
+                });
+            }
+        }
+    }
     await (0, onboarding_1.submitOnboardingForm)(token, {
         vatOrTaxNumber: body.data.vatOrTaxNumber,
         phone: body.data.phone,
-        services: body.data.services,
-        signature: req.file ? { buffer: req.file.buffer, mime: req.file.mimetype, originalName: req.file.originalname } : undefined,
+        services: services.length > 0 ? services : undefined,
+        signature: signatureData,
     });
     res.json({ ok: true });
 });

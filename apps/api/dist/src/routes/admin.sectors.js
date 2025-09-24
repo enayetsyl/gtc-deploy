@@ -9,7 +9,7 @@ const zod_1 = require("zod");
 const prisma_1 = require("../lib/prisma");
 const auth_1 = require("../middleware/auth");
 const argon2_1 = __importDefault(require("argon2"));
-const email_1 = require("../queues/email");
+const mailer_1 = require("../lib/mailer");
 const jwt_1 = require("../lib/jwt");
 const env_1 = require("../config/env");
 exports.adminSectors = (0, express_1.Router)();
@@ -118,7 +118,7 @@ exports.adminSectors.post("/sector-owners", async (req, res) => {
         const { token } = await (0, jwt_1.signInviteToken)(user.id);
         const primarySector = found.find((s) => s.id === primarySectorId);
         const link = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/invite/accept?token=${encodeURIComponent(token)}`;
-        await (0, email_1.enqueueEmail)({
+        await (0, mailer_1.sendEmail)({
             to: user.email,
             subject: "You're invited as Sector Owner",
             html: `<p>Hello ${user.name},</p><p>You've been added as a Sector Owner for <strong>${primarySector?.name ?? "your sector(s)"}</strong>. To activate your account and set your password, click: <a href="${link}">${link}</a></p>`,

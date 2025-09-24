@@ -203,6 +203,7 @@ model PointOnboarding {
   vatOrTaxNumber     String?
   phone              String?
   signaturePath      String?
+  signatureUploadthingKey String?  // UploadThing key for signature file
   includeServices    Boolean                @default(false)
   status             PointOnboardingStatus  @default(DRAFT)
 
@@ -255,14 +256,15 @@ model Lead {
 }
 
 model LeadAttachment {
-  id        String   @id @default(cuid())
-  leadId    String
-  fileName  String
-  path      String
-  mime      String
-  size      Int
-  checksum  String
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  leadId        String
+  fileName      String
+  path          String
+  mime          String
+  size          Int
+  checksum      String
+  uploadthingKey String?  // UploadThing file key for deletion
+  createdAt     DateTime @default(now())
 
   lead Lead @relation(fields: [leadId], references: [id])
 

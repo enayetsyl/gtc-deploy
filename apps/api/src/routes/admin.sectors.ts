@@ -4,7 +4,7 @@ import { prisma } from "../lib/prisma";
 import { Prisma } from "@prisma/client";
 import { requireAuth, requireRole } from "../middleware/auth";
 import argon2 from "argon2";
-import { enqueueEmail } from "../queues/email";
+import { sendEmail } from "../lib/mailer";
 import { signInviteToken } from "../lib/jwt";
 import { env } from "../config/env";
 
@@ -124,7 +124,7 @@ adminSectors.post("/sector-owners", async (req, res) => {
     const { token } = await signInviteToken(user.id);
     const primarySector = found.find((s: any) => s.id === primarySectorId);
     const link = `${env.webBaseUrl.replace(/\/$/, "")}/invite/accept?token=${encodeURIComponent(token)}`;
-    await enqueueEmail({
+    await sendEmail({
       to: user.email,
       subject: "You're invited as Sector Owner",
       html: `<p>Hello ${user.name},</p><p>You've been added as a Sector Owner for <strong>${primarySector?.name ?? "your sector(s)"}</strong>. To activate your account and set your password, click: <a href="${link}">${link}</a></p>`,

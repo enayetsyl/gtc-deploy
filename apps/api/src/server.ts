@@ -2,9 +2,9 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import path from "node:path";
 import { env } from "./config/env";
 import cookieParser from "cookie-parser";
-import path from "node:path";
 import { errorHandler } from "./middleware/error";
 import { router as healthRouter } from "./routes/health.js";
 import { authRouter } from "./routes/auth";
@@ -23,6 +23,11 @@ import { leadsPublic } from "./routes/leads.public";
 import { leadFiles } from "./routes/leads.files";
 import { sectorsPublic } from "./routes/sectors.public";
 import { pointsOnboardingPublic } from "./routes/points.onboarding.public";
+import { uploadthingRouter } from "./routes/uploadthing";
+import { debugRouter } from "./routes/debug";
+
+// Debug - remove in production
+import { testUploadThingConnection } from "./debug/uploadthing-test";
 
 export const app = express();
 
@@ -38,7 +43,8 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json());
 
-app.use("/uploads", express.static(path.resolve("uploads")));
+// Note: /uploads static serving can be removed once fully migrated to UploadThing
+// app.use("/uploads", express.static(path.resolve("uploads")));
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/me", meRouter);
@@ -57,6 +63,13 @@ app.use("/api/me/leads", meLeads);
 app.use("/api/admin/leads", adminLeads);
 app.use("/api/sectors/public", sectorsPublic);
 app.use("/api/public/onboarding/points", pointsOnboardingPublic);
+app.use("/api/uploadthing", uploadthingRouter);
+app.use("/api/debug", debugRouter);
+
+// Serve test file (remove in production)
+app.get("/test-upload", (req, res) => {
+  res.sendFile(path.resolve("test-upload.html"));
+});
 
 
 app.use(errorHandler);
