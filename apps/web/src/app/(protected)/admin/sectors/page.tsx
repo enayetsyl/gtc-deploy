@@ -13,6 +13,7 @@ import { z } from "zod";
 import { useI18n } from "@/providers/i18n-provider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import Spinner from "@/components/ui/Spinner";
 
 const sectorSchema = z.object({ name: z.string().min(2).max(100) });
 
@@ -22,6 +23,8 @@ export default function SectorsPage() {
   const [name, setName] = useState("");
   const [editing, setEditing] = useState<null | Sector>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [updatePendingId, setUpdatePendingId] = useState<string | null>(null);
+  const [deletePendingId, setDeletePendingId] = useState<string | null>(null);
 
   const q = useQuery({
     queryKey: ["admin", "sectors"],
@@ -45,12 +48,16 @@ export default function SectorsPage() {
       qc.invalidateQueries({ queryKey: ["admin", "sectors"] });
     },
     onError: () => setErr("Failed to update"),
+  onMutate: (p: { id: string; name: string }) => setUpdatePendingId(p.id),
+    onSettled: () => setUpdatePendingId(null),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteSector(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "sectors"] }),
     onError: () => setErr("Delete failed (maybe sector has points)"),
+    onMutate: (id: string) => setDeletePendingId(id),
+    onSettled: () => setDeletePendingId(null),
   });
 
   return (
@@ -83,7 +90,14 @@ export default function SectorsPage() {
             size="sm"
             className="bg-button-primary text-button-on-primary"
           >
-            {createMut.isPending ? t("ui.creating") : t("ui.create")}
+            {createMut.isPending ? (
+              <span className="inline-flex items-center">
+                <Spinner />
+                {t("ui.creating")}
+              </span>
+            ) : (
+              t("ui.create")
+            )}
           </Button>
         </form>
         {err && <p className="text-sm text-danger">{err}</p>}
@@ -134,9 +148,14 @@ export default function SectorsPage() {
                       size="sm"
                       className="bg-button-primary text-button-on-primary"
                     >
-                      {updateMut.isPending
-                        ? t("ui.saving") ?? "Saving..."
-                        : t("ui.save") ?? "Save"}
+                      {updatePendingId === s.id ? (
+                        <span className="inline-flex items-center">
+                          <Spinner />
+                          {t("ui.saving") ?? "Saving..."}
+                        </span>
+                      ) : (
+                        t("ui.save") ?? "Save"
+                      )}
                     </Button>
                   </form>
                 ) : (
@@ -158,9 +177,16 @@ export default function SectorsPage() {
                         variant="destructive"
                         size="sm"
                         onClick={() => deleteMut.mutate(s.id)}
-                        disabled={deleteMut.isPending}
+                        disabled={deletePendingId != null}
                       >
-                        {t("ui.delete")}
+                        {deletePendingId === s.id ? (
+                          <span className="inline-flex items-center">
+                            <Spinner />
+                            {t("ui.delete")}
+                          </span>
+                        ) : (
+                          t("ui.delete")
+                        )}
                       </Button>
                     </div>
                   </>

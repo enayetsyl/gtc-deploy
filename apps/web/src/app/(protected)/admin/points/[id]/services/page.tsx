@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qk } from "@/lib/queryKeys/services";
 import {
@@ -22,6 +23,7 @@ import ServiceStatusBadge from "@/components/services/ServiceStatusBadge";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
 import { useI18n } from "@/providers/i18n-provider";
+import Spinner from "@/components/ui/Spinner";
 // Link is intentionally not used in this page; keep import removed to satisfy linter
 
 type ToggleVars = { serviceId: string; action: "ENABLE" | "DISABLE" };
@@ -33,6 +35,9 @@ export default function AdminPointServicesPage() {
   const pointId = params.id!;
 
   const qc = useQueryClient();
+  const [togglePending, setTogglePending] = useState<
+    { serviceId: string; action: "ENABLE" | "DISABLE" } | null
+  >(null);
   const { data, isLoading, isError } = useQuery<ServiceLink[]>({
     queryKey: qk.adminPointServices(pointId),
     queryFn: () => getAdminPointServices(pointId),
@@ -47,6 +52,7 @@ export default function AdminPointServicesPage() {
       action: "ENABLE" | "DISABLE";
     }) => toggleAdminPointService(pointId, serviceId, action),
     onMutate: async ({ serviceId, action }) => {
+      setTogglePending({ serviceId, action });
       await qc.cancelQueries({ queryKey: qk.adminPointServices(pointId) });
       const prev = qc.getQueryData<ServiceLink[]>(
         qk.adminPointServices(pointId)
@@ -76,6 +82,7 @@ export default function AdminPointServicesPage() {
       );
       qc.invalidateQueries({ queryKey: qk.adminPointServices(pointId) });
     },
+    onSettled: () => setTogglePending(null),
   });
 
   const { t } = useI18n();
@@ -121,7 +128,11 @@ export default function AdminPointServicesPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={toggle.isPending || row.status === "ENABLED"}
+                        disabled={
+                          (togglePending?.serviceId === row.serviceId &&
+                            togglePending.action === "ENABLE") ||
+                          row.status === "ENABLED"
+                        }
                         onClick={() =>
                           toggle.mutate({
                             serviceId: row.serviceId,
@@ -129,12 +140,24 @@ export default function AdminPointServicesPage() {
                           })
                         }
                       >
-                        {t("admin.points.services.enable")}
+                        {togglePending?.serviceId === row.serviceId &&
+                        togglePending.action === "ENABLE" ? (
+                          <span className="inline-flex items-center">
+                            <Spinner />
+                            {t("admin.points.services.enable")}
+                          </span>
+                        ) : (
+                          t("admin.points.services.enable")
+                        )}
                       </Button>
                       <Button
                         size="sm"
                         variant="secondary"
-                        disabled={toggle.isPending || row.status === "DISABLED"}
+                        disabled={
+                          (togglePending?.serviceId === row.serviceId &&
+                            togglePending.action === "DISABLE") ||
+                          row.status === "DISABLED"
+                        }
                         onClick={() =>
                           toggle.mutate({
                             serviceId: row.serviceId,
@@ -142,7 +165,15 @@ export default function AdminPointServicesPage() {
                           })
                         }
                       >
-                        {t("admin.points.services.disable")}
+                        {togglePending?.serviceId === row.serviceId &&
+                        togglePending.action === "DISABLE" ? (
+                          <span className="inline-flex items-center">
+                            <Spinner />
+                            {t("admin.points.services.disable")}
+                          </span>
+                        ) : (
+                          t("admin.points.services.disable")
+                        )}
                       </Button>
                     </TableCell>
                   </TableRow>

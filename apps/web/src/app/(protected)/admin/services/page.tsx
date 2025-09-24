@@ -11,6 +11,7 @@ import {
 import { useState } from "react";
 import { z } from "zod";
 import { useI18n } from "@/providers/i18n-provider";
+import Spinner from "@/components/ui/Spinner";
 
 const schema = z.object({
   code: z
@@ -24,6 +25,8 @@ const schema = z.object({
 export default function ServicesPage() {
   const { t } = useI18n();
   const qc = useQueryClient();
+  const [togglePendingId, setTogglePendingId] = useState<string | null>(null);
+  const [delPendingId, setDelPendingId] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ["admin", "services"],
     queryFn: () => listServices(),
@@ -45,13 +48,19 @@ export default function ServicesPage() {
   const toggleMut = useMutation({
     mutationFn: (svc: Service) =>
       updateService(svc.id, { active: !svc.active }),
+    onMutate: (svc: Service) => {
+      setTogglePendingId(svc.id);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "services"] }),
+    onSettled: () => setTogglePendingId(null),
   });
 
   const delMut = useMutation({
     mutationFn: (id: string) => deleteService(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "services"] }),
+    onMutate: (id: string) => setDelPendingId(id),
     onError: () => setErr("Delete failed (service linked to points)"),
+    onSettled: () => setDelPendingId(null),
   });
 
   return (
@@ -102,7 +111,14 @@ export default function ServicesPage() {
               className="rounded-md bg-black text-white px-3 py-2"
               disabled={createMut.isPending}
             >
-              {createMut.isPending ? t("ui.creating") : t("ui.create")}
+              {createMut.isPending ? (
+                <span className="inline-flex items-center">
+                  <Spinner className="w-4 h-4 mr-2" />
+                  {t("ui.creating")}
+                </span>
+              ) : (
+                t("ui.create")
+              )}
             </button>
             {err && <span className="ml-3 text-sm text-red-600">{err}</span>}
           </div>
@@ -130,16 +146,30 @@ export default function ServicesPage() {
                   <button
                     className="rounded-md border px-3 py-1.5"
                     onClick={() => toggleMut.mutate(svc)}
-                    disabled={toggleMut.isPending}
+                    disabled={togglePendingId != null}
                   >
-                    {svc.active ? t("ui.disable") : t("ui.enable")}
+                    {togglePendingId === svc.id ? (
+                      <span className="inline-flex items-center">
+                        <Spinner className="w-4 h-4 mr-2" />
+                        {svc.active ? t("ui.disable") : t("ui.enable")}
+                      </span>
+                    ) : (
+                      svc.active ? t("ui.disable") : t("ui.enable")
+                    )}
                   </button>
                   <button
                     className="rounded-md border px-3 py-1.5"
                     onClick={() => delMut.mutate(svc.id)}
-                    disabled={delMut.isPending}
+                    disabled={delPendingId != null}
                   >
-                    {t("ui.delete")}
+                    {delPendingId === svc.id ? (
+                      <span className="inline-flex items-center">
+                        <Spinner className="w-4 h-4 mr-2" />
+                        {t("ui.delete")}
+                      </span>
+                    ) : (
+                      t("ui.delete")
+                    )}
                   </button>
                 </div>
               </div>
