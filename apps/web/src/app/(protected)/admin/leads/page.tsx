@@ -158,8 +158,8 @@ export default function AdminLeadsPage() {
                               name={a.fileName}
                             />
                           ))
-                        ) : (
-                          <span className="text-muted-foreground">Nessuno</span>
+                          ) : (
+                          <span className="text-muted-foreground">{t("ui.none")}</span>
                         )}
                       </TableCell>
                     </TableRow>
