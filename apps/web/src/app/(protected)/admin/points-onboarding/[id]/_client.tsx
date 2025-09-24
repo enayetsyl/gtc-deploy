@@ -14,6 +14,7 @@ type OnboardDetail = {
   phone?: string;
   signaturePath?: string;
   sector?: { id: string; name?: string } | null;
+  status?: string;
   services?: Array<{ id: string; serviceId: string }>;
 };
 
@@ -71,14 +72,22 @@ export default function Client({ id }: { id: string }) {
     }
   }
 
-  if (!item) return <div>Loading…</div>;
+  if (!item)
+    return (
+      <div className="flex justify-center items-center h-screen">Loading…</div>
+    );
+
+  console.log("item", item);
   return (
     <div>
-      <h2>{item.name}</h2>
-      <h2>({item.email})</h2>
-      {item.sector && <p>Sector: {item.sector.name}</p>}
-      <p>VAT: {item.vatOrTaxNumber}</p>
-      <p>Phone: {item.phone}</p>
+      <h2>GTC Point Name: {item.name}</h2>
+      <h2>GTC Point Email: {item.email}</h2>
+      <p>
+        Sector:{" "}
+        {item.sector && item.sector.name ? item.sector.name : "Not given"}
+      </p>
+      <p>VAT: {item.vatOrTaxNumber ? item.vatOrTaxNumber : "Not given"}</p>
+      <p>Phone: {item.phone ? item.phone : "Not given"}</p>
       {item.services && item.services.length > 0 && (
         <div>
           <p className="font-medium">Requested services:</p>
@@ -110,10 +119,18 @@ export default function Client({ id }: { id: string }) {
       </div>
       <div className="mt-4 space-y-2">
         <div className="flex gap-2 mt-4">
-          <Button variant="default" onClick={approve}>
+          <Button
+            variant="default"
+            onClick={approve}
+            disabled={item.status !== "SUBMITTED"}
+          >
             Approve
           </Button>
-          <Button variant="destructive" onClick={decline}>
+          <Button
+            variant="destructive"
+            onClick={decline}
+            disabled={item.status !== "SUBMITTED"}
+          >
             Decline
           </Button>
         </div>
