@@ -50,75 +50,7 @@ export default function PointsPage() {
 
   return (
     <main className="space-y-6">
-      <section className="rounded-xl border p-6 space-y-4">
-        <h2 className="text-lg font-semibold">
-          {t("admin.points.createTitle")}
-        </h2>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setErr(null);
-            const parsed = schema.safeParse(form);
-            if (!parsed.success) {
-              return setErr(
-                parsed.error.issues[0]?.message ?? "Validation error"
-              );
-            }
-            createMut.mutate(parsed.data);
-          }}
-          className="grid gap-3 sm:grid-cols-2"
-        >
-          <div className="sm:col-span-1">
-            <label className="block text-sm mb-1">{t("form.name")}</label>
-            <input
-              className="w-full rounded-md border px-3 py-2"
-              value={form.name}
-              onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
-            />
-          </div>
-          <div className="sm:col-span-1">
-            <label className="block text-sm mb-1">{t("form.email")}</label>
-            <input
-              className="w-full rounded-md border px-3 py-2"
-              value={form.email}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, email: e.target.value }))
-              }
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-sm mb-1">{t("ui.sector")}</label>
-            <select
-              className="w-full rounded-md border px-3 py-2"
-              value={form.sectorId}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, sectorId: e.target.value }))
-              }
-              disabled={sectorsQ.isLoading}
-            >
-              <option value="">{t("ui.selectSector")}</option>
-              {sectorOptions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              {t("admin.points.sectorHelp")}
-            </p>
-          </div>
-
-          <div className="sm:col-span-2">
-            <button
-              className="rounded-md bg-black text-white px-3 py-2"
-              disabled={createMut.isPending}
-            >
-              {createMut.isPending ? t("ui.creating") : t("ui.create")}
-            </button>
-            {err && <span className="ml-3 text-sm text-red-600">{err}</span>}
-          </div>
-        </form>
-      </section>
+     
 
       <section className="rounded-xl border p-6">
         <h2 className="text-lg font-semibold mb-4">
