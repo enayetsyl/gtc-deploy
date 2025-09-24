@@ -1,8 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { Prisma } from "@prisma/client";
 import { randomBytes } from "node:crypto";
-import { enqueueEmail } from "../queues/email";
-import { storage } from "../storage/provider";
+import { sendEmail } from "../lib/mailer";
 import { notifyUsers, notifyUser } from "./notifications";
 import { env } from "../config/env";
 
@@ -37,7 +36,7 @@ export async function createOnboardingLink(input: CreateOnboardingInput) {
   const link = `${env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/${ob.onboardingToken}`;
 
   // send email to point
-  await enqueueEmail({
+  await sendEmail({
     to: ob.email,
     subject: "Complete your GTC Point onboarding",
     html: `<p>Please open the link to complete your details and e-sign: <a href=\"${link}\">${link}</a></p>`,
@@ -50,7 +49,7 @@ type SubmitOnboardingPayload = {
   vatOrTaxNumber?: string;
   phone?: string;
   services?: string[];
-  signature?: { buffer: Buffer; mime: string; originalName: string };
+  signature?: { url: string; key: string; originalName: string; mime: string };
 };
 
 export async function submitOnboardingForm(onboardingToken: string, payload: SubmitOnboardingPayload) {
@@ -60,9 +59,10 @@ export async function submitOnboardingForm(onboardingToken: string, payload: Sub
   if (ob.tokenExpiresAt && ob.tokenExpiresAt < new Date()) throw new Error("Token expired");
 
   let signaturePath: string | undefined = ob.signaturePath ?? undefined;
+  let signatureKey: string | undefined = undefined;
   if (payload.signature) {
-    const stored = await storage.put(payload.signature);
-    signaturePath = stored.path;
+    signaturePath = payload.signature.url; // Store UploadThing URL
+    signatureKey = payload.signature.key; // Store UploadThing key
   }
 
   await (prisma as any).pointOnboarding.update({
@@ -71,6 +71,7 @@ export async function submitOnboardingForm(onboardingToken: string, payload: Sub
       vatOrTaxNumber: payload.vatOrTaxNumber ?? ob.vatOrTaxNumber,
       phone: payload.phone ?? ob.phone,
       signaturePath,
+      // signatureUploadthingKey: signatureKey, // TODO: Add after migration
       status: "SUBMITTED",
       submittedAt: new Date(),
       services:
@@ -106,7 +107,19 @@ export async function approveOnboarding(id: string, adminUserId: string) {
   if (!ob) throw new Error("Not found");
   if (ob.status !== "SUBMITTED") throw new Error("Invalid state");
 
-  const point = await prisma.gtcPoint.create({ data: { name: ob.name, email: ob.email, sectorId: ob.sectorId } });
+  // Use upsert to either create or update the GtcPoint
+  const point = await prisma.gtcPoint.upsert({
+    where: { email: ob.email },
+    update: {
+      name: ob.name,
+      sectorId: ob.sectorId
+    },
+    create: {
+      name: ob.name,
+      email: ob.email,
+      sectorId: ob.sectorId
+    }
+  });
 
   if (ob.includeServices && ob.services && ob.services.length) {
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -129,7 +142,7 @@ export async function approveOnboarding(id: string, adminUserId: string) {
   });
 
   const link = `${env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/register/${registrationToken}`;
-  await enqueueEmail({ to: ob.email, subject: "Your GTC Point registration link", html: `<p>Your onboarding was approved. Complete your account by setting password: <a href=\"${link}\">${link}</a></p>` });
+  await sendEmail({ to: ob.email, subject: "Your GTC Point registration link", html: `<p>Your onboarding was approved. Complete your account by setting password: <a href=\"${link}\">${link}</a></p>` });
 
   // notify admins and sector owners about approval
   const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
@@ -161,7 +174,7 @@ export async function declineOnboarding(id: string, adminUserId: string) {
   if (ob.status !== "SUBMITTED") throw new Error("Invalid state");
 
   await (prisma as any).pointOnboarding.update({ where: { id: ob.id }, data: { status: "DECLINED", approvedByUserId: adminUserId, approvedAt: new Date() } });
-  await enqueueEmail({ to: ob.email, subject: "Your onboarding was declined", html: `<p>Your onboarding request was declined by admin.</p>` });
+  await sendEmail({ to: ob.email, subject: "Your onboarding was declined", html: `<p>Your onboarding request was declined by admin.</p>` });
 
   // notify admins and owners that it was declined
   const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
@@ -198,7 +211,7 @@ export async function completeRegistration(registrationToken: string, passwordHa
   }
 
   // send welcome email to the newly created user
-  await enqueueEmail({ to: user.email, subject: "Welcome — your account is ready", html: `<p>Your account has been created and you can now login with your email.</p>` });
+  await sendEmail({ to: user.email, subject: "Welcome — your account is ready", html: `<p>Your account has been created and you can now login with your email.</p>` });
 
   // create an in-app welcome notification for the new user
   await notifyUser({ userId: user.id, subject: "Welcome to GTC", contentHtml: `<p>Welcome ${user.name}! Your account is now active.</p>` });

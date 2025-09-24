@@ -1,6 +1,6 @@
 import { prisma, } from "../lib/prisma";
 import { emitToUser } from "../sockets/io";
-import { enqueueEmail } from "../queues/email";
+import { sendEmail } from "../lib/mailer";
 
 type NotifyInput = {
   userId: string;
@@ -38,7 +38,7 @@ export async function notifyUser(input: NotifyInput) {
       select: { email: true },
     });
     if (user?.email) {
-      await enqueueEmail({
+      await sendEmail({
         to: input.email?.to ?? user.email,
         subject: input.email?.subject ?? input.subject,
         html: input.email?.html ?? input.contentHtml,

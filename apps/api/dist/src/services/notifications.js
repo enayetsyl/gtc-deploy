@@ -4,7 +4,7 @@ exports.notifyUser = notifyUser;
 exports.notifyUsers = notifyUsers;
 const prisma_1 = require("../lib/prisma");
 const io_1 = require("../sockets/io");
-const email_1 = require("../queues/email");
+const mailer_1 = require("../lib/mailer");
 /**
  * Creates a Notification row, emits socket events, and optionally enqueues an email.
  * Returns the created Notification.
@@ -31,7 +31,7 @@ async function notifyUser(input) {
             select: { email: true },
         });
         if (user?.email) {
-            await (0, email_1.enqueueEmail)({
+            await (0, mailer_1.sendEmail)({
                 to: input.email?.to ?? user.email,
                 subject: input.email?.subject ?? input.subject,
                 html: input.email?.html ?? input.contentHtml,

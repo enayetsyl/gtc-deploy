@@ -163,7 +163,7 @@ const { t } = useI18n();
         <div className="w-full border rounded-md p-4 flex items-center justify-center bg-white/2">
           {item.signaturePath ? (
             <Image
-              src={`${API_BASE}/uploads${item.signaturePath}`}
+              src={`${item.signaturePath}`}
               alt="signature"
               width={400}
               height={160}

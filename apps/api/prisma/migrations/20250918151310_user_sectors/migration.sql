@@ -13,8 +13,8 @@ ALTER TABLE `UserSector` ADD CONSTRAINT `UserSector_userId_fkey` FOREIGN KEY (`u
 -- AddForeignKey
 ALTER TABLE `UserSector` ADD CONSTRAINT `UserSector_sectorId_fkey` FOREIGN KEY (`sectorId`) REFERENCES `Sector`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- RenameIndex
-ALTER TABLE `UserSector` RENAME INDEX `UserSector_sectorId_index` TO `UserSector_sectorId_idx`;
+-- RenameIndex (MariaDB compatible)
+ALTER TABLE `UserSector` DROP INDEX `UserSector_sectorId_index`, ADD INDEX `UserSector_sectorId_idx` (`sectorId`);
 
--- RenameIndex
-ALTER TABLE `UserSector` RENAME INDEX `UserSector_userId_sectorId_unique` TO `UserSector_userId_sectorId_key`;
+-- RenameIndex (MariaDB compatible) 
+ALTER TABLE `UserSector` DROP INDEX `UserSector_userId_sectorId_unique`, ADD UNIQUE INDEX `UserSector_userId_sectorId_key` (`userId`, `sectorId`);

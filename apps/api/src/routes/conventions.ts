@@ -86,7 +86,13 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
     if (!belongs) return res.status(403).json({ error: "Forbidden" });
   }
 
-  const file = req.file;
+  // Handle file from multer.any() - files are in req.files array
+  let file: Express.Multer.File | undefined;
+  if (req.files) {
+    const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+    file = files.find((f: any) => f.fieldname === 'file');
+  }
+
   if (!file) return res.status(400).json({ error: "file is required (multipart/form-data)" });
 
   if (conv.status === "APPROVED" || conv.status === "DECLINED") {
@@ -127,6 +133,9 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
       changed = true;
     }
     return { doc: created, statusChanged: changed };
+  }, {
+    maxWait: 10000, // 10 seconds
+    timeout: 15000, // 15 seconds
   });
 
   if (statusChanged) {

@@ -1,9 +1,10 @@
 import multer from "multer";
 import { RequestHandler } from "express";
 
+
 // Feature flag: if UPLOADS_ENABLED !== 'true', we short-circuit and ignore incoming files.
 // This lets us deploy to environments (e.g., Render free tier) without persistent storage.
-// To re-enable real uploads later, just set UPLOADS_ENABLED=true (no code change needed).
+// During transition to UploadThing, we still need to parse multipart data
 
 const realUpload = multer({ storage: multer.memoryStorage() });
 
@@ -13,13 +14,22 @@ export interface UploadOptions {
 }
 
 export function upload(options: UploadOptions = {}): RequestHandler | RequestHandler[] {
-  const { multiple = false, fieldName = "file" } = options;
+  const { multiple = false } = options;
 
-  if (process.env.UPLOADS_ENABLED !== "true") {
-    // No-op middleware(s) preserving API contract; req.file / req.files stay undefined.
+  // During transition, we need to parse multipart data to handle form fields and files
+  // Always enable during development or when explicitly requested
+  const shouldParseMultipart =
+    process.env.UPLOADS_ENABLED === "true" ||
+    process.env.NODE_ENV === "development" ||
+    !process.env.NODE_ENV; // Default to enabled if NODE_ENV is not set
+
+  if (!shouldParseMultipart) {
+    // No-op middleware preserving API contract; req.file / req.files stay undefined.
     const noop: RequestHandler = (_req, _res, next) => next();
     return noop;
   }
 
-  return multiple ? (realUpload.array(fieldName) as unknown as RequestHandler) : (realUpload.single(fieldName) as unknown as RequestHandler);
+  // During transition period, always use .any() to accept files with any field name
+  // This allows frontend to send files with field names like 'files', 'signature', etc.
+  return realUpload.any() as unknown as RequestHandler;
 }

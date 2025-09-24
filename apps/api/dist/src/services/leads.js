@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.onLeadCreated = onLeadCreated;
 const prisma_1 = require("../lib/prisma");
 const notifications_1 = require("./notifications");
-const email_1 = require("../queues/email");
+const mailer_1 = require("../lib/mailer");
 /** Users with role SECTOR_OWNER for the sector.
  *
  * Owners can be assigned in two ways in this schema:
@@ -91,9 +91,9 @@ async function onLeadCreated(leadId) {
     if (to.length) {
         // debug log so we can see who's being emailed in server logs
         for (const addr of to) {
-            // enqueue one job per address to avoid mailing list filtering and to
+            // send one email per address to avoid mailing list filtering and to
             // keep recipients private (one-to-one sends)
-            await (0, email_1.enqueueEmail)({ to: addr, subject, html });
+            await (0, mailer_1.sendEmail)({ to: addr, subject, html });
         }
     }
 }

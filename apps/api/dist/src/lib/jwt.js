@@ -15,8 +15,18 @@ exports.verifyInviteToken = verifyInviteToken;
 exports.revokeInviteToken = revokeInviteToken;
 // src/lib/jwt.ts
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const redis_1 = require("./redis");
 const crypto_1 = require("crypto");
+// In-memory storage for tokens (will be lost on server restart)
+const tokenStore = new Map();
+// Cleanup expired tokens periodically
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of tokenStore.entries()) {
+        if (value.expiresAt < now) {
+            tokenStore.delete(key);
+        }
+    }
+}, 60000); // Clean up every minute
 const ACCESS_TTL = process.env.ACCESS_TOKEN_TTL ?? "15m";
 const REFRESH_TTL_DAYS = Number(process.env.REFRESH_TOKEN_TTL_DAYS ?? 7);
 const JWT_SECRET = process.env.JWT_SECRET ?? "dev_supersecret_change_me";
@@ -28,9 +38,10 @@ function signAccessToken(payload) {
 async function signRefreshToken(userId) {
     const jti = (0, crypto_1.randomUUID)();
     const token = jsonwebtoken_1.default.sign({ sub: userId, jti }, JWT_SECRET, { expiresIn: `${REFRESH_TTL_DAYS}d` });
-    // store jti in redis with ttl
+    // store jti in memory with ttl
     const ttlSecs = REFRESH_TTL_DAYS * 24 * 60 * 60;
-    await redis_1.redis.set(`refresh:${jti}`, userId, "EX", ttlSecs);
+    const expiresAt = Date.now() + (ttlSecs * 1000);
+    tokenStore.set(`refresh:${jti}`, { userId, expiresAt });
     return { token, jti };
 }
 function setRefreshCookie(res, token) {
@@ -50,31 +61,34 @@ function verifyAccessToken(token) {
 }
 async function verifyRefreshToken(token) {
     const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
-    const exists = await redis_1.redis.get(`refresh:${decoded.jti}`);
-    if (!exists)
+    const stored = tokenStore.get(`refresh:${decoded.jti}`);
+    if (!stored || stored.expiresAt < Date.now()) {
         throw new Error("refresh_revoked");
+    }
     return decoded;
 }
 async function revokeRefreshToken(jti) {
-    await redis_1.redis.del(`refresh:${jti}`);
+    tokenStore.delete(`refresh:${jti}`);
 }
 // One-time invite tokens for account activation / password set
 async function signInviteToken(userId) {
     const jti = (0, crypto_1.randomUUID)();
     const token = jsonwebtoken_1.default.sign({ sub: userId, jti, kind: "invite" }, JWT_SECRET, { expiresIn: `${INVITE_TTL_DAYS}d` });
     const ttlSecs = INVITE_TTL_DAYS * 24 * 60 * 60;
-    await redis_1.redis.set(`invite:${jti}`, userId, "EX", ttlSecs);
+    const expiresAt = Date.now() + (ttlSecs * 1000);
+    tokenStore.set(`invite:${jti}`, { userId, expiresAt });
     return { token, jti };
 }
 async function verifyInviteToken(token) {
     const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
     if (decoded.kind !== "invite")
         throw new Error("invalid_invite_kind");
-    const exists = await redis_1.redis.get(`invite:${decoded.jti}`);
-    if (!exists)
+    const stored = tokenStore.get(`invite:${decoded.jti}`);
+    if (!stored || stored.expiresAt < Date.now()) {
         throw new Error("invite_revoked");
+    }
     return decoded;
 }
 async function revokeInviteToken(jti) {
-    await redis_1.redis.del(`invite:${jti}`);
+    tokenStore.delete(`invite:${jti}`);
 }

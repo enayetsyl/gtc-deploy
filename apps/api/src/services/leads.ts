@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { notifyUsers } from "./notifications";
-import { enqueueEmail } from "../queues/email";
+import { sendEmail } from "../lib/mailer";
 
 /** Users with role SECTOR_OWNER for the sector.
  *
@@ -95,9 +95,9 @@ export async function onLeadCreated(leadId: string) {
     // debug log so we can see who's being emailed in server logs
 
     for (const addr of to) {
-      // enqueue one job per address to avoid mailing list filtering and to
+      // send one email per address to avoid mailing list filtering and to
       // keep recipients private (one-to-one sends)
-      await enqueueEmail({ to: addr, subject, html });
+      await sendEmail({ to: addr, subject, html });
     }
   }
 }

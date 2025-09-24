@@ -1,8 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
-import path from "node:path";
-import fs from "node:fs/promises";
 
 export const leadFiles = Router();
 
@@ -31,14 +29,13 @@ leadFiles.get("/:id/attachments/:attId/download", requireAuth, requireRole("ADMI
     }
   }
 
-  const abs = path.resolve("uploads", "." + att.path);
-  try {
-    await fs.access(abs);
-  } catch {
-    return res.status(410).json({ error: "File missing from storage" });
+  // With UploadThing, we redirect to the file URL instead of serving locally
+  // The 'path' field now contains the UploadThing URL
+  if (att.path.startsWith('http')) {
+    // UploadThing URL - redirect to it
+    return res.redirect(att.path);
+  } else {
+    // Legacy local file path - return 410 Gone
+    return res.status(410).json({ error: "File no longer available - migrated to cloud storage" });
   }
-
-  res.setHeader("Content-Type", att.mime);
-  res.setHeader("Content-Disposition", `attachment; filename="${att.fileName}"`);
-  res.sendFile(abs);
 });
