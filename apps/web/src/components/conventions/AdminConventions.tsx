@@ -24,6 +24,7 @@ export default function AdminConventionsPage() {
     "UPLOADED"
   );
   const items = useAdminConventions(status);
+
   const { t } = useI18n();
 
   return (
@@ -54,7 +55,7 @@ export default function AdminConventionsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/30 text-left">
-                <th className="p-3">{t("table.convention")}</th>
+                <th className="p-3">{t("table.conventionId")}</th>
                 <th className="p-3">{t("table.pointSector")}</th>
                 <th className="p-3">{t("table.status")}</th>
                 <th className="p-3">{t("table.actions")}</th>

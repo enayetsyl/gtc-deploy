@@ -26,6 +26,8 @@
   "table.documents": "Documenti",
   "table.actions": "Azioni",
   "table.convention": "Convenzione",
+  "table.conventionId": "ID Convenzione",
+
   "table.pointSector": "Punto / Settore",
   "ui.loading": "Caricamento…",
   "form.applicantName": "Nome richiedente",

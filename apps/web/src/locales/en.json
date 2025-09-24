@@ -25,6 +25,7 @@
   "table.sector": "Sector",
   "table.documents": "Documents",
   "table.convention": "Convention",
+  "table.conventionId": "Convention Id",
   "table.pointSector": "Point / Sector",
   "table.actions": "Actions",
   "ui.loading": "Loading…",
