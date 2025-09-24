@@ -24,6 +24,7 @@ export default function Client({ id }: { id: string }) {
   const [servicesList, setServicesList] = useState<
     Array<{ id: string; name: string }>
   >([]);
+const { t } = useI18n();
 
   const router = useRouter();
   useEffect(() => {
@@ -78,7 +79,7 @@ export default function Client({ id }: { id: string }) {
       <div className="flex justify-center items-center h-screen">Loading…</div>
     );
 
-  const { t } = useI18n();
+  
   const isSubmitted = item.status === "SUBMITTED";
   const statusLabel = item.status ?? t("status.unknown") ?? "Unknown";
   const statusClasses =
