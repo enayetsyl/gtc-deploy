@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AttachmentChip } from "@/components/lead/AttachmentChip";
+import Pagination from "@/components/ui/pagination";
 
 type Attachment = { id: string; fileName: string };
 type Lead = {
@@ -169,28 +170,14 @@ export default function AdminLeadsPage() {
                 </TableBody>
               </Table>
 
-              <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-muted-foreground">
-                  {t("table.total", { total })}
-                </div>
-                <div className="space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => go(Math.max(1, currentPage - 1))}
-                    disabled={currentPage <= 1}
-                  >
-                    {t("pagination.prev")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => go(currentPage + 1)}
-                    disabled={currentPage * currentPageSize >= total}
-                  >
-                    {t("pagination.next")}
-                  </Button>
-                </div>
+              <div className="flex items-center justify-center mt-4">
+               
+                <Pagination
+                  total={total}
+                  page={currentPage}
+                  pageSize={currentPageSize}
+                  onPageChange={(p) => go(p)}
+                />
               </div>
             </>
           )}
