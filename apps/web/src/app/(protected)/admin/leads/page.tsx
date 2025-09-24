@@ -42,7 +42,7 @@ export default function AdminLeadsPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const page = Number(sp.get("page") || 1);
-  const pageSize = 20;
+  const pageSize = 10;
   const [sectorId, setSectorId] = useState<string>(sp.get("sectorId") || "");
   const { data, isLoading } = useLeadsAdmin(
     page,
@@ -158,8 +158,10 @@ export default function AdminLeadsPage() {
                               name={a.fileName}
                             />
                           ))
-                          ) : (
-                          <span className="text-muted-foreground">{t("ui.none")}</span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {t("ui.none")}
+                          </span>
                         )}
                       </TableCell>
                     </TableRow>
