@@ -12,6 +12,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { useI18n } from "@/providers/i18n-provider";
 import Spinner from "@/components/ui/Spinner";
+import { Button } from "@/components/ui/button";
 
 const schema = z.object({
   code: z
@@ -107,8 +108,7 @@ export default function ServicesPage() {
             />
           </div>
           <div className="sm:col-span-2">
-            <button
-              className="rounded-md bg-black text-white px-3 py-2"
+            <Button
               disabled={createMut.isPending}
             >
               {createMut.isPending ? (
@@ -119,7 +119,7 @@ export default function ServicesPage() {
               ) : (
                 t("ui.create")
               )}
-            </button>
+            </Button>
             {err && <span className="ml-3 text-sm text-red-600">{err}</span>}
           </div>
         </form>
@@ -143,7 +143,7 @@ export default function ServicesPage() {
                   <div className="text-xs text-gray-600">{svc.code}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button
                     className="rounded-md border px-3 py-1.5"
                     onClick={() => toggleMut.mutate(svc)}
                     disabled={togglePendingId != null}
@@ -158,8 +158,9 @@ export default function ServicesPage() {
                     ) : (
                       t("ui.enable")
                     )}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                  variant='destructive'
                     className="rounded-md border px-3 py-1.5"
                     onClick={() => delMut.mutate(svc.id)}
                     disabled={delPendingId != null}
@@ -172,7 +173,7 @@ export default function ServicesPage() {
                     ) : (
                       t("ui.delete")
                     )}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}

@@ -128,7 +128,7 @@ export default function AdminPointServicesPage() {
                     <TableCell className="text-right space-x-2">
                       <Button
                         size="sm"
-                        variant="outline"
+                       
                         disabled={
                           (togglePending?.serviceId === row.serviceId &&
                             togglePending.action === "ENABLE") ||
@@ -153,7 +153,7 @@ export default function AdminPointServicesPage() {
                       </Button>
                       <Button
                         size="sm"
-                        variant="secondary"
+                        
                         disabled={
                           (togglePending?.serviceId === row.serviceId &&
                             togglePending.action === "DISABLE") ||

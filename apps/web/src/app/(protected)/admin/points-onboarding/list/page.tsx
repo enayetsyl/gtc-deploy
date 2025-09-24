@@ -29,13 +29,9 @@ export default function ReviewList() {
             {t("admin.onboarding.submitted")}
           </h2>
           <Button>
-
-          <Link
-            href="/admin/points-onboarding/create"
-            
-          >
-            {t("admin.onboarding.createInvite")}
-          </Link>
+            <Link href="/admin/points-onboarding/create">
+              {t("admin.onboarding.createInvite")}
+            </Link>
           </Button>
         </div>
 
@@ -59,14 +55,11 @@ export default function ReviewList() {
                 </div>
                 <div className="flex items-center gap-3">
                   <StatusBadge status={i.status} />
-                 <Button>
-                   <Link
-                    href={`/admin/points-onboarding/${i.id}`}
-              
-                  >
-                    {t("ui.view")}
-                  </Link>
-                 </Button>
+                  <Button>
+                    <Link href={`/admin/points-onboarding/${i.id}`}>
+                      {t("ui.view")}
+                    </Link>
+                  </Button>
                 </div>
               </div>
             ))
@@ -79,13 +72,34 @@ export default function ReviewList() {
 
 function StatusBadge({ status }: { status?: string | null }) {
   const s = (status || "unknown").toLowerCase();
-  let bg = "bg-[--color-muted] text-[--color-muted-foreground]";
-  if (s === "approved" || s === "accepted") {
-    bg = "bg-[--color-brand-teal-500] text-white";
-  } else if (s === "pending") {
-    bg = "bg-[--color-highlight] text-black";
-  } else if (s === "rejected" || s === "denied") {
-    bg = "bg-[--color-danger] text-white";
+  let bg = "bg-color-muted text-muted-foreground";
+
+  // Map PointOnboardingStatus and legacy values to color classes
+  switch (s) {
+    case "draft":
+      // not yet submitted
+      bg = "bg-color-muted text-muted-foreground";
+      break;
+    case "submitted":
+      // waiting review
+      bg = "bg-color-highlight text-black";
+      break;
+    case "approved":
+    case "accepted":
+      bg = "bg-brand-blue-500 text-white";
+      break;
+    case "completed":
+      // success states
+      bg = "bg-brand-teal-500 text-white";
+      break;
+    case "declined":
+    case "rejected":
+    case "denied":
+      // failure states
+      bg = "bg-color-danger text-white";
+      break;
+    default:
+      bg = "bg-color-muted text-muted-foreground";
   }
   return (
     <span
