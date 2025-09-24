@@ -21,6 +21,7 @@ import {
 import ServiceStatusBadge from "@/components/services/ServiceStatusBadge";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
+import { useI18n } from "@/providers/i18n-provider";
 // Link is intentionally not used in this page; keep import removed to satisfy linter
 
 type ToggleVars = { serviceId: string; action: "ENABLE" | "DISABLE" };
@@ -67,31 +68,41 @@ export default function AdminPointServicesPage() {
           qk.adminPointServices(pointId),
           ctx.prev
         );
-      toast.error("Update failed");
+      toast.error(t("toast.updateFailed"));
     },
     onSuccess: (link) => {
-      toast.success(`Service ${link.status.toLowerCase()} for point`);
+      toast.success(
+        t("toast.updateSuccess", { status: link.status.toLowerCase() })
+      );
       qc.invalidateQueries({ queryKey: qk.adminPointServices(pointId) });
     },
   });
+
+  const { t } = useI18n();
 
   return (
     <div className="container mx-auto py-6 space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Point Services</CardTitle>
+          <CardTitle>{t("admin.points.servicesTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading && <p>Loading…</p>}
-          {isError && <p className="text-destructive">Failed to load.</p>}
+          {isLoading && <p>{t("ui.loading")}</p>}
+          {isError && (
+            <p className="text-destructive">{t("ui.failedToLoad")}</p>
+          )}
           {!isLoading && data && (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[44%]">Service</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="w-[44%]">
+                    {t("table.service")}
+                  </TableHead>
+                  <TableHead>{t("table.code")}</TableHead>
+                  <TableHead>{t("table.status")}</TableHead>
+                  <TableHead className="text-right">
+                    {t("table.actions")}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -118,7 +129,7 @@ export default function AdminPointServicesPage() {
                           })
                         }
                       >
-                        Enable
+                        {t("admin.points.services.enable")}
                       </Button>
                       <Button
                         size="sm"
@@ -131,7 +142,7 @@ export default function AdminPointServicesPage() {
                           })
                         }
                       >
-                        Disable
+                        {t("admin.points.services.disable")}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -143,7 +154,7 @@ export default function AdminPointServicesPage() {
       </Card>
 
       <p className="text-sm text-muted-foreground">
-        Changes notify the point in real-time (in-app + email).
+        {t("admin.points.services.changesHelp")}
       </p>
     </div>
   );
