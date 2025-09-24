@@ -77,62 +77,130 @@ export default function Client({ id }: { id: string }) {
       <div className="flex justify-center items-center h-screen">Loading…</div>
     );
 
-  console.log("item", item);
+  const isSubmitted = item.status === "SUBMITTED";
+  const statusLabel = item.status ?? "Unknown";
+  const statusClasses =
+    item.status === "SUBMITTED"
+      ? "bg-emerald-100 text-emerald-800"
+      : item.status === "APPROVED"
+      ? "bg-blue-100 text-blue-800"
+      : item.status === "DECLINED"
+      ? "bg-red-100 text-red-800"
+      : "bg-gray-100 text-gray-800";
+
   return (
-    <div>
-      <h2>GTC Point Name: {item.name}</h2>
-      <h2>GTC Point Email: {item.email}</h2>
-      <p>
-        Sector:{" "}
-        {item.sector && item.sector.name ? item.sector.name : "Not given"}
-      </p>
-      <p>VAT: {item.vatOrTaxNumber ? item.vatOrTaxNumber : "Not given"}</p>
-      <p>Phone: {item.phone ? item.phone : "Not given"}</p>
-      {item.services && item.services.length > 0 && (
+    <div className="max-w-3xl mx-auto p-6 bg-white/5 rounded-lg shadow-sm">
+      <div className="flex items-start justify-between">
         <div>
-          <p className="font-medium">Requested services:</p>
-          <ul className="list-disc pl-6">
+          <h2 className="text-2xl font-semibold">
+            GTC Point Name: <span className="font-normal">{item.name}</span>
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Email: <span className="font-medium">{item.email}</span>
+          </p>
+        </div>
+        <div className="flex items-center space-x-3">
+          <span
+            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusClasses}`}
+          >
+            {statusLabel}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+        <div>
+          <p className="text-sm text-muted-foreground">Sector</p>
+          <p className="mt-1 font-medium">
+            {item.sector && item.sector.name ? item.sector.name : "Not given"}
+          </p>
+        </div>
+        <div>
+          <p className="text-sm text-muted-foreground">VAT / Tax Number</p>
+          <p className="mt-1 font-medium">
+            {item.vatOrTaxNumber ? item.vatOrTaxNumber : "Not given"}
+          </p>
+        </div>
+        <div>
+          <p className="text-sm text-muted-foreground">Phone</p>
+          <p className="mt-1 font-medium">
+            {item.phone ? item.phone : "Not given"}
+          </p>
+        </div>
+        <div></div>
+      </div>
+
+      {item.services && item.services.length > 0 && (
+        <div className="mt-6">
+          <p className="text-sm font-medium mb-2">Requested services</p>
+          <div className="flex flex-wrap gap-2">
             {item.services.map((s) => {
               const svc = servicesList.find((x) => x.id === s.serviceId);
-              return <li key={s.id}>{svc ? svc.name : s.serviceId}</li>;
+              return (
+                <span
+                  key={s.id}
+                  className="text-sm bg-slate-100 text-slate-800 px-2 py-1 rounded-full"
+                >
+                  {svc ? svc.name : s.serviceId}
+                </span>
+              );
             })}
-          </ul>
+          </div>
         </div>
       )}
-      <div>
-        {item.signaturePath ? (
-          // Use a plain <img> with the API base URL so the browser requests the file
-          // directly from the API server (which serves /uploads). Next's Image
-          // optimizer requests /uploads from the Next server and can return
-          // invalid responses in dev if not proxied to the API.
-          <Image
-            src={`${API_BASE}/uploads${item.signaturePath}`}
-            alt="signature"
-            width={400}
-            height={160}
-            style={{ objectFit: "contain" }}
-            unoptimized
-          />
-        ) : (
-          <div>No signature</div>
-        )}
+
+      <div className="mt-6">
+        <p className="text-sm text-muted-foreground mb-2">Signature</p>
+        <div className="w-full border rounded-md p-4 flex items-center justify-center bg-white/2">
+          {item.signaturePath ? (
+            <Image
+              src={`${API_BASE}/uploads${item.signaturePath}`}
+              alt="signature"
+              width={400}
+              height={160}
+              style={{ objectFit: "contain" }}
+              unoptimized
+            />
+          ) : (
+            <div className="text-sm text-muted-foreground">No signature</div>
+          )}
+        </div>
       </div>
-      <div className="mt-4 space-y-2">
-        <div className="flex gap-2 mt-4">
-          <Button
-            variant="default"
-            onClick={approve}
-            disabled={item.status !== "SUBMITTED"}
-          >
-            Approve
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={decline}
-            disabled={item.status !== "SUBMITTED"}
-          >
-            Decline
-          </Button>
+
+      <div className="mt-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex gap-2">
+            <Button
+              variant="default"
+              onClick={approve}
+              disabled={!isSubmitted}
+              title={
+                !isSubmitted
+                  ? "Only available when status is SUBMITTED"
+                  : undefined
+              }
+            >
+              Approve
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={decline}
+              disabled={!isSubmitted}
+              title={
+                !isSubmitted
+                  ? "Only available when status is SUBMITTED"
+                  : undefined
+              }
+            >
+              Decline
+            </Button>
+          </div>
+
+          {!isSubmitted && (
+            <p className="text-xs text-muted-foreground">
+              Actions available only when status is SUBMITTED.
+            </p>
+          )}
         </div>
       </div>
     </div>
