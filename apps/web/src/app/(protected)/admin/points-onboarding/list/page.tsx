@@ -6,6 +6,7 @@ import Link from "next/link";
 type OnboardItem = { id: string; name: string; email: string; status?: string };
 
 import { useI18n } from "@/providers/i18n-provider";
+import { Button } from "@/components/ui/button";
 
 export default function ReviewList() {
   const { t } = useI18n();
@@ -27,12 +28,15 @@ export default function ReviewList() {
           <h2 className="text-lg font-semibold text-heading">
             {t("admin.onboarding.submitted")}
           </h2>
+          <Button>
+
           <Link
             href="/admin/points-onboarding/create"
-            className="rounded-md border px-3 py-1.5 text-sm bg-[--color-button-primary] text-[--color-button-on-primary] hover:bg-[--color-button-primary-hover]"
+            
           >
             {t("admin.onboarding.createInvite")}
           </Link>
+          </Button>
         </div>
 
         <div className="mt-4 divide-y">
@@ -45,22 +49,24 @@ export default function ReviewList() {
                 className="py-3 flex items-center justify-between gap-4"
               >
                 <div className="flex-1">
-                  <a
+                  <Link
                     href={`/admin/points-onboarding/${i.id}`}
                     className="font-medium text-[--color-heading] hover:underline"
                   >
                     {i.name}
-                  </a>
+                  </Link>
                   <div className="text-xs text-muted-text">{i.email}</div>
                 </div>
                 <div className="flex items-center gap-3">
                   <StatusBadge status={i.status} />
-                  <Link
+                 <Button>
+                   <Link
                     href={`/admin/points-onboarding/${i.id}`}
-                    className="rounded-md border px-3 py-1.5 text-sm hover:bg-[--color-button-secondary-hover-bg]"
+              
                   >
                     {t("ui.view")}
                   </Link>
+                 </Button>
                 </div>
               </div>
             ))

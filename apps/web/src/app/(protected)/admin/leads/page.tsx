@@ -90,7 +90,7 @@ export default function AdminLeadsPage() {
               className="w-[260px] bg-page-bg border border-divider focus-visible:ring-2 ring-focus"
             />
             <Button
-              className="bg-brand-blue-500 hover:bg-brand-blue-600 text-white"
+             
               onClick={applyFilter}
             >
               {t("ui.apply")}

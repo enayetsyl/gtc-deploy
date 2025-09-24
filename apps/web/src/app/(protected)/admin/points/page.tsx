@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import { z } from "zod";
 import Link from "next/link";
 import { useI18n } from "@/providers/i18n-provider";
+import { Button } from "@/components/ui/button";
 
 const schema = z.object({
   name: z.string().min(2).max(200),
@@ -75,13 +76,18 @@ export default function PointsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                  variant='default'
+                  >
+
                   <Link
                     href={`/admin/points/${p.id}/services`}
-                    className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
+                    
                     title={t("admin.points.manageServicesTitle")}
                   >
                     {t("admin.points.services")}
                   </Link>
+                  </Button>
                   {/* (optional) overview/edit buttons can go here too */}
                 </div>
               </div>
