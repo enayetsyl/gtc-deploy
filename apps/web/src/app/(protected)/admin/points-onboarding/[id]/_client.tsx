@@ -5,7 +5,9 @@ import Image from "next/image";
 import { api, API_BASE } from "@/lib/axios";
 // ...existing UI imports
 import { Button } from "@/components/ui/button";
+import Spinner from "@/components/ui/Spinner";
 import { useI18n } from "@/providers/i18n-provider";
+import { toast } from "sonner";
 
 type OnboardDetail = {
   id: string;
@@ -24,9 +26,11 @@ export default function Client({ id }: { id: string }) {
   const [servicesList, setServicesList] = useState<
     Array<{ id: string; name: string }>
   >([]);
-const { t } = useI18n();
+  const { t } = useI18n();
 
   const router = useRouter();
+  const [approving, setApproving] = useState(false);
+  const [declining, setDeclining] = useState(false);
   useEffect(() => {
     (async () => {
       try {
@@ -56,21 +60,27 @@ const { t } = useI18n();
   }, [id]);
 
   async function approve() {
+    setApproving(true);
     try {
       await api.post(`/api/admin/points/onboarding/${id}/approve`);
-      alert(t("detail.approvedMsg"));
+      toast.success(t("detail.approvedMsg"));
       router.push("/admin/points-onboarding/list");
     } catch (err) {
       console.error(err);
+    } finally {
+      setApproving(false);
     }
   }
   async function decline() {
+    setDeclining(true);
     try {
       await api.post(`/api/admin/points/onboarding/${id}/decline`);
-      alert(t("detail.declinedMsg"));
+      toast.success(t("detail.declinedMsg"));
       router.push("/admin/points-onboarding/list");
     } catch (err) {
       console.error(err);
+    } finally {
+      setDeclining(false);
     }
   }
 
@@ -79,7 +89,6 @@ const { t } = useI18n();
       <div className="flex justify-center items-center h-screen">Loading…</div>
     );
 
-  
   const isSubmitted = item.status === "SUBMITTED";
   const statusLabel = item.status ?? t("status.unknown") ?? "Unknown";
   const statusClasses =
@@ -184,22 +193,24 @@ const { t } = useI18n();
             <Button
               variant="default"
               onClick={approve}
-              disabled={!isSubmitted}
+              disabled={!isSubmitted || approving}
               title={
                 !isSubmitted ? t("detail.actionsOnlyWhenSubmitted") : undefined
               }
             >
-              {t("detail.approve")}
+              {approving && <Spinner className="w-4 h-4 mr-2" />}
+              {approving ? t("detail.approving") : t("detail.approve")}
             </Button>
             <Button
               variant="destructive"
               onClick={decline}
-              disabled={!isSubmitted}
+              disabled={!isSubmitted || declining}
               title={
                 !isSubmitted ? t("detail.actionsOnlyWhenSubmitted") : undefined
               }
             >
-              {t("detail.decline")}
+              {declining && <Spinner className="w-4 h-4 mr-2" />}
+              {declining ? t("detail.declining") : t("detail.decline")}
             </Button>
           </div>
 

@@ -17,6 +17,7 @@ import { api } from "@/lib/axios";
 type Sector = { id: string; name: string };
 
 import { useI18n } from "@/providers/i18n-provider";
+import { toast } from "sonner";
 
 export default function CreateInvite() {
   const { t } = useI18n();
@@ -66,12 +67,12 @@ export default function CreateInvite() {
         serviceIds: includeServices ? selectedServices : undefined,
       });
       // use a basic toast via browser alert (sonner Toaster can be mounted globally)
-      alert(t("admin.onboarding.inviteCreated"));
+      toast.success(t("admin.onboarding.inviteCreated"));
       setEmail("");
       setName("");
       setIncludeServices(false);
     } catch {
-      alert(t("ui.createFailed"));
+      toast.error(t("ui.createFailed"));
     } finally {
       setLoading(false);
     }

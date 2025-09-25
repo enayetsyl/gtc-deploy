@@ -23,6 +23,15 @@ function normalizeRecipients(to) {
     const list = Array.isArray(to) ? to : to.split(",").map((s) => s.trim()).filter(Boolean);
     return list.map((email) => ({ Email: email }));
 }
+// Helper: read first non-empty env from a list of keys
+function pickEnv(keys) {
+    for (const k of keys) {
+        const v = process.env[k];
+        if (v && String(v).trim().length > 0)
+            return v;
+    }
+    return undefined;
+}
 // Simple email sending function without queues
 async function sendEmail(options) {
     const { to, subject, html, text } = options;
@@ -31,8 +40,19 @@ async function sendEmail(options) {
     try {
         if (MAIL_PROVIDER === "mailjet") {
             // Send via Mailjet HTTP API (v3.1)
-            const apiKey = process.env.MJ_APIKEY_PUBLIC;
-            const apiSecret = process.env.MJ_APIKEY_PRIVATE;
+            // Dashboard labels are "API Key" and "Secret Key". We accept several env names.
+            const apiKey = pickEnv([
+                "MJ_APIKEY_PUBLIC",
+                "MJ_API_KEY",
+                "MJ_APIKEY",
+                "MAILJET_API_KEY",
+            ]);
+            const apiSecret = pickEnv([
+                "MJ_APIKEY_PRIVATE",
+                "MJ_SECRET_KEY",
+                "MJ_API_SECRET",
+                "MAILJET_API_SECRET",
+            ]);
             if (!apiKey || !apiSecret) {
                 throw new Error("Mailjet API keys missing. Set MJ_APIKEY_PUBLIC and MJ_APIKEY_PRIVATE.");
             }

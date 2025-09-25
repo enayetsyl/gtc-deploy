@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSubmitLeadPublic } from "@/hooks/useLeads";
 import { Button } from "@/components/ui/button";
+import Spinner from "@/components/ui/Spinner";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -86,10 +87,13 @@ export default function LeadPage() {
     }
   }
 
-  const sectorItems = (sectors.data || []) as Array<{ id: string; name: string }>;
+  const sectorItems = (sectors.data || []) as Array<{
+    id: string;
+    name: string;
+  }>;
   const sectorValue = watch("sectorId");
 
-  console.log('sector', sectors.data)
+  console.log("sector", sectors.data);
 
   return (
     <div className="mx-auto max-w-2xl p-6">
@@ -105,7 +109,9 @@ export default function LeadPage() {
             <div>
               <Label htmlFor="sectorId">Sector</Label>
               {sectors.isLoading ? (
-                <p className="text-sm text-muted-foreground">Loading sectors…</p>
+                <p className="text-sm text-muted-foreground">
+                  Loading sectors…
+                </p>
               ) : sectorItems.length ? (
                 <Select
                   value={sectorValue}
@@ -140,7 +146,9 @@ export default function LeadPage() {
                 </>
               )}
               {errors.sectorId && (
-                <p className="text-sm text-red-500">{errors.sectorId.message}</p>
+                <p className="text-sm text-red-500">
+                  {errors.sectorId.message}
+                </p>
               )}
             </div>
 
@@ -218,7 +226,8 @@ export default function LeadPage() {
             )}
 
             <Button type="submit" disabled={submit.isPending}>
-              Submit
+              {submit.isPending && <Spinner className="w-4 h-4 mr-2" />}
+              {submit.isPending ? "Submitting…" : "Submit"}
             </Button>
           </form>
         </CardContent>

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import Spinner from "@/components/ui/Spinner";
 import { toast } from "sonner";
 
 type OnboardingPrefill = {
@@ -26,6 +27,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   const [phone, setPhone] = useState("");
   const [termsOpen, setTermsOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [services, setServices] = useState<string[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const router = useRouter();
@@ -160,6 +162,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       );
       return;
     }
+    setSubmitting(true);
     const fd = new FormData();
     fd.append("vatOrTaxNumber", vat);
     fd.append("phone", phone);
@@ -179,8 +182,9 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       router.push("/onboarding/thanks");
     } catch (err) {
       console.error(err);
-      alert("Submit failed");
+      toast.error("Submit failed");
     }
+    setSubmitting(false);
   }
 
   const { t } = useI18n();
@@ -267,7 +271,10 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       </div>
 
       <div>
-        <Button type="submit">{t("onboarding.submit")}</Button>
+        <Button type="submit" disabled={submitting}>
+          {submitting && <Spinner className="w-4 h-4 mr-2" />}
+          {submitting ? t("onboarding.submitting") : t("onboarding.submit")}
+        </Button>
       </div>
 
       {/* Terms modal (simple overlay) */}

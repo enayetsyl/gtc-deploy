@@ -10,6 +10,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { downloadBlob } from "@/lib/axios";
 import { useI18n } from "@/providers/i18n-provider";
+import Spinner from "@/components/ui/Spinner";
 
 const statusTabs: (ConventionStatus | "ALL")[] = [
   "ALL",
@@ -50,7 +51,12 @@ export default function AdminConventionsPage() {
       </div>
 
       <section className="rounded-2xl border">
-        {items.isLoading && <div className="p-4">{t("ui.loading")}</div>}
+        {items.isLoading && (
+          <div className="p-4 flex items-center">
+            <Spinner className="w-4 h-4 mr-2" />
+            <span>{t("ui.loading")}</span>
+          </div>
+        )}
         {!items.isLoading && (
           <table className="w-full text-sm">
             <thead>
@@ -95,6 +101,9 @@ function AdminRow({
   const decision = useAdminDecision(id);
 
   const canDecide = status === "NEW" || status === "UPLOADED";
+  const [approving, setApproving] = useState(false);
+  const [declining, setDeclining] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   return (
     <tr className="border-t">
@@ -113,31 +122,51 @@ function AdminRow({
             />
             <Button
               size="sm"
-              onClick={() =>
-                decision.mutate({
-                  action: "APPROVE",
-                  internalSalesRep: rep || undefined,
-                })
-              }
+              onClick={async () => {
+                try {
+                  setApproving(true);
+                  await decision.mutateAsync({
+                    action: "APPROVE",
+                    internalSalesRep: rep || undefined,
+                  });
+                } finally {
+                  setApproving(false);
+                }
+              }}
             >
+              {approving && <Spinner className="w-4 h-4 mr-2" />}
               {t("convention.approve")}
             </Button>
             <Button
               size="sm"
               variant="destructive"
-              onClick={() => decision.mutate({ action: "DECLINE" })}
+              onClick={async () => {
+                try {
+                  setDeclining(true);
+                  await decision.mutateAsync({ action: "DECLINE" });
+                } finally {
+                  setDeclining(false);
+                }
+              }}
             >
+              {declining && <Spinner className="w-4 h-4 mr-2" />}
               {t("convention.decline")}
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={async () => {
-                const { blob, filename } = await downloadArchive(id);
-                downloadBlob(blob, filename);
+                try {
+                  setDownloading(true);
+                  const { blob, filename } = await downloadArchive(id);
+                  downloadBlob(blob, filename);
+                } finally {
+                  setDownloading(false);
+                }
               }}
               title={t("convention.downloadAll")}
             >
+              {downloading && <Spinner className="w-4 h-4 mr-2" />}
               ZIP
             </Button>
           </div>
