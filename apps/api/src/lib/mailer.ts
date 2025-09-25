@@ -1,15 +1,34 @@
 import nodemailer from "nodemailer";
 
-export const mailer = nodemailer.createTransport({
-  service: 'gmail', // Use Gmail service
-  host: 'smtp.gmail.com',
+// Choose provider at runtime. Default is nodemailer+Gmail for local dev.
+const MAIL_PROVIDER = (process.env.MAIL_PROVIDER || "gmail").toLowerCase();
+
+// Reusable Gmail transporter (kept for dev/local or if explicitly chosen)
+const gmailTransporter = nodemailer.createTransport({
+  service: "gmail",
+  host: "smtp.gmail.com",
   port: 587,
-  secure: false, // true for 465, false for other ports like 587
+  secure: false,
   auth: {
-    user: process.env.MAIL_USER, // Your Gmail address
-    pass: process.env.MAIL_PASS, // Your Gmail app password (not regular password)
+    user: process.env.MAIL_USER,
+    pass: process.env.MAIL_PASS,
   },
 });
+
+// Helper: normalize recipients
+function normalizeRecipients(to: string | string[]): { Email: string }[] {
+  const list = Array.isArray(to) ? to : to.split(",").map((s) => s.trim()).filter(Boolean);
+  return list.map((email) => ({ Email: email }));
+}
+
+// Helper: read first non-empty env from a list of keys
+function pickEnv(keys: string[]): string | undefined {
+  for (const k of keys) {
+    const v = process.env[k as keyof NodeJS.ProcessEnv];
+    if (v && String(v).trim().length > 0) return v;
+  }
+  return undefined;
+}
 
 // Simple email sending function without queues
 export async function sendEmail(options: {
@@ -20,8 +39,64 @@ export async function sendEmail(options: {
 }) {
   const { to, subject, html, text } = options;
 
+  const fromEmail = (process.env.MJ_SENDER_EMAIL || process.env.MAIL_FROM?.match(/<(.+)>/)?.[1] || process.env.MAIL_USER || "noreply@gtc.local");
+  const fromName = (process.env.MJ_SENDER_NAME || process.env.MAIL_FROM?.replace(/<.*>/, "").trim() || "GTC");
+
   try {
-    const info = await mailer.sendMail({
+    if (MAIL_PROVIDER === "mailjet") {
+      // Send via Mailjet HTTP API (v3.1)
+      // Dashboard labels are "API Key" and "Secret Key". We accept several env names.
+      const apiKey = pickEnv([
+        "MJ_APIKEY_PUBLIC",
+        "MJ_API_KEY",
+        "MJ_APIKEY",
+        "MAILJET_API_KEY",
+      ]);
+      const apiSecret = pickEnv([
+        "MJ_APIKEY_PRIVATE",
+        "MJ_SECRET_KEY",
+        "MJ_API_SECRET",
+        "MAILJET_API_SECRET",
+      ]);
+      if (!apiKey || !apiSecret) {
+        throw new Error("Mailjet API keys missing. Set MJ_APIKEY_PUBLIC and MJ_APIKEY_PRIVATE.");
+      }
+
+      const auth = Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
+      const payload = {
+        Messages: [
+          {
+            From: { Email: fromEmail, Name: fromName },
+            To: normalizeRecipients(to),
+            Subject: subject,
+            TextPart: html ? undefined : (text ?? " "),
+            HTMLPart: html,
+            CustomID: "gtc-mail",
+          },
+        ],
+      } as const;
+
+      const res = await fetch("https://api.mailjet.com/v3.1/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${auth}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const textBody = await res.text();
+        throw new Error(`Mailjet API error: ${res.status} ${res.statusText} — ${textBody}`);
+      }
+
+      const json = await res.json();
+      console.log("[email] sent via Mailjet:", JSON.stringify(json));
+      return json;
+    }
+
+    // Default: send via Gmail SMTP (nodemailer)
+    const info = await gmailTransporter.sendMail({
       from: process.env.MAIL_FROM || "GTC <noreply@gtc.local>",
       to,
       subject,
@@ -29,7 +104,7 @@ export async function sendEmail(options: {
       text: html ? undefined : text ?? " ",
     });
 
-    console.log("[email] sent successfully:", info.messageId);
+    console.log("[email] sent via Gmail:", info.messageId);
     return info;
   } catch (error) {
     console.error("[email] failed to send:", error);
