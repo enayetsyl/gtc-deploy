@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.debugRouter = void 0;
 const express_1 = require("express");
 const utapi_test_1 = require("../debug/utapi-test");
+const mailer_1 = require("../lib/mailer");
 const router = (0, express_1.Router)();
 exports.debugRouter = router;
 // Simple test endpoint to verify UploadThing configuration
@@ -37,5 +38,22 @@ router.get("/test-utapi", async (req, res) => {
             success: false,
             error: error instanceof Error ? error.message : String(error)
         });
+    }
+});
+// Optional: quick email test endpoint
+router.get("/test-email", async (req, res) => {
+    try {
+        const to = req.query.to || process.env.MAIL_USER || "";
+        if (!to)
+            return res.status(400).json({ success: false, error: "Provide ?to=email@example.com or set MAIL_USER" });
+        await (0, mailer_1.sendEmail)({
+            to,
+            subject: "Test email from GTC API",
+            html: `<p>Hello from GTC API. Provider: ${process.env.MAIL_PROVIDER || "gmail"}</p>`,
+        });
+        res.json({ success: true, to });
+    }
+    catch (error) {
+        res.status(500).json({ success: false, error: error instanceof Error ? error.message : String(error) });
     }
 });
