@@ -112,6 +112,8 @@
   "detail.emailLabel": "Email",
   "detail.approvedMsg": "Approvato",
   "detail.declinedMsg": "Rifiutato",
+  "detail.approving": "Approvazione in corso…",
+  "detail.declining": "Rifiuto in corso…",
 
   "ui.create": "Crea",
   "ui.creating": "Creazione…",

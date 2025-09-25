@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { qk } from "@/lib/queryKeys/services";
 import {
   getPointServices,
@@ -8,6 +9,7 @@ import {
   ServiceLink,
 } from "@/lib/clients/servicesClient";
 import { Button } from "@/components/ui/button";
+import Spinner from "@/components/ui/Spinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -44,6 +46,17 @@ export default function PointServicesPage() {
       toast.error(err.response?.data?.error ?? t("ui.requestFailed")),
   });
 
+  const [pendingServiceId, setPendingServiceId] = useState<string | null>(null);
+
+  const handleRequest = async (serviceId: string) => {
+    try {
+      setPendingServiceId(serviceId);
+      await requestMut.mutateAsync(serviceId);
+    } finally {
+      setPendingServiceId(null);
+    }
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <Card>
@@ -51,7 +64,12 @@ export default function PointServicesPage() {
           <CardTitle>{t("point.services.title")}</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading && <p>{t("ui.loading")}</p>}
+          {isLoading && (
+            <p className="flex items-center">
+              <Spinner className="w-4 h-4 mr-2" />
+              {t("ui.loading")}
+            </p>
+          )}
           {isError && (
             <p className="text-destructive">{t("ui.failedToLoad")}</p>
           )}
@@ -84,9 +102,14 @@ export default function PointServicesPage() {
                       <TableCell className="text-right">
                         <Button
                           size="sm"
-                          disabled={!canRequest || requestMut.isPending}
-                          onClick={() => requestMut.mutate(row.serviceId)}
+                          disabled={
+                            !canRequest || pendingServiceId === row.serviceId
+                          }
+                          onClick={() => handleRequest(row.serviceId)}
                         >
+                          {pendingServiceId === row.serviceId && (
+                            <Spinner className="w-4 h-4 mr-2" />
+                          )}
                           {canRequest
                             ? t("point.services.request")
                             : row.status === "PENDING_REQUEST"

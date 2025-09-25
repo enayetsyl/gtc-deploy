@@ -111,6 +111,8 @@
   "detail.emailLabel": "Email",
   "detail.approvedMsg": "Approved",
   "detail.declinedMsg": "Declined",
+  "detail.approving": "Approving…",
+  "detail.declining": "Declining…",
 
   "ui.create": "Create",
   "ui.creating": "Creating…",

@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import Spinner from "@/components/ui/Spinner";
 import { toast } from "sonner";
 
 export default function RegisterPage() {
@@ -24,6 +25,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const router = useRouter();
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -53,13 +55,16 @@ export default function RegisterPage() {
       return;
     }
     try {
+      setSubmitting(true);
       await api.post(`/api/public/onboarding/points/register/${token}`, {
         password,
         confirm,
       });
       router.push("/login");
     } catch {
-      alert("Registration failed");
+      toast.error("Registration failed");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -112,7 +117,10 @@ export default function RegisterPage() {
         </CardContent>
         <CardFooter>
           <div className="w-full flex justify-end">
-            <Button type="submit">Create account</Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting && <Spinner className="w-4 h-4 mr-2" />}
+              {submitting ? "Creating…" : "Create account"}
+            </Button>
           </div>
         </CardFooter>
       </Card>
