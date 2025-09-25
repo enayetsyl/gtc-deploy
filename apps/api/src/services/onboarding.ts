@@ -43,7 +43,7 @@ export async function createOnboardingLink(input: CreateOnboardingInput) {
       <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
         <p>Please open the link to complete your details and e-sign.</p>
         <p>
-          <a href="${link}" style="display:inline-block;padding:12px 20px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
+          <a href="${link}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
             Complete onboarding
           </a>
         </p>
@@ -107,8 +107,27 @@ export async function submitOnboardingForm(onboardingToken: string, payload: Sub
     await notifyUsers(adminAndOwners, {
       type: "GENERIC",
       subject: "New GTC Point onboarding submitted",
-      contentHtml: `<p>Point <strong>${ob.name}</strong> &lt;${ob.email}&gt; submitted onboarding details. Review: <a href=\"${adminLink}\">Review onboarding</a></p>`,
-      email: { subject: "New GTC Point onboarding submitted", html: `<p>Point <strong>${ob.name}</strong> &lt;${ob.email}&gt; submitted onboarding details. Review: <a href=\"${adminLink}\">${adminLink}</a></p>` },
+      contentHtml: `
+        <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+          <p>Point <strong>${ob.name}</strong> &lt;${ob.email}&gt; submitted onboarding details.</p>
+          <p>
+            <a href="${adminLink}" style="display:inline-block;padding:10px 16px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">Review onboarding</a>
+          </p>
+        </div>
+      `,
+      email: {
+        subject: "New GTC Point onboarding submitted",
+        html: `
+          <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+            <p>Point <strong>${ob.name}</strong> &lt;${ob.email}&gt; submitted onboarding details.</p>
+            <p>
+              <a href="${adminLink}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">Review onboarding</a>
+            </p>
+            <p style="font-size:13px;color:#666">If the button doesn't work, copy and paste the following URL into your browser:</p>
+            <p style="word-break:break-all"><a href="${adminLink}">${adminLink}</a></p>
+          </div>
+        `,
+      },
     });
   }
 }
@@ -160,7 +179,7 @@ export async function approveOnboarding(id: string, adminUserId: string) {
       <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
         <p>Your onboarding was approved. Complete your account by setting a password.</p>
         <p>
-          <a href="${link}" style="display:inline-block;padding:12px 20px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
+          <a href="${link}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
             Complete registration
           </a>
         </p>
@@ -187,7 +206,18 @@ export async function approveOnboarding(id: string, adminUserId: string) {
   }
 
   if (recipients.length) {
-    const html = `<p>GTC Point <strong>${ob.name}</strong> (&lt;${ob.email}&gt;) was approved by admin.</p>${serviceNames.length ? `<p>Enabled services: <strong>${serviceNames.join(", ")}</strong></p>` : ""}<p>View point: <a href=\"${env.webBaseUrl.replace(/\/$/, "")}/admin/points/${point.id}\">Open point</a></p>`;
+    const adminPointUrl = `${env.webBaseUrl.replace(/\/$/, "")}/admin/points/${point.id}`;
+    const html = `
+      <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+        <p>GTC Point <strong>${ob.name}</strong> (&lt;${ob.email}&gt;) was approved by admin.</p>
+        ${serviceNames.length ? `<p>Enabled services: <strong>${serviceNames.join(", ")}</strong></p>` : ""}
+        <p>
+          <a href="${adminPointUrl}" style="display:inline-block;padding:8px 20px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">Open point</a>
+        </p>
+        <p style="font-size:13px;color:#666">If the button doesn't work, copy and paste the following URL into your browser:</p>
+        <p style="word-break:break-all"><a href="${adminPointUrl}">${adminPointUrl}</a></p>
+      </div>
+    `;
     await notifyUsers(recipients, { type: "GENERIC", subject: "GTC Point approved", contentHtml: html, email: { subject: "GTC Point approved", html } });
   }
 
