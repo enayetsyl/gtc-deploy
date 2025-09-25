@@ -39,7 +39,18 @@ export async function createOnboardingLink(input: CreateOnboardingInput) {
   await sendEmail({
     to: ob.email,
     subject: "Complete your GTC Point onboarding",
-    html: `<p>Please open the link to complete your details and e-sign: <a href=\"${link}\">${link}</a></p>`,
+    html: `
+      <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+        <p>Please open the link to complete your details and e-sign.</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:12px 20px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
+            Complete onboarding
+          </a>
+        </p>
+        <p style="font-size:13px;color:#666">If the button doesn't work, copy and paste the following URL into your browser:</p>
+        <p style="word-break:break-all"><a href="${link}">${link}</a></p>
+      </div>
+    `,
   });
 
   return ob;
@@ -142,7 +153,22 @@ export async function approveOnboarding(id: string, adminUserId: string) {
   });
 
   const link = `${env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/register/${registrationToken}`;
-  await sendEmail({ to: ob.email, subject: "Your GTC Point registration link", html: `<p>Your onboarding was approved. Complete your account by setting password: <a href=\"${link}\">${link}</a></p>` });
+  await sendEmail({
+    to: ob.email,
+    subject: "Your GTC Point registration link",
+    html: `
+      <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+        <p>Your onboarding was approved. Complete your account by setting a password.</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:12px 20px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
+            Complete registration
+          </a>
+        </p>
+        <p style="font-size:13px;color:#666">If the button doesn't work, copy and paste the following URL into your browser:</p>
+        <p style="word-break:break-all"><a href="${link}">${link}</a></p>
+      </div>
+    `,
+  });
 
   // notify admins and sector owners about approval
   const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
