@@ -29,7 +29,15 @@ type Lead = {
   phone?: string | null;
   message?: string | null;
   attachments?: Attachment[];
+  sector: sector;
 };
+type sector ={
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 type LeadsPage = {
   items: Lead[];
   total: number;
@@ -70,6 +78,8 @@ export default function AdminLeadsPage() {
     qp.set("page", String(p));
     router.push(`?${qp.toString()}`);
   }
+
+console.log('leads', leads)
 
   const total = leads?.total ?? 0;
   const currentPage = leads?.page ?? page;
@@ -135,7 +145,7 @@ export default function AdminLeadsPage() {
                         {new Date(l.createdAt).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-sm text-body">
-                        {l.sectorId}
+                        {l.sector.name}
                       </TableCell>
                       <TableCell className="text-sm text-body">
                         {l.name}
