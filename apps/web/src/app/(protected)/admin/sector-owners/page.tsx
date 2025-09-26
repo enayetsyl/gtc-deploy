@@ -98,16 +98,14 @@ export default function AdminSectorOwnersPage() {
   });
 
   return (
-    <main className="space-y-6">
-      <section
-        className="rounded-xl "
-        aria-labelledby="create-sector-owner"
-      >
+    <main className="space-y-6 mb-10">
+      <section className="rounded-xl " aria-labelledby="create-sector-owner">
         <div className="flex items-center justify-end">
-          
           <div>
             <a href="/admin/sector-owners/create">
-              <Button className="bg-button-primary text-button-on-primary">{t("admin.sectorOwners.createTitle")}</Button>
+              <Button className="bg-button-primary text-button-on-primary">
+                {t("admin.sectorOwners.createTitle")}
+              </Button>
             </a>
           </div>
         </div>
@@ -127,55 +125,107 @@ export default function AdminSectorOwnersPage() {
           <div className="text-sm text-muted-text">{t("ui.loading")}</div>
         )}
         {ownersQ.data && (
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="text-left border-b border-divider">
-                <th className="py-2 pr-3">{t("table.name")}</th>
-                <th className="py-2 pr-3">{t("table.email")}</th>
-                <th className="py-2 pr-3">{t("table.sector")}</th>
-                <th className="py-2 pr-3">{t("table.actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Desktop/tablet: show table on md+ */}
+            <div className="hidden md:block">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="text-left border-b border-divider">
+                    <th className="py-2 pr-3">{t("table.name")}</th>
+                    <th className="py-2 pr-3">{t("table.email")}</th>
+                    <th className="py-2 pr-3">{t("table.sector")}</th>
+                    <th className="py-2 pr-3">{t("table.actions")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ownersQ.data.items.map((o) => (
+                    <tr
+                      key={o.id}
+                      className="border-b last:border-0 border-divider"
+                    >
+                      <td className="py-2 pr-3 align-top">{o.name}</td>
+                      <td className="py-2 pr-3 align-top">{o.email}</td>
+                      <td className="py-2 pr-3 align-top">
+                        {o.sectors && o.sectors.length ? (
+                          o.sectors.map((s) => s.name).join(", ")
+                        ) : (
+                          <span className="text-muted-text">
+                            {t("ui.none")}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 align-top">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditing(o);
+                            setEditName(o.name);
+                            setEditEmail(o.email);
+                            setEditSectorIds(o.sectors.map((s) => s.id));
+                            setEditErr(null);
+                          }}
+                        >
+                          {t("ui.edit")}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile: stacked cards */}
+            <div className="block md:hidden space-y-3">
               {ownersQ.data.items.map((o) => (
-                <tr
+                <div
                   key={o.id}
-                  className="border-b last:border-0 border-divider"
+                  className="border rounded-lg p-3 bg-card flex flex-col"
                 >
-                  <td className="py-2 pr-3 align-top">{o.name}</td>
-                  <td className="py-2 pr-3 align-top">{o.email}</td>
-                  <td className="py-2 pr-3 align-top">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-body truncate">
+                        {o.name}
+                      </div>
+                      <div className="text-sm text-muted-text truncate">
+                        {o.email}
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setEditing(o);
+                          setEditName(o.name);
+                          setEditEmail(o.email);
+                          setEditSectorIds(o.sectors.map((s) => s.id));
+                          setEditErr(null);
+                        }}
+                      >
+                        {t("ui.edit")}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm text-muted-text">
                     {o.sectors && o.sectors.length ? (
-                      o.sectors.map((s) => s.name).join(", ")
+                      <div className="truncate">
+                        {o.sectors.map((s) => s.name).join(", ")}
+                      </div>
                     ) : (
                       <span className="text-muted-text">{t("ui.none")}</span>
                     )}
-                  </td>
-                  <td className="py-2 pr-3 align-top">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditing(o);
-                        setEditName(o.name);
-                        setEditEmail(o.email);
-                        setEditSectorIds(o.sectors.map((s) => s.id));
-                        setEditErr(null);
-                      }}
-                    >
-                      {t("ui.edit")}
-                    </Button>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </section>
 
       {editing && (
-        <div className="fixed inset-0 bg-black/30 flex items-start justify-center p-6 z-50">
-          <div className="bg-card-bg border border-card-border rounded-lg shadow-lg w-full max-w-lg p-6 space-y-4">
+        <div className="fixed inset-0 bg-black/30 flex items-start justify-center p-4 sm:p-6 z-50 overflow-auto">
+          <div className="bg-card-bg border border-card-border rounded-lg shadow-lg w-full max-w-lg p-4 sm:p-6 space-y-4 mx-2 sm:mx-0">
             <h3 className="text-heading font-semibold text-base">
               {t("ui.edit")} {editing.name}
             </h3>
