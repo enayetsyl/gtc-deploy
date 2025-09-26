@@ -127,14 +127,19 @@ adminSectors.post("/sector-owners", async (req, res) => {
     await sendEmail({
       to: user.email,
       subject: "You're invited as Sector Owner",
-      html: `<p>Hello ${user.name},</p><p>You've been added as a Sector Owner for <strong>${primarySector?.name ?? "your sector(s)"}</strong>. To activate your account and set your password, click: <a href="${link}">${link}</a></p>`,
+      html: `
+        <p>Hello ${user.name},</p>
+        <p>You've been added as a Sector Owner for <strong>${primarySector?.name ?? "your sector(s)"}</strong>.</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:12px 20px;background-color:#2563eb;color:#ffffff;border-radius:6px;text-decoration:none;font-weight:600;">Activate account &amp; set password</a>
+        </p>
+        <p style="color:#6b7280;font-size:13px">If the button doesn't work, copy and paste this link into your browser:</p>
+        <p style="word-break:break-all;"><a href="${link}">${link}</a></p>
+      `,
     });
   }
 
-  // NOTE: multi-sector membership is not persisted beyond primary sector without a DB migration.
-  // We only set the user's primary `sectorId` to preserve compatibility. To fully support
-  // many-to-many sector ownership, we should add a join table (e.g. UserSector) in Prisma
-  // and migrate the database. If you want that, I can prepare the migration in a follow-up.
+
 
   res.status(201).json(user);
 });
