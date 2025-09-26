@@ -126,10 +126,10 @@ export default function PointServicesPage() {
         </CardContent>
       </Card>
 
-        <p
-          className="text-sm text-muted-foreground"
-          dangerouslySetInnerHTML={{ __html: t("point.services.tip") }}
-        />
+      <p
+        className="text-sm text-muted-foreground"
+        dangerouslySetInnerHTML={{ __html: t("point.services.tip") }}
+      />
     </div>
   );
 }
