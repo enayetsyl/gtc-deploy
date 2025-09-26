@@ -151,6 +151,8 @@
   "point.services.request": "Request",
   "ui.pending": "Pending…",
 
+  "point.services.tip": "Tip: \u201cRequest\u201d is only available for services that are currently <b>Disabled</b>.",
+
   "point.sectors.title": "Available Sectors",
   "ui.noSectors": "No sectors available.",
   "admin.points.listTitle": "GTC Points",

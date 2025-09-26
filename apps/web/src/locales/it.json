@@ -152,6 +152,8 @@
   "point.services.request": "Richiedi",
   "ui.pending": "In attesa…",
 
+    "point.services.tip": "Suggerimento: \u201cRichiedi\u201d è disponibile solo per i servizi attualmente <b>Disabilitati</b>.",
+
   "point.sectors.title": "Settori disponibili",
   "ui.noSectors": "Nessun settore disponibile.",
   "admin.points.listTitle": "Punti GTC",
