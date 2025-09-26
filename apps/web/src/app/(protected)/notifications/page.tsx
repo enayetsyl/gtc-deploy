@@ -56,7 +56,7 @@ export default function NotificationsPage() {
   const items = feed.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
-    <main className="p-6 space-y-4">
+    <main className="p-2 lg:p-6 space-y-4 mb-10 lg:mb-0">
       <h1 className="text-2xl font-semibold">{t("nav.notifications")}</h1>
 
       <div className="rounded-xl border divide-y border-divider bg-card-bg">
@@ -71,25 +71,25 @@ export default function NotificationsPage() {
             {items.map((n) => (
               <div
                 key={n.id}
-                className="p-4 flex items-start justify-between gap-4"
+                className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
                 style={{
                   background: n.read ? undefined : "rgba(59,130,246,0.05)",
                 }}
               >
-                <div>
+                <div className="flex-1 min-w-0">
                   <div className="font-medium text-body">{n.subject}</div>
-                  {n.contentHtml ? (
+                  {/* {n.contentHtml ? (
                     <div
                       className="prose prose-sm max-w-none text-body"
                       dangerouslySetInnerHTML={{ __html: n.contentHtml }}
                     />
-                  ) : null}
+                  ) : null} */}
                   <div className="text-xs text-muted-foreground mt-1">
                     {new Date(n.createdAt).toLocaleString()}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mt-3 md:mt-0 md:ml-4 shrink-0">
                   {!n.read && (
                     <Button
                       onClick={() => markMut.mutate(n.id)}
