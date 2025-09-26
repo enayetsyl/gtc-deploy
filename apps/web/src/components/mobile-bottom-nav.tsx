@@ -93,11 +93,10 @@ export default function MobileBottomNav() {
     setMoreOpen(false);
   }, [pathname]);
 
-  // WhatsApp-like: show up to 4 main tabs, rest go into More sheet
+  // WhatsApp-like: reserve the last slot for More. Show up to MAX_TABS-1 visible tabs; rest go into More sheet
   const MAX_TABS = 4;
-  const hasOverflow = items.length > MAX_TABS;
-  const visibleItems = hasOverflow ? items.slice(0, MAX_TABS - 1) : items;
-  const overflowItems = hasOverflow ? items.slice(MAX_TABS - 1) : [];
+  const visibleItems = items.slice(0, MAX_TABS - 1);
+  const overflowItems = items.slice(MAX_TABS - 1);
 
   if (!items.length) return null; // non-auth or roles with no items
 
@@ -107,8 +106,8 @@ export default function MobileBottomNav() {
 
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 z-50">
-      {/* Overflow sheet */}
-      {hasOverflow && moreOpen && (
+      {/* Overflow sheet (More) - includes overflow items and logout */}
+      {moreOpen && (
         <div className="absolute bottom-16 left-0 right-0 px-3">
           <div className="rounded-xl bg-white dark:bg-brand-navy-900 shadow-lg border border-gray-200/60 dark:border-white/10 overflow-hidden text-gray-800 dark:text-white">
             <ul className="max-h-72 overflow-auto divide-y divide-gray-100/60 dark:divide-white/10">
@@ -177,42 +176,28 @@ export default function MobileBottomNav() {
               </li>
             );
           })}
-          {/* When there is no overflow, show logout as last tab */}
-          {!hasOverflow && (
-            <li className="list-none">
-              <button
-                type="button"
-                onClick={() => logout()}
-                className="w-full flex flex-col items-center justify-center py-2 gap-1 text-[11px] text-red-600"
-              >
-                <LogOut className="h-5 w-5" />
-                <span className="leading-none">{t("nav.logout")}</span>
-              </button>
-            </li>
-          )}
-          {hasOverflow && (
-            <li className="list-none">
-              <button
-                type="button"
-                aria-expanded={moreOpen}
-                aria-controls="mobile-nav-more"
-                onClick={() => setMoreOpen((v) => !v)}
-                className={`w-full flex flex-col items-center justify-center py-2 gap-1 text-[11px] ${
-                  moreOpen || activeOverflow
-                    ? "text-brand-blue-600 dark:text-white"
-                    : "text-gray-600 dark:text-gray-300"
-                }`}
-              >
-                <MoreHorizontal className="h-5 w-5" />
-                {/* If an overflow item is active, show its label in the More slot; otherwise show common.more */}
-                <span className="leading-none">
-                  {activeOverflow
-                    ? t(activeOverflow.labelKey)
-                    : t("common.more") ?? "More"}
-                </span>
-              </button>
-            </li>
-          )}
+          {/* More button (always present as the last slot) */}
+          <li className="list-none">
+            <button
+              type="button"
+              aria-expanded={moreOpen}
+              aria-controls="mobile-nav-more"
+              onClick={() => setMoreOpen((v) => !v)}
+              className={`w-full flex flex-col items-center justify-center py-2 gap-1 text-[11px] ${
+                moreOpen || activeOverflow
+                  ? "text-brand-blue-600 dark:text-white"
+                  : "text-gray-600 dark:text-gray-300"
+              }`}
+            >
+              <MoreHorizontal className="h-5 w-5" />
+              {/* If an overflow item is active, show its label in the More slot; otherwise show common.more */}
+              <span className="leading-none">
+                {activeOverflow
+                  ? t(activeOverflow.labelKey)
+                  : t("common.more") ?? "More"}
+              </span>
+            </button>
+          </li>
         </ul>
       </nav>
     </div>
