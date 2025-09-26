@@ -49,6 +49,8 @@
   "onboarding.thanksMessagePart1": "Abbiamo ricevuto la tua richiesta di onboarding per un punto GTC.",
   "onboarding.instructionsPart1": "scarica il modulo precompilato, firmalo e ricaricalo nella",
   "onboarding.thanksMessagePart2": "Un amministratore esaminerà la tua richiesta e ti informerà via email quando sarà processata.",
+  "onboarding.contactSupport": "Se hai domande, contatta il referente del settore o scrivi a {email}.",
+  "onboarding.returnHome": "Torna alla home",
 
   "onboarding.invalidLink": "Link non valido o scaduto",
   "onboarding.title": "Onboarding per {name}",

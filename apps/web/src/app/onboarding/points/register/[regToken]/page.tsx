@@ -19,6 +19,7 @@ import { toast } from "sonner";
 export default function RegisterPage() {
   const params = useParams() as { regToken?: string } | undefined;
   const token = params?.regToken as string;
+
   const [prefill, setPrefill] = useState<
     { email: string; name: string; role: string } | null | undefined
   >(undefined);
@@ -72,7 +73,7 @@ export default function RegisterPage() {
   if (!prefill) return <div>Loading…</div>;
 
   return (
-    <form onSubmit={submit} className="max-w-md mx-auto">
+    <form onSubmit={submit} className="max-w-md mx-auto p-2 mt-5">
       <Card>
         <CardHeader>
           <CardTitle>Register account</CardTitle>
