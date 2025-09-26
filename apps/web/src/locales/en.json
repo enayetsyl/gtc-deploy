@@ -48,6 +48,8 @@
   "onboarding.thanksMessagePart1": "We have received your onboarding request for a GTC point.",
   "onboarding.instructionsPart1": "download the pre-filled convention form, sign it, and re-upload it in",
   "onboarding.thanksMessagePart2": "An administrator will review your submission and notify you by email when it is processed.",
+  "onboarding.contactSupport": "If you have any questions, contact your sector owner or email {email}.",
+  "onboarding.returnHome": "Return to home",
 
   "onboarding.invalidLink": "Invalid or expired link",
   "onboarding.title": "Onboarding for {name}",
