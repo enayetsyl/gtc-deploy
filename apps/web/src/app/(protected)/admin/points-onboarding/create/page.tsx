@@ -79,7 +79,7 @@ export default function CreateInvite() {
   }
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center p-6">
+    <div className="min-h-[60vh] flex items-center justify-center p-2 mb-10">
       <Toaster />
       <div className="w-full max-w-2xl">
         <Card>
