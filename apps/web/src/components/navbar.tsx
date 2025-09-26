@@ -5,6 +5,7 @@ import Image from "next/image";
 // removed unused Menu import
 import AdminNav from "@/components/admin-nav";
 import NotificationBell from "@/components/notification-bell";
+import MobileLangSwitch from "@/components/mobile-lang-switch";
 // no state needed; bottom nav handles mobile
 import MobileBottomNav from "@/components/mobile-bottom-nav";
 
@@ -38,6 +39,8 @@ export default function Navbar() {
           {/* Mobile actions: show notification bell on small screens */}
           <div className="md:hidden flex items-center gap-2">
             <NotificationBell />
+            {/* Language switch (mobile) */}
+            <MobileLangSwitch />
           </div>
         </div>
 
