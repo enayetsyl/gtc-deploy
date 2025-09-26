@@ -90,10 +90,14 @@ export default function OwnerPointsPage() {
                           <button
                             className="text-sm underline"
                             onClick={() =>
-                              setExpandedPoint((s) => (s === p.id ? null : p.id))
+                              setExpandedPoint((s) =>
+                                s === p.id ? null : p.id
+                              )
                             }
                           >
-                            {expandedPoint === p.id ? t("ui.hide") : t("ui.show")}
+                            {expandedPoint === p.id
+                              ? t("ui.hide")
+                              : t("ui.show")}
                           </button>
                         </td>
                       </tr>
@@ -114,7 +118,10 @@ export default function OwnerPointsPage() {
             {/* Mobile stacked cards */}
             <div className="flex flex-col gap-3 md:hidden">
               {q.data?.items.map((p: PointRow) => (
-                <div key={`card-${p.id}`} className="border rounded p-3 bg-page-bg">
+                <div
+                  key={`card-${p.id}`}
+                  className="border rounded p-3 bg-page-bg"
+                >
                   <div className="flex justify-between items-start gap-3">
                     <div>
                       <div className="font-medium">{p.name}</div>
