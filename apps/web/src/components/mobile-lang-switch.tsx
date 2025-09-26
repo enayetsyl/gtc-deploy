@@ -7,14 +7,17 @@ export default function MobileLangSwitch() {
 
   const toggle = () => setLocale(locale === "en" ? "it" : "en");
 
+  const target = locale === "en" ? "it" : "en";
+  const targetLabel = target === "en" ? "EN" : "IT";
+
   return (
     <button
       type="button"
       onClick={toggle}
-      aria-label="Switch language"
+      aria-label={`Switch to ${target}`}
       className="h-8 w-8 rounded-md bg-white/10 text-white flex items-center justify-center text-xs font-medium"
     >
-      {locale.toUpperCase()}
+      {targetLabel}
     </button>
   );
 }

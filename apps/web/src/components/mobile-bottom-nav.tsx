@@ -136,7 +136,7 @@ export default function MobileBottomNav() {
       {/* Bottom bar */}
       <nav
         aria-label="Bottom navigation"
-        className="bg-white dark:bg-brand-navy-900 border-t border-gray-200 dark:border-white/10"
+        className="bg-white dark:bg-brand-navy-900 border-t border-gray-200 dark:border-white/10 "
       >
         <ul className="grid grid-cols-4">
           {visibleItems.map((it) => {
