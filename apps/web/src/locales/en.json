@@ -43,6 +43,7 @@
   "status.declined": "Declined",
   "nav.notifications": "Notifications",
   "nav.unreadNotifications": "{count} unread notifications",
+  "common.more": "More",
   "onboarding.thanksTitle": "Thank you — request received",
   "onboarding.thanksMessagePart1": "We have received your onboarding request for a GTC point.",
   "onboarding.instructionsPart1": "download the pre-filled convention form, sign it, and re-upload it in",
