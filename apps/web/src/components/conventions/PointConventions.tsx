@@ -32,12 +32,17 @@ export default function PointConventionsPage() {
   }
 
   return (
-    <div className="p-2 space-y-6 mb-10">
-      <div className="flex items-center justify-between">
+    <div className="p-2 space-y-6 mb-10 max-w-5xl mx-auto">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">{t("nav.myConventions")}</h1>
-        <Button onClick={() => createConvention.mutate()}>
-          {t("convention.create")}
-        </Button>
+        <div className="w-full md:w-auto">
+          <Button
+            className="w-full md:w-auto"
+            onClick={() => createConvention.mutate()}
+          >
+            {t("convention.create")}
+          </Button>
+        </div>
       </div>
 
       <section className="rounded-2xl border p-4 space-y-4">
@@ -50,8 +55,8 @@ export default function PointConventionsPage() {
 
         {/* Desktop / larger screens: table */}
         {!isLoading && (
-          <div className="hidden md:block">
-            <table className="w-full text-sm">
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm min-w-[700px]">
               <thead>
                 <tr className="bg-muted/30 text-left">
                   <th className="p-3">#</th>
@@ -79,8 +84,10 @@ export default function PointConventionsPage() {
                       </span>
                     </td>
                     <td className="p-3 align-top">{c.gtcPoint?.name ?? "—"}</td>
-                    <td className="p-3 align-top">{c.sector?.name ?? "—"}</td>
-                    <td className="p-3 align-top">
+                    <td className="p-3 align-top break-words">
+                      {c.sector?.name ?? "—"}
+                    </td>
+                    <td className="p-3 align-top break-words">
                       {c.documents?.length ? (
                         <ul className="space-y-1">
                           {c.documents.map((d) => (

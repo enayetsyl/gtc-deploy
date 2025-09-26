@@ -32,7 +32,7 @@ export default function UploadSigned({
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-col md:flex-row items-start md:items-center gap-3 w-full">
       <UploadWidget
         accept="application/pdf"
         maxSizeMB={10}
@@ -40,13 +40,31 @@ export default function UploadSigned({
         onSelect={setFile}
         disabled={mutation.isPending}
         hint={t("file.accepted", { types: "PDF", max: "10" })}
-        className="min-w-[360px]"
+        className="w-full md:min-w-[360px]"
       />
-      <Button disabled={!file || mutation.isPending} onClick={onUpload}>
-        {mutation.isPending ? t("upload.uploading") : t("upload.uploadSigned")}
-      </Button>
+
+      <div className="flex items-center gap-2 w-full md:w-auto">
+        <Button
+          className="w-full md:w-auto"
+          disabled={!file || mutation.isPending}
+          onClick={onUpload}
+        >
+          {mutation.isPending
+            ? t("upload.uploading")
+            : t("upload.uploadSigned")}
+        </Button>
+
+        {progress !== null && (
+          <span className="text-sm text-muted-foreground hidden md:inline-block">
+            {progress}%
+          </span>
+        )}
+      </div>
+
       {progress !== null && (
-        <span className="text-sm text-muted-foreground">{progress}%</span>
+        <div className="mt-2 md:hidden text-sm text-muted-foreground">
+          {progress}%
+        </div>
       )}
     </div>
   );
