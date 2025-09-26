@@ -31,12 +31,12 @@ type Lead = {
   attachments?: Attachment[];
   sector: sector;
 };
-type sector ={
+type sector = {
   id: string;
   name: string;
   createdAt: string;
   updatedAt: string;
-}
+};
 
 type LeadsPage = {
   items: Lead[];
@@ -79,30 +79,27 @@ export default function AdminLeadsPage() {
     router.push(`?${qp.toString()}`);
   }
 
-console.log('leads', leads)
+  console.log("leads", leads);
 
   const total = leads?.total ?? 0;
   const currentPage = leads?.page ?? page;
   const currentPageSize = leads?.pageSize ?? pageSize;
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <Card>
-        <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <CardTitle className="text-heading text-2xl font-semibold">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="text-heading text-xl sm:text-2xl font-semibold">
             {t("admin.leads.title")}
           </CardTitle>
-          <div className="flex gap-2 items-center">
+          <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
             <Input
               placeholder={t("admin.leads.filterPlaceholder")}
               value={sectorId}
               onChange={(e) => setSectorId(e.target.value)}
-              className="w-[260px] bg-page-bg border border-divider focus-visible:ring-2 ring-focus"
+              className="w-full sm:w-[260px] bg-page-bg border border-divider focus-visible:ring-2 ring-focus"
             />
-            <Button
-             
-              onClick={applyFilter}
-            >
+            <Button onClick={applyFilter} className="w-full sm:w-auto">
               {t("ui.apply")}
             </Button>
           </div>
@@ -112,76 +109,79 @@ console.log('leads', leads)
             <p>{t("ui.loading")}</p>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-sm text-muted-foreground">
-                      {t("table.created")}
-                    </TableHead>
-                    <TableHead className="text-sm text-muted-foreground">
-                      {t("table.sector")}
-                    </TableHead>
-                    <TableHead className="text-sm text-muted-foreground">
-                      {t("table.name")}
-                    </TableHead>
-                    <TableHead className="text-sm text-muted-foreground">
-                      {t("table.email")}
-                    </TableHead>
-                    <TableHead className="text-sm text-muted-foreground">
-                      {t("table.phone")}
-                    </TableHead>
-                    <TableHead className="text-sm text-muted-foreground">
-                      {t("table.message")}
-                    </TableHead>
-                    <TableHead className="text-sm text-muted-foreground">
-                      {t("table.attachments")}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(leads?.items || []).map((l) => (
-                    <TableRow key={l.id}>
-                      <TableCell className="text-sm text-body">
-                        {new Date(l.createdAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-sm text-body">
-                        {l.sector.name}
-                      </TableCell>
-                      <TableCell className="text-sm text-body">
-                        {l.name}
-                      </TableCell>
-                      <TableCell className="text-sm text-body">
-                        {l.email || "—"}
-                      </TableCell>
-                      <TableCell className="text-sm text-body">
-                        {l.phone || "—"}
-                      </TableCell>
-                      <TableCell className="max-w-[320px] truncate text-sm text-body">
-                        {l.message || "—"}
-                      </TableCell>
-                      <TableCell className="space-x-2">
-                        {l.attachments?.length ? (
-                          l.attachments.map((a) => (
-                            <AttachmentChip
-                              key={a.id}
-                              leadId={l.id}
-                              attId={a.id}
-                              name={a.fileName}
-                            />
-                          ))
-                        ) : (
-                          <span className="text-muted-foreground">
-                            {t("ui.none")}
-                          </span>
-                        )}
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[700px] sm:min-w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-sm text-muted-foreground">
+                        {t("table.created")}
+                      </TableHead>
+                      <TableHead className="text-sm text-muted-foreground">
+                        {t("table.sector")}
+                      </TableHead>
+                      <TableHead className="text-sm text-muted-foreground">
+                        {t("table.name")}
+                      </TableHead>
+                      <TableHead className="text-sm text-muted-foreground">
+                        {t("table.email")}
+                      </TableHead>
+                      <TableHead className="text-sm text-muted-foreground">
+                        {t("table.phone")}
+                      </TableHead>
+                      <TableHead className="text-sm text-muted-foreground">
+                        {t("table.message")}
+                      </TableHead>
+                      <TableHead className="text-sm text-muted-foreground">
+                        {t("table.attachments")}
+                      </TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {(leads?.items || []).map((l) => (
+                      <TableRow key={l.id}>
+                        <TableCell className="text-sm text-body">
+                          {new Date(l.createdAt).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-sm text-body">
+                          {l.sector.name}
+                        </TableCell>
+                        <TableCell className="text-sm text-body">
+                          {l.name}
+                        </TableCell>
+                        <TableCell className="text-sm text-body">
+                          {l.email || "—"}
+                        </TableCell>
+                        <TableCell className="text-sm text-body">
+                          {l.phone || "—"}
+                        </TableCell>
+                        <TableCell className="max-w-[320px] break-words text-sm text-body">
+                          {l.message || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2">
+                            {l.attachments?.length ? (
+                              l.attachments.map((a) => (
+                                <AttachmentChip
+                                  key={a.id}
+                                  leadId={l.id}
+                                  attId={a.id}
+                                  name={a.fileName}
+                                />
+                              ))
+                            ) : (
+                              <span className="text-muted-foreground">
+                                {t("ui.none")}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
               <div className="flex items-center justify-center mt-4">
-               
                 <Pagination
                   total={total}
                   page={currentPage}
