@@ -44,6 +44,7 @@
   "status.declined": "Rifiutate",
   "nav.notifications": "Notifiche",
   "nav.unreadNotifications": "{count} notifiche non lette",
+  "common.more": "Altro",
   "onboarding.thanksTitle": "Grazie — richiesta ricevuta",
   "onboarding.thanksMessagePart1": "Abbiamo ricevuto la tua richiesta di onboarding per un punto GTC.",
   "onboarding.instructionsPart1": "scarica il modulo precompilato, firmalo e ricaricalo nella",
@@ -150,6 +151,8 @@
   "ui.action": "Azione",
   "point.services.request": "Richiedi",
   "ui.pending": "In attesa…",
+
+  "point.services.tip": "Suggerimento: \u201cRichiedi\u201d è disponibile solo per i servizi attualmente <b>Disabilitati</b>.",
 
   "point.sectors.title": "Settori disponibili",
   "ui.noSectors": "Nessun settore disponibile.",

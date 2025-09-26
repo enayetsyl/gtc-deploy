@@ -47,7 +47,7 @@ export default function OwnerLeadsPage() {
     router.push(`?${qp.toString()}`);
   }
   return (
-    <div className="p-6">
+    <div className="p-2 mb-10">
       <Card>
         <CardHeader className="flex items-center justify-between">
           <CardTitle className="text-heading text-xl font-semibold">

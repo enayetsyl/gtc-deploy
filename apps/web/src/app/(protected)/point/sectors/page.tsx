@@ -22,7 +22,7 @@ export default function Page() {
   }, []);
 
   return (
-    <div className="p-4">
+    <div className="p-4 mb-10">
       <Card>
         <CardHeader>
           <CardTitle className="text-heading text-xl font-semibold">

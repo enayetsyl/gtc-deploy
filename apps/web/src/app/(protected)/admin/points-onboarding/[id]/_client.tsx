@@ -86,7 +86,9 @@ export default function Client({ id }: { id: string }) {
 
   if (!item)
     return (
-      <div className="flex justify-center items-center h-screen">Loading…</div>
+      <div className="flex justify-center items-center min-h-[60vh]">
+        Loading…
+      </div>
     );
 
   const isSubmitted = item.status === "SUBMITTED";
@@ -101,8 +103,8 @@ export default function Client({ id }: { id: string }) {
       : "bg-gray-100 text-gray-800";
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white/5 rounded-lg shadow-sm">
-      <div className="flex items-start justify-between">
+    <div className="max-w-3xl mx-auto p-4 sm:p-6 bg-white/5 rounded-lg shadow-sm mb-10">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-0">
         <div>
           <h2 className="text-2xl font-semibold">
             {t("detail.gtcPointName")}:{" "}
@@ -169,16 +171,17 @@ export default function Client({ id }: { id: string }) {
         <p className="text-sm text-muted-foreground mb-2">
           {t("detail.signature")}
         </p>
-        <div className="w-full border rounded-md p-4 flex items-center justify-center bg-white/2">
+        <div className="w-full border rounded-md p-4 bg-white/2">
           {item.signaturePath ? (
-            <Image
-              src={`${item.signaturePath}`}
-              alt="signature"
-              width={400}
-              height={160}
-              style={{ objectFit: "contain" }}
-              unoptimized
-            />
+            <div className="relative w-full h-40 sm:h-48">
+              <Image
+                src={`${item.signaturePath}`}
+                alt="signature"
+                fill
+                className="object-contain"
+                unoptimized
+              />
+            </div>
           ) : (
             <div className="text-sm text-muted-foreground">
               {t("detail.noSignature")}
@@ -189,8 +192,9 @@ export default function Client({ id }: { id: string }) {
 
       <div className="mt-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button
+              className="w-full sm:w-auto justify-center"
               variant="default"
               onClick={approve}
               disabled={!isSubmitted || approving}
@@ -202,6 +206,7 @@ export default function Client({ id }: { id: string }) {
               {approving ? t("detail.approving") : t("detail.approve")}
             </Button>
             <Button
+              className="w-full sm:w-auto justify-center"
               variant="destructive"
               onClick={decline}
               disabled={!isSubmitted || declining}

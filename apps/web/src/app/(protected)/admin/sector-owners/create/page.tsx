@@ -71,7 +71,7 @@ export default function CreateSectorOwnerPage() {
   });
 
   return (
-    <main className="space-y-6 max-w-md mx-auto">
+    <main className="space-y-6 max-w-md mx-auto mb-10">
       <section
         className="rounded-xl border bg-card p-6 space-y-4"
         aria-labelledby="create-sector-owner"

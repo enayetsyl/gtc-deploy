@@ -44,16 +44,16 @@ export async function onLeadCreated(leadId: string) {
   });
   if (!lead) return;
 
-  const subject = `New lead for ${lead.sector?.name ?? "Sector"}`;
+  const subject = `Nuova richiesta per ${lead.sector?.name ?? "Settore"}`;
   const html = `
-    <p>A new lead has been submitted.</p>
+    <p>È stata inviata una nuova richiesta (lead).</p>
     <p>
-      <b>Name:</b> ${lead.name}<br/>
+      <b>Nome:</b> ${lead.name}<br/>
       ${lead.email ? `<b>Email:</b> ${lead.email}<br/>` : ""}
-      ${lead.phone ? `<b>Phone:</b> ${lead.phone}<br/>` : ""}
-      ${lead.message ? `<b>Message:</b> ${lead.message}<br/>` : ""}
-      <b>Sector:</b> ${lead.sector?.name ?? lead.sectorId}<br/>
-      <b>Lead ID:</b> ${lead.id}
+      ${lead.phone ? `<b>Telefono:</b> ${lead.phone}<br/>` : ""}
+      ${lead.message ? `<b>Messaggio:</b> ${lead.message}<br/>` : ""}
+      <b>Settore:</b> ${lead.sector?.name ?? lead.sectorId}<br/>
+      <b>ID Lead:</b> ${lead.id}
     </p>
   `;
 

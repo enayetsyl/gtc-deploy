@@ -107,7 +107,7 @@ export default function LeadPage() {
             <input type="hidden" {...register("sectorId")} />
 
             <div>
-              <Label htmlFor="sectorId">Sector</Label>
+              <Label htmlFor="sectorId" className="mb-1">Sector</Label>
               {sectors.isLoading ? (
                 <p className="text-sm text-muted-foreground">
                   Loading sectors…
@@ -153,7 +153,7 @@ export default function LeadPage() {
             </div>
 
             <div>
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name" className="mb-1">Name</Label>
               <Input id="name" {...register("name")} />
               {errors.name && (
                 <p className="text-sm text-red-500">{errors.name.message}</p>
@@ -162,7 +162,7 @@ export default function LeadPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="mb-1">Email</Label>
                 <Input id="email" type="email" {...register("email")} />
                 {errors.email && (
                   <p className="text-sm text-red-500">
@@ -171,7 +171,7 @@ export default function LeadPage() {
                 )}
               </div>
               <div>
-                <Label htmlFor="phone">Phone</Label>
+                <Label htmlFor="phone" className="mb-1">Phone</Label>
                 <Input id="phone" {...register("phone")} />
                 {errors.phone && (
                   <p className="text-sm text-red-500">
@@ -182,12 +182,12 @@ export default function LeadPage() {
             </div>
 
             <div>
-              <Label htmlFor="message">Message</Label>
+              <Label htmlFor="message" className="mb-1">Message</Label>
               <Textarea id="message" rows={4} {...register("message")} />
             </div>
 
             <div>
-              <Label>Attachments</Label>
+              <Label className="mb-1">Attachments</Label>
               <input
                 type="file"
                 multiple
