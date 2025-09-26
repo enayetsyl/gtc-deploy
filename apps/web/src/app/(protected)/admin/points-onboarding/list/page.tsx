@@ -22,17 +22,19 @@ export default function ReviewList() {
     })();
   }, []);
   return (
-    <main className="space-y-6">
+    <main className="space-y-6 mb-10">
       <section className="rounded-xl border p-6 bg-card">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h2 className="text-lg font-semibold text-heading">
             {t("admin.onboarding.submitted")}
           </h2>
-          <Button>
-            <Link href="/admin/points-onboarding/create">
-              {t("admin.onboarding.createInvite")}
-            </Link>
-          </Button>
+          <div className="flex items-center justify-start sm:justify-end">
+            <Button size="sm" className="whitespace-nowrap">
+              <Link href="/admin/points-onboarding/create">
+                {t("admin.onboarding.createInvite")}
+              </Link>
+            </Button>
+          </div>
         </div>
 
         <div className="mt-4 divide-y">
@@ -42,20 +44,22 @@ export default function ReviewList() {
             items.map((i) => (
               <div
                 key={i.id}
-                className="py-3 flex items-center justify-between gap-4"
+                className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
               >
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <Link
                     href={`/admin/points-onboarding/${i.id}`}
-                    className="font-medium text-[--color-heading] hover:underline"
+                    className="font-medium text-[--color-heading] hover:underline block truncate"
                   >
                     {i.name}
                   </Link>
-                  <div className="text-xs text-muted-text">{i.email}</div>
+                  <div className="text-xs text-muted-text truncate">
+                    {i.email}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 mt-2 sm:mt-0">
                   <StatusBadge status={i.status} />
-                  <Button>
+                  <Button size="sm" className="whitespace-nowrap">
                     <Link href={`/admin/points-onboarding/${i.id}`}>
                       {t("ui.view")}
                     </Link>
@@ -78,11 +82,11 @@ function StatusBadge({ status }: { status?: string | null }) {
   switch (s) {
     case "draft":
       // not yet submitted
-      bg = "bg-color-muted text-muted-foreground";
+      bg = "bg-neutral-400 text-black";
       break;
     case "submitted":
       // waiting review
-      bg = "bg-color-highlight text-black";
+      bg = "bg-brand-teal-400 text-black";
       break;
     case "approved":
     case "accepted":
@@ -96,7 +100,7 @@ function StatusBadge({ status }: { status?: string | null }) {
     case "rejected":
     case "denied":
       // failure states
-      bg = "bg-color-danger text-white";
+      bg = "bg-alert-error text-white";
       break;
     default:
       bg = "bg-color-muted text-muted-foreground";
