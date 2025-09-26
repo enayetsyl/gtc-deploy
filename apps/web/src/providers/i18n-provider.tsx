@@ -24,13 +24,13 @@ const I18nContext = createContext<I18nCtx | null>(null);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => {
-    if (typeof window === "undefined") return "en";
+    if (typeof window === "undefined") return "it";
     const stored = (localStorage.getItem(LOCALE_KEY) as Locale) || null;
     if (stored) return stored;
     // Try to infer from browser settings
     const nav = navigator?.language?.slice(0, 2);
     if (nav === "it") return "it";
-    return "en";
+    return "it";
   });
 
   const setLocale = (l: Locale) => {
