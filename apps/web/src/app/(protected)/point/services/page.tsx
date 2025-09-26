@@ -58,7 +58,7 @@ export default function PointServicesPage() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="container mx-auto py-6 space-y-6 mb-10">
       <Card>
         <CardHeader>
           <CardTitle>{t("point.services.title")}</CardTitle>
