@@ -50,9 +50,7 @@ export default function PointsPage() {
   });
 
   return (
-    <main className="space-y-6">
-     
-
+    <main className="space-y-6 mb-10">
       <section className="rounded-xl border p-6">
         <h2 className="text-lg font-semibold mb-4">
           {t("admin.points.listTitle")}
@@ -76,17 +74,13 @@ export default function PointsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                  variant='default'
-                  >
-
-                  <Link
-                    href={`/admin/points/${p.id}/services`}
-                    
-                    title={t("admin.points.manageServicesTitle")}
-                  >
-                    {t("admin.points.services")}
-                  </Link>
+                  <Button variant="default">
+                    <Link
+                      href={`/admin/points/${p.id}/services`}
+                      title={t("admin.points.manageServicesTitle")}
+                    >
+                      {t("admin.points.services")}
+                    </Link>
                   </Button>
                   {/* (optional) overview/edit buttons can go here too */}
                 </div>
