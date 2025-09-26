@@ -65,7 +65,7 @@ export default function ServicesPage() {
   });
 
   return (
-    <main className="space-y-6">
+    <main className="space-y-6 mb-10">
       <section className="rounded-xl border p-6 space-y-4">
         <h2 className="text-lg font-semibold">
           {t("admin.services.createTitle")}
