@@ -16,6 +16,7 @@ import {
   FolderCheck,
   MoreHorizontal,
 } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 // A tiny icon renderer by labelKey fallback to Files
 const iconByKey: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -81,6 +82,7 @@ function useRoleAwareItems(user: { role?: string } | null | undefined) {
 export default function MobileBottomNav() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { logout } = useAuth();
   const { t } = useI18n();
   const items = useRoleAwareItems(user);
 
@@ -128,6 +130,17 @@ export default function MobileBottomNav() {
                   </li>
                 );
               })}
+              {/* Logout item at bottom of overflow sheet */}
+              <li>
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span className="truncate">{t("nav.logout")}</span>
+                </button>
+              </li>
             </ul>
           </div>
         </div>
@@ -164,7 +177,19 @@ export default function MobileBottomNav() {
               </li>
             );
           })}
-
+          {/* When there is no overflow, show logout as last tab */}
+          {!hasOverflow && (
+            <li className="list-none">
+              <button
+                type="button"
+                onClick={() => logout()}
+                className="w-full flex flex-col items-center justify-center py-2 gap-1 text-[11px] text-red-600"
+              >
+                <LogOut className="h-5 w-5" />
+                <span className="leading-none">{t("nav.logout")}</span>
+              </button>
+            </li>
+          )}
           {hasOverflow && (
             <li className="list-none">
               <button
