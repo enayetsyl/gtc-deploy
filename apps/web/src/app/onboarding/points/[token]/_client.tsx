@@ -193,7 +193,10 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   if (!prefill) return <div>{t("onboarding.invalidLink")}</div>;
 
   return (
-    <form onSubmit={submit} className="max-w-2xl space-y-4 mx-auto">
+    <form
+      onSubmit={submit}
+      className="max-w-2xl space-y-4 mx-auto px-4 sm:px-0 my-10"
+    >
       <h1 className="text-xl font-semibold">
         {t("onboarding.title", { name: prefill.name })}
       </h1>
@@ -202,21 +205,30 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       </p>
 
       <div>
-        <Label>{t("onboarding.vatLabel")}</Label>
-        <Input value={vat} onChange={(e) => setVat(e.target.value)} />
+        <Label className="mb-1">{t("onboarding.vatLabel")}</Label>
+        <Input
+          className="w-full"
+          value={vat}
+          onChange={(e) => setVat(e.target.value)}
+        />
       </div>
 
       <div>
-        <Label>{t("onboarding.phoneLabel")}</Label>
-        <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <Label className="mb-1">{t("onboarding.phoneLabel")}</Label>
+        <Input
+          className="w-full"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+        />
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="flex-1" />
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex-1 min-w-0" />
         <Button
           type="button"
           variant="ghost"
           onClick={() => setTermsOpen(true)}
+          className="ml-auto"
         >
           {t("onboarding.terms")}
         </Button>
@@ -224,7 +236,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
 
       {prefill.includeServices && (
         <div>
-          <Label>{t("onboarding.servicesPreselected")}</Label>
+          <Label className="mb-1">{t("onboarding.servicesPreselected")}</Label>
           <div className="space-y-2">
             {prefill.serviceIds?.map((sid: string) => (
               <div key={sid} className="flex items-center gap-2">
@@ -245,25 +257,35 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       )}
 
       <div>
-        <Label>{t("onboarding.signature")}</Label>
+        <Label className="mb-1">{t("onboarding.signature")}</Label>
         <div>
-          <canvas
-            ref={canvasRef}
-            width={800}
-            height={320}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            style={{
-              border: "1px solid #ccc",
-              width: "100%",
-              height: 160,
-              touchAction: "none",
-            }}
-          />
-          <div className="mt-2 flex gap-2">
-            <Button type="button" variant="outline" onClick={clearCanvas}>
+          <div
+            className="w-full"
+            style={{ aspectRatio: "5 / 1", maxHeight: 240 }}
+          >
+            <canvas
+              ref={canvasRef}
+              width={800}
+              height={320}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              style={{
+                border: "1px solid #ccc",
+                width: "100%",
+                height: "100%",
+                touchAction: "none",
+              }}
+            />
+          </div>
+          <div className="mt-2 flex gap-2 flex-wrap">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={clearCanvas}
+              className="flex-1 sm:flex-none"
+            >
               {t("onboarding.clear")}
             </Button>
           </div>
@@ -271,7 +293,11 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       </div>
 
       <div>
-        <Button type="submit" disabled={submitting}>
+        <Button
+          type="submit"
+          disabled={submitting}
+          className="w-full sm:w-auto"
+        >
           {submitting && <Spinner className="w-4 h-4 mr-2" />}
           {submitting ? t("onboarding.submitting") : t("onboarding.submit")}
         </Button>
@@ -284,7 +310,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
             className="absolute inset-0 bg-black/40"
             onClick={() => setTermsOpen(false)}
           />
-          <div className="relative max-w-2xl w-full bg-popover text-popover-foreground rounded-xl shadow-lg p-6 mx-4">
+          <div className="relative max-w-2xl w-full bg-popover text-popover-foreground rounded-xl shadow-lg p-4 sm:p-6 mx-4">
             <h2 className="text-lg font-semibold mb-2">
               {t("onboarding.termsTitle")}
             </h2>
@@ -294,7 +320,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
               <p>{t("onboarding.termsParagraph3")}</p>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -304,7 +330,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
                 <span className="text-sm">{t("onboarding.agreeLabel")}</span>
               </label>
 
-              <div className="ml-auto flex gap-2">
+              <div className="ml-auto flex gap-2 flex-wrap">
                 <Button
                   type="button"
                   variant="outline"
