@@ -86,14 +86,16 @@ export async function onConventionDecision(conventionId: string, approved: boole
   if (!c) return;
 
   const subject = `Convention ${approved ? "APPROVED" : "DECLINED"}: ${c.gtcPoint.name}`;
-  const html = `<p>Your convention has been <b>${approved ? "APPROVED" : "DECLINED"}</b>.</p>
+  const pointHtml = `<p>Your convention has been <b>${approved ? "APPROVED" : "DECLINED"}</b>.</p>
+<p><b>Convention ID:</b> ${c.id}${internalSalesRep ? `<br/><b>Internal sales rep:</b> ${internalSalesRep}` : ""}</p>`;
+  const ownerHtml = `<p>The convention for <b>${c.gtcPoint.name}</b> has been <b>${approved ? "APPROVED" : "DECLINED"}</b>.</p>
 <p><b>Convention ID:</b> ${c.id}${internalSalesRep ? `<br/><b>Internal sales rep:</b> ${internalSalesRep}` : ""}</p>`;
 
   const pointUsers = await getPointUsers(c.gtcPointId);
   await notifyUsers(pointUsers, {
     type: "CONVENTION_STATUS",
     subject,
-    contentHtml: html,
+    contentHtml: pointHtml,
   });
 
   // Also notify sector owners about the decision
@@ -102,7 +104,7 @@ export async function onConventionDecision(conventionId: string, approved: boole
     await notifyUsers(ownerIds, {
       type: "CONVENTION_STATUS",
       subject,
-      contentHtml: html,
+      contentHtml: ownerHtml,
     });
   }
 }
