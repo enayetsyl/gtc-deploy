@@ -7,7 +7,7 @@ import { prisma } from "../lib/prisma";
 import { Prisma } from "@prisma/client";
 import { storage } from "../storage/provider";
 import { buildPrefillPdf } from "../utils/pdf";
-import { onConventionUploaded } from "../services/conventions";
+import { onConventionUploaded, onConventionCreated } from "../services/conventions";
 import { lookup as mimeLookup } from "mime-types";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -43,6 +43,12 @@ conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) 
   const conv = await prisma.convention.create({
     data: { gtcPointId: gtcPointId!, sectorId: sectorId!, status: "NEW" as any },
   });
+  // Notify sector owners about the new convention
+  try {
+    await onConventionCreated(conv.id);
+  } catch (e) {
+    // non-blocking notification
+  }
   res.status(201).json(conv);
 });
 
