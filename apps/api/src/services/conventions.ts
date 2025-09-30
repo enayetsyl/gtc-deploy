@@ -31,11 +31,11 @@ export async function onConventionCreated(conventionId: string) {
   });
   if (!c) return;
 
-  const subject = `New convention created: ${c.gtcPoint.name} (${c.sector.name})`;
-  const html = `<p>A new convention has been created.</p>
-<p><b>Point:</b> ${c.gtcPoint.name}<br/>
-<b>Sector:</b> ${c.sector.name}<br/>
-<b>Convention ID:</b> ${c.id}</p>`;
+  const subject = `Nuova convenzione creata: ${c.gtcPoint.name} (${c.sector.name})`;
+  const html = `<p>È stata creata una nuova convenzione.</p>
+<p><b>Punto:</b> ${c.gtcPoint.name}<br/>
+<b>Settore:</b> ${c.sector.name}<br/>
+<b>ID Convenzione:</b> ${c.id}</p>`;
 
   const ownerIds = await getSectorOwners(c.sectorId);
   if (ownerIds.length) {
@@ -54,11 +54,11 @@ export async function onConventionUploaded(conventionId: string) {
   });
   if (!c) return;
 
-  const subject = `Convention uploaded: ${c.gtcPoint.name} (${c.sector.name})`;
-  const html = `<p>A signed convention has been uploaded.</p>
-<p><b>Point:</b> ${c.gtcPoint.name}<br/>
-<b>Sector:</b> ${c.sector.name}<br/>
-<b>Convention ID:</b> ${c.id}</p>`;
+  const subject = `Convenzione caricata: ${c.gtcPoint.name} (${c.sector.name})`;
+  const html = `<p>È stata caricata una convenzione firmata.</p>
+<p><b>Punto:</b> ${c.gtcPoint.name}<br/>
+<b>Settore:</b> ${c.sector.name}<br/>
+<b>ID Convenzione:</b> ${c.id}</p>`;
 
   const adminIds = await getAdmins();
   await notifyUsers(adminIds, {
@@ -85,11 +85,11 @@ export async function onConventionDecision(conventionId: string, approved: boole
   });
   if (!c) return;
 
-  const subject = `Convention ${approved ? "APPROVED" : "DECLINED"}: ${c.gtcPoint.name}`;
-  const pointHtml = `<p>Your convention has been <b>${approved ? "APPROVED" : "DECLINED"}</b>.</p>
-<p><b>Convention ID:</b> ${c.id}${internalSalesRep ? `<br/><b>Internal sales rep:</b> ${internalSalesRep}` : ""}</p>`;
-  const ownerHtml = `<p>The convention for <b>${c.gtcPoint.name}</b> has been <b>${approved ? "APPROVED" : "DECLINED"}</b>.</p>
-<p><b>Convention ID:</b> ${c.id}${internalSalesRep ? `<br/><b>Internal sales rep:</b> ${internalSalesRep}` : ""}</p>`;
+  const subject = `Convenzione ${approved ? "APPROVATA" : "RIFIUTATA"}: ${c.gtcPoint.name}`;
+  const pointHtml = `<p>La tua convenzione è stata <b>${approved ? "APPROVATA" : "RIFIUTATA"}</b>.</p>
+<p><b>ID Convenzione:</b> ${c.id}${internalSalesRep ? `<br/><b>Referente interno:</b> ${internalSalesRep}` : ""}</p>`;
+  const ownerHtml = `<p>La convenzione per <b>${c.gtcPoint.name}</b> è stata <b>${approved ? "APPROVATA" : "RIFIUTATA"}</b>.</p>
+<p><b>ID Convenzione:</b> ${c.id}${internalSalesRep ? `<br/><b>Referente interno:</b> ${internalSalesRep}` : ""}</p>`;
 
   const pointUsers = await getPointUsers(c.gtcPointId);
   await notifyUsers(pointUsers, {
