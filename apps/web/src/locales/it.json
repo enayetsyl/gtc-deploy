@@ -223,5 +223,22 @@
   "status.submitted": "Inviato",
   "status.completed": "Completato",
   "status.unknown": "Sconosciuto",
-  "detail.signatureAlt": "Firma"
+  "detail.signatureAlt": "Firma",
+  "lead.title": "Contatto / Lead",
+  "lead.sector.label": "Settore",
+  "lead.sector.enterIdPlaceholder": "Inserisci l'ID del settore",
+  "lead.sector.noList": "Nessuna lista di settore pubblica disponibile. Inserisci l'ID del settore manualmente.",
+  "lead.phone": "Telefono",
+  "lead.message": "Messaggio",
+  "lead.attachments": "Allegati",
+  "lead.gdpr": "Accetto la politica sulla privacy (GDPR)",
+  "lead.filesSelected": "{count, plural, one {# file selezionato} other {# file selezionati}}",
+  "lead.button.submitting": "Invio in corso…",
+  "lead.button.submit": "Invia",
+  "form.errors.name.required": "Inserisci il tuo nome",
+  "form.errors.gdpr.required": "Devi accettare",
+  "form.errors.phone.invalid": "Inserisci un numero di telefono valido",
+  "lead.toast.success": "Richiesta inviata — Ti contatteremo al più presto.",
+  "lead.toast.tooMany": "Troppe richieste — Riprova più tardi.",
+  "lead.toast.failure": "Invio fallito — Controlla i campi e riprova."
 }

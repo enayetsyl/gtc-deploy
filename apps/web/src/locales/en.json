@@ -222,5 +222,22 @@
   "status.submitted": "Submitted",
   "status.completed": "Completed",
   "status.unknown": "Unknown",
-  "detail.signatureAlt": "Signature"
+  "detail.signatureAlt": "Signature",
+  "lead.title": "Contact / Lead",
+  "lead.sector.label": "Sector",
+  "lead.sector.enterIdPlaceholder": "Enter sector ID",
+  "lead.sector.noList": "No public sector list available. Enter sector ID manually.",
+  "lead.phone": "Phone",
+  "lead.message": "Message",
+  "lead.attachments": "Attachments",
+  "lead.gdpr": "I agree to the privacy policy (GDPR)",
+  "lead.filesSelected": "{count, plural, one {# file selected} other {# files selected}}",
+  "lead.button.submitting": "Submitting…",
+  "lead.button.submit": "Submit",
+  "form.errors.name.required": "Enter your name",
+  "form.errors.gdpr.required": "You must agree",
+  "form.errors.phone.invalid": "Please enter a valid phone number",
+  "lead.toast.success": "Lead submitted — We will get back to you soon.",
+  "lead.toast.tooMany": "Too many submissions — Please try again later.",
+  "lead.toast.failure": "Submission failed — Please check fields and try again."
 }
