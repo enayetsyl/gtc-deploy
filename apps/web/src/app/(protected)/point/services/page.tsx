@@ -114,7 +114,7 @@ export default function PointServicesPage() {
                             ? t("point.services.request")
                             : row.status === "PENDING_REQUEST"
                             ? t("ui.pending")
-                            : "—"}
+                            : t("ui.none")}
                         </Button>
                       </TableCell>
                     </TableRow>
