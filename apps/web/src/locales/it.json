@@ -139,6 +139,8 @@
   "admin.points.createTitle": "Crea Punto GTC",
   "admin.points.sectorHelp": "È richiesto un settore valido (evita errori di foreign key).",
 
+  "admin.points.createFailed": "Creazione punto non riuscita (controlla il settore)",
+
   "admin.services.createTitle": "Crea servizio",
   "admin.services.codeLabel": "Codice (UPPER_SNAKE)",
   "admin.services.codePlaceholder": "DOC_SIGN",

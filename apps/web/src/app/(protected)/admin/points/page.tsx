@@ -46,7 +46,7 @@ export default function PointsPage() {
       setForm({ name: "", email: "", sectorId: "" });
       qc.invalidateQueries({ queryKey: ["admin", "points"] });
     },
-    onError: () => setErr("Failed to create point (check sector)"),
+    onError: () => setErr(t("admin.points.createFailed")),
   });
 
   return (

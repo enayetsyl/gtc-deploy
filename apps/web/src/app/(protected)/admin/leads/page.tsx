@@ -79,7 +79,6 @@ export default function AdminLeadsPage() {
     router.push(`?${qp.toString()}`);
   }
 
-  console.log("leads", leads);
 
   const total = leads?.total ?? 0;
   const currentPage = leads?.page ?? page;

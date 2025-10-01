@@ -138,6 +138,8 @@
   "admin.points.createTitle": "Create GTC Point",
   "admin.points.sectorHelp": "A valid sector is required (avoids foreign key errors).",
 
+  "admin.points.createFailed": "Failed to create point (check sector)",
+
   "admin.services.createTitle": "Create service",
   "admin.services.codeLabel": "Code (UPPER_SNAKE)",
   "admin.services.codePlaceholder": "DOC_SIGN",
