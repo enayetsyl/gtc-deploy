@@ -188,6 +188,7 @@
   "auth.login.signingIn": "Signing in...",
   "form.errors.validation": "Validation error",
   "form.errors.name.min": "Name must be at least {min} characters",
+  "form.errors.sector.required": "Please select a sector",
   "form.errors.email.invalid": "Please enter a valid email address",
   "form.errors.email.required": "Email is required",
   "form.errors.password.min": "Password must be at least {min} characters",

@@ -2,9 +2,9 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { z } from "zod";
+// import { z } from "zod";
 import {
-  createSectorOwner,
+  // createSectorOwner,
   listSectors,
   listSectorOwners,
   updateSectorOwner,
@@ -15,23 +15,23 @@ import { useI18n } from "@/providers/i18n-provider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-const schema = z.object({
-  name: z.string().min(2).max(120),
-  email: z.string().email(),
-  sectorId: z.string().min(1),
-  sendInvite: z.boolean().optional().default(true),
-});
+// const schema = z.object({
+//   name: z.string().min(2).max(120),
+//   email: z.string().email(),
+//   sectorId: z.string().min(1),
+//   sendInvite: z.boolean().optional().default(true),
+// });
 
 export default function AdminSectorOwnersPage() {
   const { t } = useI18n();
   const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [sectorId, setSectorId] = useState("");
-  const [sectorIds, setSectorIds] = useState<string[]>([]);
-  const [sendInvite, setSendInvite] = useState(true);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  // const [name, setName] = useState("");
+  // const [email, setEmail] = useState("");
+  // const [sectorId, setSectorId] = useState("");
+  // const [sectorIds, setSectorIds] = useState<string[]>([]);
+  // const [sendInvite, setSendInvite] = useState(true);
+  // const [msg, setMsg] = useState<string | null>(null);
+  // const [err, setErr] = useState<string | null>(null);
 
   const sectorsQ = useQuery({
     queryKey: ["admin", "sectors", "options"],
@@ -73,29 +73,29 @@ export default function AdminSectorOwnersPage() {
     },
   });
 
-  const createMut = useMutation({
-    mutationFn: (payload: {
-      name: string;
-      email: string;
-      sectorId?: string;
-      sectorIds?: string[];
-      sendInvite?: boolean;
-    }) => createSectorOwner(payload),
-    onSuccess: () => {
-      setMsg(t("admin.sectorOwners.created"));
-      setErr(null);
-      setName("");
-      setEmail("");
-      setSectorId("");
-      setSendInvite(true);
-    },
-    onError: (e: unknown) => {
-      const m = (e as { response?: { data?: { error?: string } } }).response
-        ?.data?.error;
-      setErr(m ?? t("ui.createFailed"));
-      setMsg(null);
-    },
-  });
+  // const createMut = useMutation({
+  //   mutationFn: (payload: {
+  //     name: string;
+  //     email: string;
+  //     sectorId?: string;
+  //     sectorIds?: string[];
+  //     sendInvite?: boolean;
+  //   }) => createSectorOwner(payload),
+  //   onSuccess: () => {
+  //     setMsg(t("admin.sectorOwners.created"));
+  //     setErr(null);
+  //     setName("");
+  //     setEmail("");
+  //     setSectorId("");
+  //     setSendInvite(true);
+  //   },
+  //   onError: (e: unknown) => {
+  //     const m = (e as { response?: { data?: { error?: string } } }).response
+  //       ?.data?.error;
+  //     setErr(m ?? t("ui.createFailed"));
+  //     setMsg(null);
+  //   },
+  // });
 
   return (
     <main className="space-y-6 mb-10">
