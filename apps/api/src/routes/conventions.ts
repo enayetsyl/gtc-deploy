@@ -15,6 +15,45 @@ import fs from "node:fs/promises";
 export const conventionsRouter = Router();
 conventionsRouter.use(requireAuth);
 
+// 4.1b Delete a convention (only allowed when status is NEW)
+conventionsRouter.delete("/:id", requireRole("GTC_POINT", "ADMIN"), async (req, res) => {
+  const id = req.params.id;
+  const conv = await prisma.convention.findUnique({ include: { documents: true, gtcPoint: true }, where: { id } });
+  if (!conv) return res.status(404).json({ error: "Convention not found" });
+
+  // Only allow delete if NEW
+  if (conv.status !== "NEW") return res.status(409).json({ error: "Convention is finalized and cannot be deleted" });
+
+  // Authorization: GTC_POINT may only delete their own convention
+  if (req.user!.role === "GTC_POINT") {
+    const belongs = await prisma.user.findFirst({ where: { id: req.user!.id, gtcPointId: conv.gtcPointId }, select: { id: true } });
+    if (!belongs) return res.status(403).json({ error: "Forbidden" });
+  }
+
+  // Remove stored files if storage provider supports it - attempt best-effort
+  for (const doc of conv.documents ?? []) {
+    try {
+      // If path looks like an UploadThing URL, some storage implementations store a key in path or uploadthingKey in other models.
+      // The storage interface exposes remove(relPath) which UploadThingStorage expects a file key.
+      if (doc.path) {
+        // For legacy local-style paths this is a no-op for UploadThingStorage remove; best-effort.
+        await storage.remove(doc.path);
+      }
+    } catch (e) {
+      // swallow - don't block deletion if file cleanup fails
+      console.error("Failed to remove file for convention document", doc.id, e);
+    }
+  }
+
+  // Remove convention documents and convention record in a transaction
+  await prisma.$transaction(async (tx) => {
+    await tx.conventionDocument.deleteMany({ where: { conventionId: id } });
+    await tx.convention.delete({ where: { id } });
+  });
+
+  return res.status(204).end();
+});
+
 // 4.1 Create a convention (GTC point or admin)
 const createSchema = z.object({
   gtcPointId: z.string().uuid().optional(), // admin may specify; point users derive from profile

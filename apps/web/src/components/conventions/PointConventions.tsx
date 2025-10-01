@@ -4,6 +4,7 @@ import {
   useCreateConvention,
   useMyConventions,
   downloadDocument,
+  useDeleteConvention,
 } from "../../hooks/useConventions";
 import PrefillForm from "./PrefillForm";
 import UploadSigned from "./UploadSigned";
@@ -12,8 +13,11 @@ import { useI18n } from "@/providers/i18n-provider";
 
 export default function PointConventionsPage() {
   const [page] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const { data, isLoading } = useMyConventions(page, 20);
   const createConvention = useCreateConvention();
+  const deleteConvention = useDeleteConvention();
   const { t } = useI18n();
 
   async function handleDownload(
@@ -32,15 +36,18 @@ export default function PointConventionsPage() {
   }
 
   return (
-    <div className="p-2 space-y-6 mb-10 max-w-5xl mx-auto">
+    <div className="p-2 space-y-6 mb-10 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">{t("nav.myConventions")}</h1>
         <div className="w-full md:w-auto">
           <Button
             className="w-full md:w-auto"
             onClick={() => createConvention.mutate()}
+            disabled={createConvention.isPending}
           >
-            {t("convention.create")}
+            {createConvention.isPending
+              ? t("ui.creating")
+              : t("convention.create")}
           </Button>
         </div>
       </div>
@@ -85,7 +92,9 @@ export default function PointConventionsPage() {
                         )}
                       </span>
                     </td>
-                    <td className="p-3 align-top">{c.gtcPoint?.name ?? "—"}</td>
+                    <td className="p-3 align-top">
+                      <div>{c.gtcPoint?.name ?? "—"}</div>
+                    </td>
                     <td className="p-3 align-top break-words">
                       {c.sector?.name ?? t("ui.none")}
                     </td>
@@ -103,7 +112,7 @@ export default function PointConventionsPage() {
                               >
                                 {t("convention.download")}
                               </Button>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-xs text-muted-foreground truncate max-w-[6rem]">
                                 {d.fileName}
                               </span>
                               <span className="text-muted-foreground">
@@ -123,9 +132,26 @@ export default function PointConventionsPage() {
                       )}
                     </td>
                     <td className="p-3 align-top">
-                      {(c.status === "NEW" || c.status === "UPLOADED") && (
-                        <UploadSigned conventionId={c.id} />
-                      )}
+                      <div className="flex items-center gap-2">
+                        {(c.status === "NEW" || c.status === "UPLOADED") && (
+                          <UploadSigned conventionId={c.id} />
+                        )}
+
+                        {c.status === "NEW" && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setConfirmingId(c.id)}
+                            disabled={
+                              deleteConvention.isPending || deletingId === c.id
+                            }
+                          >
+                            {deletingId === c.id
+                              ? t("convention.deleting")
+                              : t("convention.delete")}
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -149,7 +175,7 @@ export default function PointConventionsPage() {
                         #{(data.page - 1) * data.pageSize + idx + 1}
                       </div>
                       <div className="mt-1">
-                        <div className="font-medium text-sm">
+                        <div className="font-medium text-sm truncate max-w-[14rem]">
                           {c.gtcPoint?.name ?? t("ui.none")}
                         </div>
                         <div className="text-xs text-muted-foreground">
@@ -212,6 +238,21 @@ export default function PointConventionsPage() {
                     {(c.status === "NEW" || c.status === "UPLOADED") && (
                       <UploadSigned conventionId={c.id} />
                     )}
+
+                    {c.status === "NEW" && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setConfirmingId(c.id)}
+                        disabled={
+                          deleteConvention.isPending || deletingId === c.id
+                        }
+                      >
+                        {deletingId === c.id
+                          ? t("convention.deleting")
+                          : t("convention.delete")}
+                      </Button>
+                    )}
                   </div>
                 </article>
               ))}
@@ -219,6 +260,46 @@ export default function PointConventionsPage() {
           </div>
         )}
       </section>
+
+      {/* Confirmation modal */}
+      {confirmingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setConfirmingId(null)}
+          />
+          <div className="bg-white rounded-lg p-6 z-10 w-[min(90%,32rem)]">
+            <h3 className="text-lg font-medium mb-2">
+              {t("convention.confirmDeleteTitle")}
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              {t("convention.confirmDeleteBody")}
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setConfirmingId(null)}>
+                {t("ui.cancel")}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  const id = confirmingId;
+                  if (!id) return;
+                  setConfirmingId(null);
+                  setDeletingId(id);
+                  deleteConvention.mutate(id, {
+                    onSettled: () => setDeletingId(null),
+                  });
+                }}
+                disabled={deleteConvention.isPending}
+              >
+                {deleteConvention.isPending
+                  ? t("convention.deleting")
+                  : t("convention.delete")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

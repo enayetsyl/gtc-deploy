@@ -4,43 +4,43 @@ import type { Convention, ConventionDocument, ConventionStatus } from "../lib/ty
 import type { AxiosProgressEvent, AxiosResponseHeaders } from "axios";
 
 export function useMyConventions(page = 1, pageSize = 20) {
-return useQuery({
-queryKey: ["conventions", { page, pageSize }],
-queryFn: async () => {
-const { data } = await api.get<{ items: Convention[]; total: number; page: number; pageSize: number }>(
-`/api/conventions`,
-{ params: { page, pageSize } }
-);
-return data;
-},
-});
+  return useQuery({
+    queryKey: ["conventions", { page, pageSize }],
+    queryFn: async () => {
+      const { data } = await api.get<{ items: Convention[]; total: number; page: number; pageSize: number }>(
+        `/api/conventions`,
+        { params: { page, pageSize } }
+      );
+      return data;
+    },
+  });
 }
 
 
 export function useAdminConventions(status?: ConventionStatus) {
-return useQuery({
-queryKey: ["admin-conventions", { status }],
-queryFn: async () => {
-const { data } = await api.get<{ items: Convention[] }>(`/api/admin/conventions`, {
-params: status ? { status } : undefined,
-});
-return data.items;
-},
-});
+  return useQuery({
+    queryKey: ["admin-conventions", { status }],
+    queryFn: async () => {
+      const { data } = await api.get<{ items: Convention[] }>(`/api/admin/conventions`, {
+        params: status ? { status } : undefined,
+      });
+      return data.items;
+    },
+  });
 }
 
 
 export function useCreateConvention() {
-const qc = useQueryClient();
-return useMutation({
-mutationFn: async () => {
-const { data } = await api.post<Convention>(`/api/conventions`, {});
-return data;
-},
-onSuccess: () => {
-qc.invalidateQueries({ queryKey: ["conventions"] });
-},
-});
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post<Convention>(`/api/conventions`, {});
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conventions"] });
+    },
+  });
 }
 
 type UploadSignedVars = {
@@ -49,64 +49,64 @@ type UploadSignedVars = {
 };
 
 export function useUploadSigned(conventionId: string) {
-const qc = useQueryClient();
-return useMutation<
+  const qc = useQueryClient();
+  return useMutation<
     { ok: boolean; document: ConventionDocument; downloadUrl: string },
     Error,
     UploadSignedVars
   >({
-mutationFn: async ({ file, onUploadProgress }) => {
-const fd = new FormData();
-fd.append("file", file);
-const r = await api.post(`/api/conventions/${conventionId}/upload`, fd,  { onUploadProgress });
- return r.data;
-},
-onSuccess: () => {
-qc.invalidateQueries({ queryKey: ["conventions"] });
-qc.invalidateQueries({ queryKey: ["admin-conventions"] });
-},
-});
+    mutationFn: async ({ file, onUploadProgress }) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await api.post(`/api/conventions/${conventionId}/upload`, fd, { onUploadProgress });
+      return r.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["conventions"] });
+      qc.invalidateQueries({ queryKey: ["admin-conventions"] });
+    },
+  });
 }
 
 
 export async function prefillPdf(params: { applicantName?: string; pointName?: string; title?: string }) {
-const { data } = await api.post(`/api/conventions/prefill`, params, { responseType: "blob" });
-return data as Blob;
+  const { data } = await api.post(`/api/conventions/prefill`, params, { responseType: "blob" });
+  return data as Blob;
 }
 
 
 export function useListDocuments(conventionId: string) {
-return useQuery({
-queryKey: ["convention-docs", conventionId],
-queryFn: async () => {
-const { data } = await api.get<{ items: ConventionDocument[] }>(`/api/conventions/${conventionId}/documents`);
-return data.items;
-},
-enabled: !!conventionId,
-});
+  return useQuery({
+    queryKey: ["convention-docs", conventionId],
+    queryFn: async () => {
+      const { data } = await api.get<{ items: ConventionDocument[] }>(`/api/conventions/${conventionId}/documents`);
+      return data.items;
+    },
+    enabled: !!conventionId,
+  });
 }
 
 
 export async function downloadDocument(conventionId: string, docId: string) {
-const { data } = await api.get(`/api/conventions/${conventionId}/documents/${docId}/download`, {
-responseType: "blob",
-});
-return data as Blob;
+  const { data } = await api.get(`/api/conventions/${conventionId}/documents/${docId}/download`, {
+    responseType: "blob",
+  });
+  return data as Blob;
 }
 
 
 export function useAdminDecision(conventionId: string) {
-const qc = useQueryClient();
-return useMutation({
-mutationFn: async (payload: { action: "APPROVE" | "DECLINE"; internalSalesRep?: string }) => {
-const { data } = await api.patch(`/api/admin/conventions/${conventionId}`, payload);
-return data as Convention;
-},
-onSuccess: () => {
-qc.invalidateQueries({ queryKey: ["admin-conventions"] });
-qc.invalidateQueries({ queryKey: ["conventions"] });
-},
-});
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: { action: "APPROVE" | "DECLINE"; internalSalesRep?: string }) => {
+      const { data } = await api.patch(`/api/admin/conventions/${conventionId}`, payload);
+      return data as Convention;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-conventions"] });
+      qc.invalidateQueries({ queryKey: ["conventions"] });
+    },
+  });
 }
 
 function parseContentDispositionFilename(h?: string): string | null {
@@ -124,4 +124,22 @@ export async function downloadArchive(conventionId: string): Promise<{ blob: Blo
   const headers = (r.headers ?? {}) as AxiosResponseHeaders;
   const filename = parseContentDispositionFilename(headers["content-disposition"]) || `convention-${conventionId}.zip`;
   return { blob: r.data as Blob, filename };
+}
+
+
+export function useDeleteConvention() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/api/conventions/${id}`);
+      return id;
+    },
+    onSuccess: (_data, id) => {
+      // invalidate lists so UI refreshes
+      qc.invalidateQueries({ queryKey: ["conventions"] });
+      qc.invalidateQueries({ queryKey: ["admin-conventions"] });
+      // Also remove cached docs if any
+      qc.removeQueries({ queryKey: ["convention-docs", id] });
+    },
+  });
 }
