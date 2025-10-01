@@ -77,8 +77,8 @@ export default function AdminConventionsPage() {
                     <AdminRow
                       key={c.id}
                       id={c.id}
-                      point={c.gtcPoint?.name ?? "—"}
-                      sector={c.sector?.name ?? "—"}
+                      point={c.gtcPoint?.name ?? t("ui.none")}
+                      sector={c.sector?.name ?? t("ui.none")}
                       status={c.status}
                     />
                   ))}
@@ -92,8 +92,8 @@ export default function AdminConventionsPage() {
                 <AdminCard
                   key={c.id}
                   id={c.id}
-                  point={c.gtcPoint?.name ?? "—"}
-                  sector={c.sector?.name ?? "—"}
+                  point={c.gtcPoint?.name ?? t("ui.none")}
+                  sector={c.sector?.name ?? t("ui.none")}
                   status={c.status}
                 />
               ))}
@@ -131,7 +131,9 @@ function AdminRow({
       <td className="p-3 align-top">
         {point} <span className="text-muted-foreground">/ {sector}</span>
       </td>
-      <td className="p-3 align-top font-medium">{status}</td>
+      <td className="p-3 align-top font-medium">
+        {t(`status.${status.toLowerCase()}`) || status}
+      </td>
       <td className="p-3 align-top">
         {canDecide ? (
           <div className="flex items-center gap-2">
@@ -187,7 +189,7 @@ function AdminRow({
               title={t("convention.downloadAll")}
             >
               {downloading && <Spinner className="w-4 h-4 mr-2" />}
-              ZIP
+              {t("convention.downloadZip")}
             </Button>
           </div>
         ) : (
@@ -230,7 +232,9 @@ function AdminCard({
             <div className="text-sm text-muted-foreground">{sector}</div>
           </div>
         </div>
-        <div className="ml-2 text-sm font-medium">{status}</div>
+        <div className="ml-2 text-sm font-medium">
+          {t(`status.${status.toLowerCase()}`) || status}
+        </div>
       </div>
 
       <div className="mt-3">
@@ -291,7 +295,7 @@ function AdminCard({
                 title={t("convention.downloadAll")}
               >
                 {downloading && <Spinner className="w-4 h-4 mr-2" />}
-                ZIP
+                {t("convention.downloadZip")}
               </Button>
             </div>
           </div>

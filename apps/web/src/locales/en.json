@@ -19,6 +19,7 @@
   "convention.noDocuments": "No documents",
   "convention.download": "Download",
   "convention.downloadAll": "Download all documents as ZIP",
+  "convention.downloadZip": "ZIP",
   "convention.decline": "Decline",
   "table.status": "Status",
   "table.point": "Point",
@@ -247,5 +248,10 @@
   "form.errors.phone.invalid": "Please enter a valid phone number",
   "lead.toast.success": "Lead submitted — We will get back to you soon.",
   "lead.toast.tooMany": "Too many submissions — Please try again later.",
-  "lead.toast.failure": "Submission failed — Please check fields and try again."
+  "lead.toast.failure": "Submission failed — Please check fields and try again.",
+  "home.title": "GTC Network",
+  "home.welcome": "Welcome to the GTC portal.",
+  "home.contact": "Contact / Lead",
+  "home.logoAlt": "GTC Logo",
+  "nav.login": "Login"
 }
