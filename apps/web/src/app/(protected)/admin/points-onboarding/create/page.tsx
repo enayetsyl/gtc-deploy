@@ -55,8 +55,14 @@ export default function CreateInvite() {
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!sector) return alert("Please select a sector");
-    if (!email || !name) return alert("Name and email are required");
+    if (!sector) {
+      toast.error(t("admin.onboarding.errors.noSector"));
+      return;
+    }
+    if (!email || !name) {
+      toast.error(t("admin.onboarding.errors.missingNameEmail"));
+      return;
+    }
     setLoading(true);
     try {
       await api.post("/api/admin/points/onboarding", {
@@ -181,7 +187,7 @@ export default function CreateInvite() {
                 <Button
                   type="submit"
                   className="bg-brand-blue-500 hover:bg-brand-blue-600 text-white"
-                  disabled={loading}
+                  disabled={loading || !sector || !name || !email}
                 >
                   {loading
                     ? t("ui.creating")

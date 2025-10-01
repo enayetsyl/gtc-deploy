@@ -102,6 +102,9 @@
   "admin.onboarding.listItem": "Name: {name} — Email: {email} — Status: {status}",
   "admin.onboarding.inviteCreated": "Invite created",
 
+  "admin.onboarding.errors.noSector": "Please select a sector",
+  "admin.onboarding.errors.missingNameEmail": "Name and email are required",
+
   "detail.sector": "Sector",
   "detail.vat": "VAT / Tax Number",
   "detail.phone": "Phone",
@@ -204,5 +207,7 @@
   "auth.invite.passwordsMismatch": "Passwords do not match",
   "auth.invite.missingToken": "Missing invite token",
   "auth.invite.success": "Password set — you can now log in.",
-  "auth.invite.invalidOrExpired": "Invalid or expired invite"
+  "auth.invite.invalidOrExpired": "Invalid or expired invite",
+  "status.unknown": "Unknown",
+  "detail.signatureAlt": "Signature"
 }

@@ -103,6 +103,9 @@
   "admin.onboarding.listItem": "Nome: {name} — Email: {email} — Stato: {status}",
   "admin.onboarding.inviteCreated": "Invito creato",
 
+  "admin.onboarding.errors.noSector": "Seleziona un settore",
+  "admin.onboarding.errors.missingNameEmail": "Nome e email sono obbligatori",
+
   "detail.sector": "Settore",
   "detail.vat": "Partita IVA / Codice fiscale",
   "detail.phone": "Telefono",
@@ -205,5 +208,7 @@
   "auth.invite.passwordsMismatch": "Le password non coincidono",
   "auth.invite.missingToken": "Token di invito mancante",
   "auth.invite.success": "Password impostata — ora puoi accedere.",
-  "auth.invite.invalidOrExpired": "Invito non valido o scaduto"
+  "auth.invite.invalidOrExpired": "Invito non valido o scaduto",
+  "status.unknown": "Sconosciuto",
+  "detail.signatureAlt": "Firma"
 }
