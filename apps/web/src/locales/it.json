@@ -20,6 +20,8 @@
   "convention.download": "Scarica",
   "file.typeUnknown": "file",
   "file.sizeKb": "{size} KB",
+  "file.errors.tooLarge": "Il file è troppo grande (max {max}MB).",
+  "file.errors.typeNotAllowed": "Tipo di file non consentito.",
   "convention.downloadAll": "Scarica tutti i documenti in ZIP",
   "convention.downloadZip": "ZIP",
   "convention.decline": "Rifiuta",

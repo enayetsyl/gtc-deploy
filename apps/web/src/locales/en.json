@@ -20,6 +20,8 @@
   "convention.download": "Download",
   "file.typeUnknown": "file",
   "file.sizeKb": "{size} KB",
+  "file.errors.tooLarge": "File is too large (max {max}MB).",
+  "file.errors.typeNotAllowed": "File type not allowed.",
   "convention.downloadAll": "Download all documents as ZIP",
   "convention.downloadZip": "ZIP",
   "convention.decline": "Decline",
