@@ -22,6 +22,7 @@
   "file.sizeKb": "{size} KB",
   "file.errors.tooLarge": "Il file è troppo grande (max {max}MB).",
   "file.errors.typeNotAllowed": "Tipo di file non consentito.",
+  "file.downloadAttachment": "Scarica allegato {name}",
   "convention.downloadAll": "Scarica tutti i documenti in ZIP",
   "convention.downloadZip": "ZIP",
   "convention.decline": "Rifiuta",
