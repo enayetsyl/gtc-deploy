@@ -18,6 +18,8 @@
   "convention.step1": "Passo 1: Precompila e scarica",
   "convention.noDocuments": "Nessun documento",
   "convention.download": "Scarica",
+  "file.typeUnknown": "file",
+  "file.sizeKb": "{size} KB",
   "convention.downloadAll": "Scarica tutti i documenti in ZIP",
   "convention.downloadZip": "ZIP",
   "convention.decline": "Rifiuta",

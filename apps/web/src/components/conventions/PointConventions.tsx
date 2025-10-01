@@ -75,7 +75,9 @@ export default function PointConventionsPage() {
                     </td>
                     <td className="p-3 align-top">
                       <span className="inline-flex items-center gap-2">
-                        <span className="font-medium">{c.status}</span>
+                        <span className="font-medium">
+                          {t(`status.${c.status.toLowerCase()}`) || c.status}
+                        </span>
                         {c.internalSalesRep && (
                           <span className="text-xs text-muted-foreground">
                             / {c.internalSalesRep}
@@ -85,7 +87,7 @@ export default function PointConventionsPage() {
                     </td>
                     <td className="p-3 align-top">{c.gtcPoint?.name ?? "—"}</td>
                     <td className="p-3 align-top break-words">
-                      {c.sector?.name ?? "—"}
+                      {c.sector?.name ?? t("ui.none")}
                     </td>
                     <td className="p-3 align-top break-words">
                       {c.documents?.length ? (
@@ -106,15 +108,17 @@ export default function PointConventionsPage() {
                               </span>
                               <span className="text-muted-foreground">
                                 {" "}
-                                · {d.mime || "file"} ·{" "}
-                                {(d.size / 1024).toFixed(0)} KB
+                                · {d.mime || t("file.typeUnknown")} ·{" "}
+                                {t("file.sizeKb", {
+                                  size: (d.size / 1024).toFixed(0),
+                                })}
                               </span>
                             </li>
                           ))}
                         </ul>
                       ) : (
                         <span className="text-muted-foreground">
-                          No documents
+                          {t("convention.noDocuments")}
                         </span>
                       )}
                     </td>
@@ -146,10 +150,10 @@ export default function PointConventionsPage() {
                       </div>
                       <div className="mt-1">
                         <div className="font-medium text-sm">
-                          {c.gtcPoint?.name ?? "—"}
+                          {c.gtcPoint?.name ?? t("ui.none")}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {c.sector?.name ?? "—"}
+                          {c.sector?.name ?? t("ui.none")}
                         </div>
                       </div>
                     </div>
@@ -190,14 +194,16 @@ export default function PointConventionsPage() {
                               </div>
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {(d.size / 1024).toFixed(0)} KB
+                              {t("file.sizeKb", {
+                                size: (d.size / 1024).toFixed(0),
+                              })}
                             </div>
                           </li>
                         ))}
                       </ul>
                     ) : (
                       <div className="text-xs text-muted-foreground">
-                        No documents
+                        {t("convention.noDocuments")}
                       </div>
                     )}
                   </div>
