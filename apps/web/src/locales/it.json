@@ -187,6 +187,8 @@
   "auth.login.errors.invalidCredentials": "Credenziali non valide",
   "auth.login.signIn": "Accedi",
   "auth.login.signingIn": "Accesso in corso...",
+  "form.errors.validation": "Errore di validazione",
+  "form.errors.name.min": "Il nome deve contenere almeno {min} caratteri",
   "form.errors.email.invalid": "Inserisci un indirizzo email valido",
   "form.errors.email.required": "L'email è obbligatoria",
   "form.errors.password.min": "La password deve contenere almeno {min} caratteri",
