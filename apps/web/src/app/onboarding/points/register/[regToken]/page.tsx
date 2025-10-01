@@ -15,8 +15,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import Spinner from "@/components/ui/Spinner";
 import { toast } from "sonner";
+import { useI18n } from "@/providers/i18n-provider";
 
 export default function RegisterPage() {
+  const { t } = useI18n();
   const params = useParams() as { regToken?: string } | undefined;
   const token = params?.regToken as string;
 
@@ -50,9 +52,12 @@ export default function RegisterPage() {
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (password !== confirm) return alert("Passwords do not match");
+    if (password !== confirm) {
+      toast.error(t("auth.register.passwordsMismatch"));
+      return;
+    }
     if (password.length < 8) {
-      toast.error("Password must be at least 8 characters long.");
+      toast.error(t("form.errors.password.min", { min: 8 }));
       return;
     }
     try {
@@ -63,40 +68,40 @@ export default function RegisterPage() {
       });
       router.push("/login");
     } catch {
-      toast.error("Registration failed");
+      toast.error(t("auth.register.failed"));
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (prefill === null) return <div>Invalid or expired link</div>;
-  if (!prefill) return <div>Loading…</div>;
+  if (prefill === null) return <div>{t("onboarding.invalidLink")}</div>;
+  if (!prefill) return <div>{t("ui.loading")}</div>;
 
   return (
     <form onSubmit={submit} className="max-w-md mx-auto p-2 mt-5">
       <Card>
         <CardHeader>
-          <CardTitle>Register account</CardTitle>
+          <CardTitle>{t("auth.register.title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4">
             <div>
-              <Label>Email</Label>
+              <Label>{t("form.email")}</Label>
               <Input value={prefill.email} disabled />
             </div>
 
             <div>
-              <Label>Name</Label>
+              <Label>{t("form.name")}</Label>
               <Input value={prefill.name} disabled />
             </div>
 
             <div>
-              <Label>Role</Label>
+              <Label>{t("form.role")}</Label>
               <Input value={prefill.role} disabled />
             </div>
 
             <div>
-              <Label>Password</Label>
+              <Label>{t("form.password")}</Label>
               <Input
                 type="password"
                 value={password}
@@ -106,7 +111,7 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <Label>Confirm password</Label>
+              <Label>{t("form.confirmPassword")}</Label>
               <Input
                 type="password"
                 value={confirm}
@@ -120,7 +125,7 @@ export default function RegisterPage() {
           <div className="w-full flex justify-end">
             <Button type="submit" disabled={submitting}>
               {submitting && <Spinner className="w-4 h-4 mr-2" />}
-              {submitting ? "Creating…" : "Create account"}
+              {submitting ? t("auth.register.creating") : t("auth.register.create")}
             </Button>
           </div>
         </CardFooter>
