@@ -16,7 +16,7 @@ export default function Navbar() {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
-              href="/"
+              href="/dashboard"
               className="flex items-center gap-2 focus-visible:ring-2 ring-focus rounded-md"
             >
               <Image
