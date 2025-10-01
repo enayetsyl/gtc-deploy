@@ -62,7 +62,7 @@ export default function AdminNav({
       className={cn(
         isMobile ? "flex flex-col gap-2" : "flex items-center gap-2"
       )}
-      aria-label="Primary"
+      aria-label={t("nav.primary")}
     >
       {/* language switcher */}
       <div
@@ -79,7 +79,7 @@ export default function AdminNav({
             "bg-white/5 border-white/20 text-white hover:bg-white/10"
           )}
         >
-          EN
+          {t("nav.lang.en")}
         </Button>
         <Button
           variant="outline"
@@ -87,7 +87,7 @@ export default function AdminNav({
           onClick={() => setLocale?.("it")}
           className="px-2 py-1 text-xs bg-white/5 border-white/20 text-white hover:bg-white/10"
         >
-          IT
+          {t("nav.lang.it")}
         </Button>
       </div>
 
