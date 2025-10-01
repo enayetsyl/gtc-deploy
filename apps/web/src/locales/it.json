@@ -209,6 +209,9 @@
   "auth.invite.missingToken": "Token di invito mancante",
   "auth.invite.success": "Password impostata — ora puoi accedere.",
   "auth.invite.invalidOrExpired": "Invito non valido o scaduto",
+  "status.draft": "Bozza",
+  "status.submitted": "Inviato",
+  "status.completed": "Completato",
   "status.unknown": "Sconosciuto",
   "detail.signatureAlt": "Firma"
 }

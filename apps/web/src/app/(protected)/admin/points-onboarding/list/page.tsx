@@ -75,41 +75,50 @@ export default function ReviewList() {
 }
 
 function StatusBadge({ status }: { status?: string | null }) {
+  const { t } = useI18n();
   const s = (status || "unknown").toLowerCase();
   let bg = "bg-color-muted text-muted-foreground";
+  let key = "status.unknown";
 
-  // Map PointOnboardingStatus and legacy values to color classes
+  // Map PointOnboardingStatus and legacy values to color classes and i18n keys
   switch (s) {
     case "draft":
       // not yet submitted
       bg = "bg-neutral-400 text-black";
+      key = "status.draft";
       break;
     case "submitted":
       // waiting review
       bg = "bg-brand-teal-400 text-black";
+      key = "status.submitted";
       break;
     case "approved":
     case "accepted":
       bg = "bg-brand-blue-500 text-white";
+      key = "status.approved";
       break;
     case "completed":
       // success states
       bg = "bg-brand-teal-500 text-white";
+      key = "status.completed";
       break;
     case "declined":
     case "rejected":
     case "denied":
       // failure states
       bg = "bg-alert-error text-white";
+      key = "status.declined";
       break;
     default:
       bg = "bg-color-muted text-muted-foreground";
+      key = "status.unknown";
   }
+
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${bg}`}
     >
-      {status ?? "UNKNOWN"}
+      {t(key)}
     </span>
   );
 }

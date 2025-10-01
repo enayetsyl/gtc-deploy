@@ -208,6 +208,9 @@
   "auth.invite.missingToken": "Missing invite token",
   "auth.invite.success": "Password set — you can now log in.",
   "auth.invite.invalidOrExpired": "Invalid or expired invite",
+  "status.draft": "Draft",
+  "status.submitted": "Submitted",
+  "status.completed": "Completed",
   "status.unknown": "Unknown",
   "detail.signatureAlt": "Signature"
 }
