@@ -54,7 +54,13 @@ export default function LoginPage() {
             | undefined;
           const data = response?.data as Record<string, unknown> | undefined;
           const error = data?.error;
-          if (typeof error === "string") return error;
+          if (typeof error === "string") {
+            // Map known server error messages to localized keys
+            if (error === "Invalid credentials") {
+              return t("auth.login.errors.invalidCredentials");
+            }
+            return error;
+          }
         }
         return t("auth.login.errors.generic");
       };

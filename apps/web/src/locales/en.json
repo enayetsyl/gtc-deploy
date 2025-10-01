@@ -178,6 +178,7 @@
   "auth.login.title": "Sign in",
   "auth.login.subtitle": "Use your admin or point credentials.",
   "auth.login.errors.generic": "Login failed",
+  "auth.login.errors.invalidCredentials": "Invalid credentials",
   "auth.login.signIn": "Sign in",
   "auth.login.signingIn": "Signing in...",
   "form.errors.email.invalid": "Please enter a valid email address",

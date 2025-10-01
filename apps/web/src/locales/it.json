@@ -179,6 +179,7 @@
   "auth.login.title": "Accedi",
   "auth.login.subtitle": "Usa le credenziali di amministratore o del punto.",
   "auth.login.errors.generic": "Accesso non riuscito",
+  "auth.login.errors.invalidCredentials": "Credenziali non valide",
   "auth.login.signIn": "Accedi",
   "auth.login.signingIn": "Accesso in corso...",
   "form.errors.email.invalid": "Inserisci un indirizzo email valido",
