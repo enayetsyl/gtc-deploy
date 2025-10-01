@@ -151,6 +151,9 @@
   "admin.services.codePlaceholder": "DOC_SIGN",
   "admin.services.nameLabel": "Name",
   "admin.services.namePlaceholder": "Document Signing",
+  "admin.services.createFailed": "Failed to create service",
+  "admin.services.deleteFailed": "Delete failed (service linked to points)",
+  "form.errors.code.invalid": "Code must use only uppercase letters, numbers and underscores",
 
   "point.services.title": "My Services",
   "point.services.requestSent": "Request sent to Admins",

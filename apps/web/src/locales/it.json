@@ -152,6 +152,9 @@
   "admin.services.codePlaceholder": "DOC_SIGN",
   "admin.services.nameLabel": "Nome",
   "admin.services.namePlaceholder": "Firma documenti",
+  "admin.services.createFailed": "Creazione servizio non riuscita",
+  "admin.services.deleteFailed": "Eliminazione fallita (servizio collegato a punti)",
+  "form.errors.code.invalid": "Il codice deve contenere solo lettere maiuscole, numeri e underscore",
 
   "point.services.title": "I miei servizi",
   "point.services.requestSent": "Richiesta inviata agli amministratori",

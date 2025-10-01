@@ -43,7 +43,7 @@ export default function ServicesPage() {
       setForm({ code: "", name: "" });
       qc.invalidateQueries({ queryKey: ["admin", "services"] });
     },
-    onError: () => setErr("Failed to create service"),
+    onError: () => setErr(t("admin.services.createFailed")),
   });
 
   const toggleMut = useMutation({
@@ -60,7 +60,7 @@ export default function ServicesPage() {
     mutationFn: (id: string) => deleteService(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "services"] }),
     onMutate: (id: string) => setDelPendingId(id),
-    onError: () => setErr("Delete failed (service linked to points)"),
+    onError: () => setErr(t("admin.services.deleteFailed")),
     onSettled: () => setDelPendingId(null),
   });
 
@@ -75,10 +75,31 @@ export default function ServicesPage() {
             e.preventDefault();
             setErr(null);
             const parsed = schema.safeParse(form);
-            if (!parsed.success)
-              return setErr(
-                parsed.error.issues[0]?.message ?? "Validation error"
-              );
+            if (!parsed.success) {
+              const issue = parsed.error.issues[0];
+              const field = issue.path[0] as string | undefined;
+              let msg = t("form.errors.validation");
+
+              type ZodIssueWithDetails = typeof issue & {
+                validation?: string;
+                minimum?: number;
+              };
+              const detailed = issue as ZodIssueWithDetails;
+
+              if (field === "code") {
+                if (
+                  detailed.code === "invalid_string" &&
+                  detailed.validation === "regex"
+                ) {
+                  msg = t("form.errors.code.invalid");
+                }
+              } else if (field === "name" && detailed.code === "too_small") {
+                const min = detailed.minimum ?? 2;
+                msg = t("form.errors.name.min", { min });
+              }
+
+              return setErr(msg);
+            }
             createMut.mutate(parsed.data);
           }}
           className="grid gap-3 sm:grid-cols-2"
@@ -108,9 +129,7 @@ export default function ServicesPage() {
             />
           </div>
           <div className="sm:col-span-2">
-            <Button
-              disabled={createMut.isPending}
-            >
+            <Button disabled={createMut.isPending}>
               {createMut.isPending ? (
                 <span className="inline-flex items-center">
                   <Spinner className="w-4 h-4 mr-2" />
@@ -160,7 +179,7 @@ export default function ServicesPage() {
                     )}
                   </Button>
                   <Button
-                  variant='destructive'
+                    variant="destructive"
                     className="rounded-md border px-3 py-1.5"
                     onClick={() => delMut.mutate(svc.id)}
                     disabled={delPendingId != null}
