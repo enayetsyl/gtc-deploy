@@ -124,6 +124,7 @@
   "ui.create": "Create",
   "ui.creating": "Creating…",
   "ui.view": "View",
+  "protected.home.chooseSection": "Choose a section: Sectors, GTC Points, or Services.",
   "ui.save": "Save",
   "ui.saving": "Saving…",
   "ui.cancel": "Cancel",

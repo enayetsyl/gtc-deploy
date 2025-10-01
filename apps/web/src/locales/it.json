@@ -125,6 +125,7 @@
   "ui.create": "Crea",
   "ui.creating": "Creazione…",
   "ui.view": "Visualizza",
+  "protected.home.chooseSection": "Scegli una sezione: Settori, Punti GTC, o Servizi.",
   "ui.selectSector": "Seleziona settore",
   "ui.noServices": "Nessun servizio disponibile",
   "ui.createFailed": "Creazione fallita",
