@@ -157,9 +157,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!agreed) {
-      toast.error(
-        "You must accept the Terms and Conditions before submitting."
-      );
+      toast.error(t("onboarding.mustAgree"));
       return;
     }
     setSubmitting(true);
@@ -182,7 +180,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       router.push("/onboarding/thanks");
     } catch (err) {
       console.error(err);
-      toast.error("Submit failed");
+      toast.error(t("onboarding.submitFailed"));
     }
     setSubmitting(false);
   }

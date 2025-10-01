@@ -62,6 +62,7 @@
   "onboarding.clear": "Clear",
   "onboarding.submit": "Submit",
   "onboarding.submitting": "Submitting\u2026",
+  "onboarding.submitFailed": "Submit failed",
   "onboarding.termsTitle": "Terms and Conditions",
   "onboarding.termsParagraph1": "These are imaginary terms and conditions for demo purposes. By signing below you agree to allow the platform to process your onboarding request, contact you by email or phone, and store submitted documents for administrative review.",
   "onboarding.termsParagraph2": "You confirm that the information provided is accurate and that you have authority to act on behalf of the organization. This demo text is not legally binding.",
