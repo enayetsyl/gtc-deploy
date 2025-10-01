@@ -135,6 +135,9 @@
   "admin.sectors.createTitle": "Crea settore",
   "admin.sectors.examplePlaceholder": "es. Formazione",
   "admin.sectors.title": "Settori",
+  "admin.sectors.createFailed": "Creazione settore non riuscita",
+  "admin.sectors.updateFailed": "Aggiornamento settore non riuscito",
+  "admin.sectors.deleteFailed": "Eliminazione fallita (forse il settore ha punti)",
 
   "ui.edit": "Modifica",
   "ui.delete": "Elimina",

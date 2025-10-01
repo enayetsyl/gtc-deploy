@@ -134,6 +134,9 @@
   "admin.sectors.createTitle": "Create sector",
   "admin.sectors.examplePlaceholder": "e.g., Training",
   "admin.sectors.title": "Sectors",
+  "admin.sectors.createFailed": "Failed to create sector",
+  "admin.sectors.updateFailed": "Failed to update sector",
+  "admin.sectors.deleteFailed": "Delete failed (maybe sector has points)",
 
   "ui.edit": "Edit",
   "ui.delete": "Delete",
