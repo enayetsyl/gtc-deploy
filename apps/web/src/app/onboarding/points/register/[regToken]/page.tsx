@@ -125,7 +125,9 @@ export default function RegisterPage() {
           <div className="w-full flex justify-end">
             <Button type="submit" disabled={submitting}>
               {submitting && <Spinner className="w-4 h-4 mr-2" />}
-              {submitting ? t("auth.register.creating") : t("auth.register.create")}
+              {submitting
+                ? t("auth.register.creating")
+                : t("auth.register.create")}
             </Button>
           </div>
         </CardFooter>
