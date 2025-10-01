@@ -25,6 +25,7 @@ import { sectorsPublic } from "./routes/sectors.public";
 import { pointsOnboardingPublic } from "./routes/points.onboarding.public";
 import { uploadthingRouter } from "./routes/uploadthing";
 import { debugRouter } from "./routes/debug";
+import { httpLogger } from "./middleware/logger";
 
 // Debug - remove in production
 import { testUploadThingConnection } from "./debug/uploadthing-test";
@@ -42,6 +43,7 @@ app.use(cors({
 }));
 app.use(cookieParser());
 app.use(express.json());
+app.use(httpLogger);
 
 // Note: /uploads static serving can be removed once fully migrated to UploadThing
 // app.use("/uploads", express.static(path.resolve("uploads")));

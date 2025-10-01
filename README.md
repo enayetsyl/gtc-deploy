@@ -19,6 +19,7 @@ A full-stack application built with a web frontend and a Node.js/TypeScript back
     - [Start Both (Development)](#start-both-development)
   - [Scripts](#scripts)
   - [Technologies Used](#technologies-used)
+  - [Logging](#logging)
 
 ## Project Structure
 
@@ -184,3 +185,13 @@ Common scripts available in `package.json` files:
 -   **Package Management:** pnpm
 -   **Caching/KV Store:** Keyv (with various adapters like Redis, Mongo, etc.)
 -   **Utilities:** braces, micromatch, fill-range, is-number, word-wrap
+
+## Logging
+
+The API uses Pino for structured logs. In development, logs are human-friendly; in production (Render), they are JSON for ingestion.
+
+- Change log level via `LOG_LEVEL` env (default: debug in dev, info in prod)
+- Each request gets an `x-request-id` returned; include it when reporting issues to correlate logs
+- To log inside handlers: `req.log.info({ meta }, "your message")`
+
+See `apps/api/README.md` for more.

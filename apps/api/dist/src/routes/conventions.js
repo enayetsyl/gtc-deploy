@@ -47,6 +47,13 @@ exports.conventionsRouter.post("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"
     const conv = await prisma_1.prisma.convention.create({
         data: { gtcPointId: gtcPointId, sectorId: sectorId, status: "NEW" },
     });
+    // Notify sector owners about the new convention
+    try {
+        await (0, conventions_1.onConventionCreated)(conv.id);
+    }
+    catch (e) {
+        // non-blocking notification
+    }
     res.status(201).json(conv);
 });
 // 4.2 Prefill PDF (no DB write) – return a flattened simple PDF

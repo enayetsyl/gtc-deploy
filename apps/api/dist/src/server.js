@@ -32,6 +32,7 @@ const sectors_public_1 = require("./routes/sectors.public");
 const points_onboarding_public_1 = require("./routes/points.onboarding.public");
 const uploadthing_1 = require("./routes/uploadthing");
 const debug_1 = require("./routes/debug");
+const logger_1 = require("./middleware/logger");
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)({
     origin: (origin, callback) => {
@@ -46,6 +47,7 @@ exports.app.use((0, cors_1.default)({
 }));
 exports.app.use((0, cookie_parser_1.default)());
 exports.app.use(express_1.default.json());
+exports.app.use(logger_1.httpLogger);
 // Note: /uploads static serving can be removed once fully migrated to UploadThing
 // app.use("/uploads", express.static(path.resolve("uploads")));
 exports.app.use("/api/health", health_js_1.router);
