@@ -189,6 +189,9 @@
   "point.services.tip": "Suggerimento: \u201cRichiedi\u201d è disponibile solo per i servizi attualmente <b>Disabilitati</b>.",
 
   "point.sectors.title": "Settori disponibili",
+  "point.sectors.mySectors": "Settori a cui appartengo",
+  "point.sectors.otherSectors": "Altri settori",
+  "point.sectors.none": "Non sei collegato a nessun settore.",
   "ui.noSectors": "Nessun settore disponibile.",
   "admin.points.listTitle": "Punti GTC",
   "admin.points.sectorLabel": "Settore: {sector}",

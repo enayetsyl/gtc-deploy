@@ -188,6 +188,9 @@
   "point.services.tip": "Tip: \u201cRequest\u201d is only available for services that are currently <b>Disabled</b>.",
 
   "point.sectors.title": "Available Sectors",
+  "point.sectors.mySectors": "Sectors I belong to",
+  "point.sectors.otherSectors": "Other sectors",
+  "point.sectors.none": "You are not attached to any sectors.",
   "ui.noSectors": "No sectors available.",
   "admin.points.listTitle": "GTC Points",
   "admin.points.sectorLabel": "Sector: {sector}",
