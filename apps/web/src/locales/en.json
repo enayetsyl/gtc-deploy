@@ -172,6 +172,8 @@
   "admin.services.selectSector": "Please select a sector",
   "admin.services.selectSectorPlaceholder": "Select sector…",
   "admin.services.sectorLabel": "Sector",
+  "admin.services.existsInSector": "A service with that code already exists in this sector",
+  "admin.services.codeExists": "A service with that code already exists",
   "form.errors.code.invalid": "Code must use only uppercase letters, numbers and underscores",
 
   "point.services.title": "My Services",

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 
@@ -7,7 +8,7 @@ export const adminServices = Router();
 adminServices.use(requireAuth, requireRole("ADMIN"));
 
 adminServices.get("/", async (req, res) => {
-  const items = await prisma.service.findMany({ orderBy: { createdAt: "desc" } });
+  const items = await prisma.service.findMany({ orderBy: { createdAt: "desc" }, include: { sector: true } });
   res.json(items);
 });
 
@@ -24,8 +25,17 @@ adminServices.post("/", async (req, res) => {
   // Ensure provided sector exists
   const sector = await prisma.sector.findUnique({ where: { id: parsed.data.sectorId } });
   if (!sector) return res.status(400).json({ error: "Invalid sectorId" });
-  const service = await prisma.service.create({ data: parsed.data });
-  res.status(201).json(service);
+  try {
+    const service = await prisma.service.create({ data: parsed.data });
+    return res.status(201).json(service);
+  } catch (err: any) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      // Unique constraint failed (e.g., sectorId+code)
+      const target = (err.meta as any)?.target;
+      return res.status(409).json({ error: "Unique constraint failed", target });
+    }
+    throw err;
+  }
 });
 
 const idParam = z.object({ id: z.string().min(1) });
@@ -52,8 +62,16 @@ adminServices.patch("/:id", async (req, res) => {
     const sector = await prisma.sector.findUnique({ where: { id: body.data.sectorId } });
     if (!sector) return res.status(400).json({ error: "Invalid sectorId" });
   }
-  const service = await prisma.service.update({ where: { id }, data: body.data });
-  res.json(service);
+  try {
+    const service = await prisma.service.update({ where: { id }, data: body.data });
+    res.json(service);
+  } catch (err: any) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const target = (err.meta as any)?.target;
+      return res.status(409).json({ error: "Unique constraint failed", target });
+    }
+    throw err;
+  }
 });
 
 adminServices.delete("/:id", async (req, res) => {

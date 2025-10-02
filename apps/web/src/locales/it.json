@@ -173,6 +173,8 @@
   "admin.services.selectSector": "Seleziona un settore",
   "admin.services.selectSectorPlaceholder": "Seleziona settore…",
   "admin.services.sectorLabel": "Settore",
+  "admin.services.existsInSector": "Un servizio con quel codice esiste già in questo settore",
+  "admin.services.codeExists": "Un servizio con quel codice esiste già",
   "form.errors.code.invalid": "Il codice deve contenere solo lettere maiuscole, numeri e underscore",
 
   "point.services.title": "I miei servizi",

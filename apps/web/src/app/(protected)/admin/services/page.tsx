@@ -10,6 +10,8 @@ import {
   type Service,
   type Sector,
 } from "@/lib/admin-api";
+import axios from "axios";
+import { toast } from "sonner";
 import { useState } from "react";
 import { z } from "zod";
 import { useI18n } from "@/providers/i18n-provider";
@@ -50,7 +52,27 @@ export default function ServicesPage() {
       setForm({ code: "", name: "", sectorId: "" });
       qc.invalidateQueries({ queryKey: ["admin", "services"] });
     },
-    onError: () => setErr(t("admin.services.createFailed")),
+    onError: (err: unknown) => {
+      // Axios errors include response.data
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        const data = err.response?.data as { target?: string[] } | undefined;
+        // If backend provides target fields, use a sector-specific message
+        if (
+          data?.target &&
+          Array.isArray(data.target) &&
+          data.target.includes("sectorId")
+        ) {
+          setErr(t("admin.services.existsInSector"));
+          toast.error(t("admin.services.existsInSector"));
+          return;
+        }
+        setErr(t("admin.services.codeExists"));
+        toast.error(t("admin.services.codeExists"));
+        return;
+      }
+      setErr(t("admin.services.createFailed"));
+      toast.error(t("admin.services.createFailed"));
+    },
   });
 
   const toggleMut = useMutation({
@@ -190,6 +212,11 @@ export default function ServicesPage() {
                 <div>
                   <div className="font-medium">{svc.name}</div>
                   <div className="text-xs text-gray-600">{svc.code}</div>
+                  {svc.sector?.name && (
+                    <div className="text-xs text-gray-500">
+                      {svc.sector.name}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button

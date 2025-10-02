@@ -89,7 +89,7 @@ model GtcPoint {
 
 model Service {
   id         String            @id @default(cuid())
-  code       String            @unique
+  code       String
   name       String
   active     Boolean           @default(true)
   createdAt  DateTime          @default(now())
@@ -100,6 +100,7 @@ model Service {
   onboardingLinks PointOnboardingService[]
 
   @@index([sectorId])
+  @@unique([sectorId, code])
 }
 
 model GtcPointService {
