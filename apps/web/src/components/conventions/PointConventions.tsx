@@ -8,6 +8,14 @@ import {
 } from "../../hooks/useConventions";
 import PrefillForm from "./PrefillForm";
 import UploadSigned from "./UploadSigned";
+import { useSectorsPublic } from "@/hooks/useSectors";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "../../components/ui/button";
 import { useI18n } from "@/providers/i18n-provider";
 
@@ -54,11 +62,13 @@ export default function PointConventionsPage() {
 
       <section className="rounded-2xl border p-4 space-y-4">
         <h2 className="font-medium">{t("convention.step1")}</h2>
+        {/* Sectors dropdown: fetch public sectors and allow selection */}
+        <SectorsDropdown />
         <PrefillForm />
       </section>
 
       <section className="rounded-2xl border">
-        {isLoading && <div className="p-4">Loading…</div>}
+        {isLoading && <div className="p-4">{t("ui.loading")}</div>}
 
         {/* Desktop / larger screens: table */}
         {!isLoading && (
@@ -299,6 +309,40 @@ export default function PointConventionsPage() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function SectorsDropdown() {
+  const sectorsQ = useSectorsPublic();
+  const { t } = useI18n();
+  const [selected, setSelected] = useState<string>("");
+
+  const items = (sectorsQ.data || []) as Array<{ id: string; name: string }>;
+
+  return (
+    <div>
+      <label className="text-sm text-muted-foreground block mb-2">
+        {t("point.sectors.title")}
+      </label>
+      {sectorsQ.isLoading ? (
+        <p className="text-sm text-muted-foreground">{t("ui.loading")}</p>
+      ) : items.length ? (
+        <Select value={selected} onValueChange={(v) => setSelected(v)}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder={t("ui.selectSector")} />
+          </SelectTrigger>
+          <SelectContent>
+            {items.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <p className="text-sm text-muted-foreground">{t("ui.noSectors")}</p>
       )}
     </div>
   );
