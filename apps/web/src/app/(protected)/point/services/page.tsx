@@ -74,11 +74,11 @@ export default function PointServicesPage() {
         <CardHeader>
           <CardTitle>
             {t("point.services.title")}
-            {sectors && sectors.length > 0 && (
+            {/* {sectors && sectors.length > 0 && (
               <div className="mt-1 text-sm text-muted-foreground">
                 {sectors.map((s) => s.name).join(", ")}
               </div>
-            )}
+            )} */}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -95,10 +95,11 @@ export default function PointServicesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[44%]">
+                  <TableHead className="w-[34%]">
                     {t("table.service")}
                   </TableHead>
-                  <TableHead>{t("table.code")}</TableHead>
+                  <TableHead className="w-[20%]">{t("table.code")}</TableHead>
+                  <TableHead>{t("table.sector")}</TableHead>
                   <TableHead>{t("table.status")}</TableHead>
                   <TableHead className="text-right">{t("ui.action")}</TableHead>
                 </TableRow>
@@ -113,6 +114,9 @@ export default function PointServicesPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {row.service.code}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {row.service.sector?.name ?? "-"}
                       </TableCell>
                       <TableCell>
                         <ServiceStatusBadge status={row.status} />
