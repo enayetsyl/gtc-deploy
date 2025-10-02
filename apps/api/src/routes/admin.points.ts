@@ -43,7 +43,11 @@ adminPoints.get("/onboarding", requireRole("ADMIN"), async (req, res) => {
 });
 
 // POST /api/admin/points/onboarding
-adminPoints.post("/onboarding", requireRole("ADMIN"), async (req, res) => {
+adminPoints.post("/onboarding", async (req, res) => {
+  // Allow ADMIN or GTC_POINT to create onboarding requests
+  const user = req.user!;
+  if (user.role !== 'ADMIN' && user.role !== 'GTC_POINT') return res.status(403).json({ error: 'Forbidden' });
+
   const parsed = onboardingCreateSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
   const ob = await createOnboardingLink(parsed.data);

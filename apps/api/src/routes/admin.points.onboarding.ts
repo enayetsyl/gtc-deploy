@@ -5,9 +5,10 @@ import { createOnboardingLink, approveOnboarding, declineOnboarding } from "../s
 import { prisma } from "../lib/prisma";
 
 export const adminPointsOnboarding = Router();
-adminPointsOnboarding.use(requireAuth, requireRole("ADMIN"));
+adminPointsOnboarding.use(requireAuth);
 
-adminPointsOnboarding.get("/", async (req, res) => {
+// Admin-only: list onboarding
+adminPointsOnboarding.get("/", requireRole("ADMIN"), async (req, res) => {
   const status = (req.query.status as string | undefined) ?? undefined;
   const where: any = {};
   if (status) where.status = status;
@@ -22,6 +23,7 @@ const createSchema = z.object({
   includeServices: z.boolean().default(false),
   serviceIds: z.array(z.string().min(1)).optional(),
 });
+// Create onboarding (allowed by ADMIN and GTC_POINT)
 adminPointsOnboarding.post("/", async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
@@ -29,13 +31,15 @@ adminPointsOnboarding.post("/", async (req, res) => {
   res.status(201).json(ob);
 });
 
-adminPointsOnboarding.post("/:id/approve", async (req, res) => {
+// Admin-only: approve
+adminPointsOnboarding.post("/:id/approve", requireRole("ADMIN"), async (req, res) => {
   const { id } = z.object({ id: z.string().min(1) }).parse(req.params);
   const result = await approveOnboarding(id, req.user!.id);
   res.json(result);
 });
 
-adminPointsOnboarding.post("/:id/decline", async (req, res) => {
+// Admin-only: decline
+adminPointsOnboarding.post("/:id/decline", requireRole("ADMIN"), async (req, res) => {
   const { id } = z.object({ id: z.string().min(1) }).parse(req.params);
   await declineOnboarding(id, req.user!.id);
   res.json({ ok: true });
