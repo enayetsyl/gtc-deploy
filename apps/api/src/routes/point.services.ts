@@ -57,6 +57,11 @@ pointServices.post("/requests", async (req, res) => {
     : await prisma.service.findUnique({ where: { code: parsed.data.serviceCode! } });
   if (!svc || !svc.active) return res.status(404).json({ error: "Service not found or inactive" });
 
+  // Ensure the service belongs to the same sector as the point
+  const point = await prisma.gtcPoint.findUnique({ where: { id: pointId } });
+  if (!point) return res.status(404).json({ error: "Point not found" });
+  if (point.sectorId !== svc.sectorId) return res.status(403).json({ error: "Service does not belong to this point's sector" });
+
   const existing = await prisma.gtcPointService.findUnique({
     where: { gtcPointId_serviceId: { gtcPointId: pointId, serviceId: svc.id } },
   });

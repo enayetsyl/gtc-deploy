@@ -29,7 +29,18 @@ export async function createOnboardingLink(input: CreateOnboardingInput) {
       includeServices: input.includeServices ?? false,
       onboardingToken,
       tokenExpiresAt: expires,
-      services: input.serviceIds && input.serviceIds.length ? { create: input.serviceIds.map((s: string) => ({ serviceId: s })) } : undefined,
+      // Validate serviceIds belong to the sector before creating onboarding service links
+      services:
+        input.serviceIds && input.serviceIds.length
+          ? {
+            create: await Promise.all(input.serviceIds.map(async (s: string) => {
+              const svc = await prisma.service.findUnique({ where: { id: s } });
+              if (!svc) throw new Error(`Invalid service id: ${s}`);
+              if (svc.sectorId !== input.sectorId) throw new Error(`Service ${s} does not belong to sector ${input.sectorId}`);
+              return { serviceId: s };
+            }))
+          }
+          : undefined,
     },
   });
 
@@ -154,6 +165,10 @@ export async function approveOnboarding(id: string, adminUserId: string) {
   if (ob.includeServices && ob.services && ob.services.length) {
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       for (const s of ob.services as any[]) {
+        // Ensure service belongs to the onboarding/point sector
+        const svc = await tx.service.findUnique({ where: { id: s.serviceId } });
+        if (!svc) throw new Error(`Invalid service id: ${s.serviceId}`);
+        if (svc.sectorId !== point.sectorId) throw new Error(`Service ${s.serviceId} does not belong to sector ${point.sectorId}`);
         await tx.gtcPointService.upsert({
           where: { gtcPointId_serviceId: { gtcPointId: point.id, serviceId: s.serviceId } },
           update: { status: "ENABLED" },

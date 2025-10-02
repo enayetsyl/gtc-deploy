@@ -169,6 +169,9 @@
   "admin.services.namePlaceholder": "Document Signing",
   "admin.services.createFailed": "Failed to create service",
   "admin.services.deleteFailed": "Delete failed (service linked to points)",
+  "admin.services.selectSector": "Please select a sector",
+  "admin.services.selectSectorPlaceholder": "Select sector…",
+  "admin.services.sectorLabel": "Sector",
   "form.errors.code.invalid": "Code must use only uppercase letters, numbers and underscores",
 
   "point.services.title": "My Services",

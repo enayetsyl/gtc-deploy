@@ -14,12 +14,16 @@ adminServices.get("/", async (req, res) => {
 const createSchema = z.object({
   code: z.string().min(2).max(50).regex(/^[A-Z0-9_]+$/),
   name: z.string().min(2).max(200),
+  sectorId: z.string().min(1),
   active: z.boolean().optional().default(true),
 });
 
 adminServices.post("/", async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
+  // Ensure provided sector exists
+  const sector = await prisma.sector.findUnique({ where: { id: parsed.data.sectorId } });
+  if (!sector) return res.status(400).json({ error: "Invalid sectorId" });
   const service = await prisma.service.create({ data: parsed.data });
   res.status(201).json(service);
 });
@@ -29,6 +33,7 @@ const updateSchema = z.object({
   code: z.string().min(2).max(50).regex(/^[A-Z0-9_]+$/).optional(),
   name: z.string().min(2).max(200).optional(),
   active: z.boolean().optional(),
+  sectorId: z.string().min(1).optional(),
 });
 
 adminServices.get("/:id", async (req, res) => {
@@ -42,6 +47,11 @@ adminServices.patch("/:id", async (req, res) => {
   const { id } = idParam.parse(req.params);
   const body = updateSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
+  // If sectorId is being updated, ensure the sector exists
+  if (body.data.sectorId) {
+    const sector = await prisma.sector.findUnique({ where: { id: body.data.sectorId } });
+    if (!sector) return res.status(400).json({ error: "Invalid sectorId" });
+  }
   const service = await prisma.service.update({ where: { id }, data: body.data });
   res.json(service);
 });

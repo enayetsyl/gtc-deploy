@@ -6,7 +6,9 @@ import {
   deleteService,
   listServices,
   updateService,
+  listSectors,
   type Service,
+  type Sector,
 } from "@/lib/admin-api";
 import { useState } from "react";
 import { z } from "zod";
@@ -33,14 +35,19 @@ export default function ServicesPage() {
     queryFn: () => listServices(),
   });
 
-  const [form, setForm] = useState({ code: "", name: "" });
+  const sectorsQ = useQuery({
+    queryKey: ["admin", "sectors", "options"],
+    queryFn: () => listSectors(1, 200),
+  });
+
+  const [form, setForm] = useState({ code: "", name: "", sectorId: "" });
   const [err, setErr] = useState<string | null>(null);
 
   const createMut = useMutation({
-    mutationFn: (payload: { code: string; name: string }) =>
+    mutationFn: (payload: { code: string; name: string; sectorId: string }) =>
       createService(payload),
     onSuccess: () => {
-      setForm({ code: "", name: "" });
+      setForm({ code: "", name: "", sectorId: "" });
       qc.invalidateQueries({ queryKey: ["admin", "services"] });
     },
     onError: () => setErr(t("admin.services.createFailed")),
@@ -100,10 +107,33 @@ export default function ServicesPage() {
 
               return setErr(msg);
             }
-            createMut.mutate(parsed.data);
+            // ensure sector selected
+            if (!form.sectorId) return setErr(t("admin.services.selectSector"));
+            createMut.mutate({ ...parsed.data, sectorId: form.sectorId });
           }}
           className="grid gap-3 sm:grid-cols-2"
         >
+          <div>
+            <label className="block text-sm mb-1">
+              {t("admin.services.sectorLabel")}
+            </label>
+            <select
+              className="w-full rounded-md border px-3 py-2"
+              value={form.sectorId}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, sectorId: e.target.value }))
+              }
+            >
+              <option value="">
+                {t("admin.services.selectSectorPlaceholder")}
+              </option>
+              {sectorsQ.data?.items.map((s: Sector) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-sm mb-1">
               {t("admin.services.codeLabel")}
