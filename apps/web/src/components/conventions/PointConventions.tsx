@@ -31,6 +31,25 @@ export default function PointConventionsPage() {
   const createConvention = useCreateConvention();
   const deleteConvention = useDeleteConvention();
   const { t } = useI18n();
+  const sectorsQ = useSectorsPublic();
+  const servicesQ = useQuery({
+    queryKey: ["admin", "services", sectorId || "none"],
+    queryFn: () => listServices(sectorId || undefined),
+    enabled: !!sectorId,
+  });
+
+  const sectorName = (
+    sectorsQ.data as Array<{ id: string; name: string }> | undefined
+  )?.find((s) => s.id === sectorId)?.name;
+  const serviceNames = (selectedServices || [])
+    .map(
+      (id) =>
+        (
+          servicesQ.data as Array<{ id: string; name: string }> | undefined
+        )?.find((s) => s.id === id)?.name
+    )
+    .filter(Boolean) as string[];
+  const externalLoading = sectorsQ.isLoading || servicesQ.isLoading;
 
   async function handleDownload(
     conventionId: string,
@@ -74,7 +93,11 @@ export default function PointConventionsPage() {
           value={selectedServices}
           onChange={setSelectedServices}
         />
-        <PrefillForm />
+        <PrefillForm
+          sectorName={sectorName}
+          serviceNames={serviceNames}
+          disabled={externalLoading}
+        />
       </section>
 
       <section className="rounded-2xl border">

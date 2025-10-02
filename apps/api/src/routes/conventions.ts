@@ -96,6 +96,8 @@ const prefillSchema = z.object({
   applicantName: z.string().min(1).optional(),
   pointName: z.string().min(1).optional(),
   title: z.string().min(1).optional(),
+  sectorName: z.string().min(1).optional(),
+  services: z.array(z.string()).optional(),
 });
 conventionsRouter.post("/prefill", requireRole("GTC_POINT", "ADMIN"), async (req, res) => {
   const parsed = prefillSchema.safeParse(req.body || {});
@@ -107,7 +109,13 @@ conventionsRouter.post("/prefill", requireRole("GTC_POINT", "ADMIN"), async (req
     pointName = me?.gtcPoint?.name || undefined;
   }
 
-  const pdf = await buildPrefillPdf({ title: parsed.data.title, applicantName: parsed.data.applicantName, pointName });
+  const pdf = await buildPrefillPdf({
+    title: parsed.data.title,
+    applicantName: parsed.data.applicantName,
+    pointName,
+    sectorName: parsed.data.sectorName,
+    services: parsed.data.services,
+  });
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="convention-prefill.pdf"`);
   res.send(pdf);
