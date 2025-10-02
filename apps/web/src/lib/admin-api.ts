@@ -64,9 +64,9 @@ export async function deletePoint(id: string) {
   return data;
 }
 
-export async function listServices() {
-  // API returns services including their sector relation
-  const { data } = await api.get<Service[]>(`/api/admin/services`);
+export async function listServices(sectorId?: string) {
+  // API returns services including their sector relation. Optionally filter by sectorId.
+  const { data } = await api.get<Service[]>(`/api/admin/services`, { params: sectorId ? { sectorId } : {} });
   return data;
 }
 export async function createService(payload: { code: string; name: string; active?: boolean; sectorId: string }) {

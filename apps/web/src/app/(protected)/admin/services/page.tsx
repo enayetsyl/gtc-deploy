@@ -32,9 +32,14 @@ export default function ServicesPage() {
   const qc = useQueryClient();
   const [togglePendingId, setTogglePendingId] = useState<string | null>(null);
   const [delPendingId, setDelPendingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ code: "", name: "", sectorId: "" });
+  const [err, setErr] = useState<string | null>(null);
+  // selectedSector is the filter used to display services in the list.
+  const [selectedSector, setSelectedSector] = useState<string>("");
+
   const q = useQuery({
-    queryKey: ["admin", "services"],
-    queryFn: () => listServices(),
+    queryKey: ["admin", "services", selectedSector || "all"],
+    queryFn: () => listServices(selectedSector || undefined),
   });
 
   const sectorsQ = useQuery({
@@ -42,15 +47,15 @@ export default function ServicesPage() {
     queryFn: () => listSectors(1, 200),
   });
 
-  const [form, setForm] = useState({ code: "", name: "", sectorId: "" });
-  const [err, setErr] = useState<string | null>(null);
-
   const createMut = useMutation({
     mutationFn: (payload: { code: string; name: string; sectorId: string }) =>
       createService(payload),
     onSuccess: () => {
-      setForm({ code: "", name: "", sectorId: "" });
-      qc.invalidateQueries({ queryKey: ["admin", "services"] });
+      // keep the selectedSector as the filter, only clear code/name inputs
+      setForm({ code: "", name: "", sectorId: selectedSector });
+      qc.invalidateQueries({
+        queryKey: ["admin", "services", selectedSector || "all"],
+      });
     },
     onError: (err: unknown) => {
       // Axios errors include response.data
@@ -81,13 +86,19 @@ export default function ServicesPage() {
     onMutate: (svc: Service) => {
       setTogglePendingId(svc.id);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "services"] }),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ["admin", "services", selectedSector || "all"],
+      }),
     onSettled: () => setTogglePendingId(null),
   });
 
   const delMut = useMutation({
     mutationFn: (id: string) => deleteService(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "services"] }),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ["admin", "services", selectedSector || "all"],
+      }),
     onMutate: (id: string) => setDelPendingId(id),
     onError: () => setErr(t("admin.services.deleteFailed")),
     onSettled: () => setDelPendingId(null),
@@ -142,9 +153,12 @@ export default function ServicesPage() {
             <select
               className="w-full rounded-md border px-3 py-2"
               value={form.sectorId}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, sectorId: e.target.value }))
-              }
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((s) => ({ ...s, sectorId: v }));
+                // also set the selectedSector so the list below filters
+                setSelectedSector(v);
+              }}
             >
               <option value="">
                 {t("admin.services.selectSectorPlaceholder")}

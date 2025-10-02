@@ -8,7 +8,10 @@ export const adminServices = Router();
 adminServices.use(requireAuth, requireRole("ADMIN"));
 
 adminServices.get("/", async (req, res) => {
-  const items = await prisma.service.findMany({ orderBy: { createdAt: "desc" }, include: { sector: true } });
+  // Optional filter: ?sectorId=...
+  const sectorId = typeof req.query.sectorId === "string" ? req.query.sectorId : undefined;
+  const where = sectorId ? { sectorId } : undefined;
+  const items = await prisma.service.findMany({ where, orderBy: { createdAt: "desc" }, include: { sector: true } });
   res.json(items);
 });
 

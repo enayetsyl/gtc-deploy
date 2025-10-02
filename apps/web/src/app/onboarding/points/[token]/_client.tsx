@@ -15,6 +15,8 @@ type OnboardingPrefill = {
   email: string;
   includeServices?: boolean;
   serviceIds?: string[];
+  // new `services` contains id+name pairs provided by backend for display
+  services?: Array<{ id: string; name?: string | null }>;
   sector?: { id: string; name?: string };
 };
 
@@ -28,7 +30,10 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   const [termsOpen, setTermsOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // services holds selected service ids
   const [services, setServices] = useState<string[]>([]);
+  // serviceNames maps id -> name for display when provided by server
+  const [serviceNames, setServiceNames] = useState<Record<string, string>>({});
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const router = useRouter();
 
@@ -39,6 +44,13 @@ export default function OnboardingFormClient({ token }: { token: string }) {
         const data = r.data as OnboardingPrefill;
         setPrefill(data);
         setServices(data.serviceIds ?? []);
+        if (data.services && Array.isArray(data.services)) {
+          const map: Record<string, string> = {};
+          data.services.forEach((s) => {
+            if (s?.id) map[s.id] = s.name ?? s.id;
+          });
+          setServiceNames(map);
+        }
       } catch {
         setPrefill(null);
       } finally {
@@ -238,16 +250,8 @@ export default function OnboardingFormClient({ token }: { token: string }) {
           <div className="space-y-2">
             {prefill.serviceIds?.map((sid: string) => (
               <div key={sid} className="flex items-center gap-2">
-                <Checkbox
-                  checked={services.includes(sid)}
-                  // onCheckedChange={(c) =>
-                  //   setServices((s) =>
-                  //     c ? [...s, sid] : s.filter((x) => x !== sid)
-                  //   )
-                  // }
-                  aria-readonly
-                />
-                <span className="text-sm">{sid}</span>
+                <Checkbox checked={services.includes(sid)} aria-readonly />
+                <span className="text-sm">{serviceNames[sid] ?? sid}</span>
               </div>
             ))}
           </div>

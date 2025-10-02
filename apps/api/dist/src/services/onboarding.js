@@ -24,7 +24,19 @@ async function createOnboardingLink(input) {
             includeServices: input.includeServices ?? false,
             onboardingToken,
             tokenExpiresAt: expires,
-            services: input.serviceIds && input.serviceIds.length ? { create: input.serviceIds.map((s) => ({ serviceId: s })) } : undefined,
+            // Validate serviceIds belong to the sector before creating onboarding service links
+            services: input.serviceIds && input.serviceIds.length
+                ? {
+                    create: await Promise.all(input.serviceIds.map(async (s) => {
+                        const svc = await prisma_1.prisma.service.findUnique({ where: { id: s } });
+                        if (!svc)
+                            throw new Error(`Invalid service id: ${s}`);
+                        if (svc.sectorId !== input.sectorId)
+                            throw new Error(`Service ${s} does not belong to sector ${input.sectorId}`);
+                        return { serviceId: s };
+                    }))
+                }
+                : undefined,
         },
     });
     const link = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/${ob.onboardingToken}`;
@@ -132,6 +144,12 @@ async function approveOnboarding(id, adminUserId) {
     if (ob.includeServices && ob.services && ob.services.length) {
         await prisma_1.prisma.$transaction(async (tx) => {
             for (const s of ob.services) {
+                // Ensure service belongs to the onboarding/point sector
+                const svc = await tx.service.findUnique({ where: { id: s.serviceId } });
+                if (!svc)
+                    throw new Error(`Invalid service id: ${s.serviceId}`);
+                if (svc.sectorId !== point.sectorId)
+                    throw new Error(`Service ${s.serviceId} does not belong to sector ${point.sectorId}`);
                 await tx.gtcPointService.upsert({
                     where: { gtcPointId_serviceId: { gtcPointId: point.id, serviceId: s.serviceId } },
                     update: { status: "ENABLED" },

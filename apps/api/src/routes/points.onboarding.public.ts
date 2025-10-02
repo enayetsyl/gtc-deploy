@@ -11,9 +11,12 @@ export const pointsOnboardingPublic = Router();
 // Preload for the form (name, email, includeServices, sectorId; DO NOT expose status)
 pointsOnboardingPublic.get("/:token", async (req: Request, res: Response) => {
   const token = z.string().min(10).parse(req.params.token);
-  const ob = await (prisma as any).pointOnboarding.findUnique({ where: { onboardingToken: token }, include: { services: true, sector: true } });
+  // Include the linked services with their service relation so we can expose names safely
+  const ob = await (prisma as any).pointOnboarding.findUnique({ where: { onboardingToken: token }, include: { services: { include: { service: true } }, sector: true } });
   if (!ob || ob.status !== "DRAFT" || (ob.tokenExpiresAt && ob.tokenExpiresAt < new Date())) return res.status(404).json({ error: "Not found" });
-  res.json({ name: ob.name, email: ob.email, includeServices: ob.includeServices, sector: { id: ob.sectorId, name: ob.sector?.name }, serviceIds: ob.services.map((s: any) => s.serviceId) });
+  const serviceIds = ob.services.map((s: any) => s.serviceId);
+  const services = ob.services.map((s: any) => ({ id: s.serviceId, name: s.service?.name }));
+  res.json({ name: ob.name, email: ob.email, includeServices: ob.includeServices, sector: { id: ob.sectorId, name: ob.sector?.name }, serviceIds, services });
 });
 
 // Submit details + signature + optional services

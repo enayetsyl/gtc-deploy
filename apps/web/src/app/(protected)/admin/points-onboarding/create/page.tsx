@@ -41,17 +41,31 @@ export default function CreateInvite() {
         // ignore
       }
     })();
+  }, []);
+
+  // Fetch services for the selected sector. Only load when a sector is chosen.
+  useEffect(() => {
     (async () => {
+      if (!sector) {
+        setServices([]);
+        setSelectedServices([]);
+        return;
+      }
       try {
         const { data } = await api.get<{ id: string; name: string }[]>(
-          "/api/admin/services"
+          "/api/admin/services",
+          { params: { sectorId: sector } }
         );
         setServices(data || []);
+        // clear selected services when sector changes
+        setSelectedServices([]);
       } catch {
         // ignore — services list is optional
+        setServices([]);
+        setSelectedServices([]);
       }
     })();
-  }, []);
+  }, [sector]);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
