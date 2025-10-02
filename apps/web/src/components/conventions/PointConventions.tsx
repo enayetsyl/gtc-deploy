@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useCreateConvention,
   useMyConventions,
@@ -11,6 +11,7 @@ import PrefillForm from "./PrefillForm";
 import UploadSigned from "./UploadSigned";
 import { useSectorsPublic } from "@/hooks/useSectors";
 import { listServices } from "@/lib/admin-api";
+import { api } from "@/lib/axios";
 import {
   Select,
   SelectContent,
@@ -50,6 +51,7 @@ export default function PointConventionsPage() {
     )
     .filter(Boolean) as string[];
   const externalLoading = sectorsQ.isLoading || servicesQ.isLoading;
+  const [createOpen, setCreateOpen] = useState(false);
 
   async function handleDownload(
     conventionId: string,
@@ -73,7 +75,7 @@ export default function PointConventionsPage() {
         <div className="w-full md:w-auto">
           <Button
             className="w-full md:w-auto"
-            onClick={() => createConvention.mutate()}
+            onClick={() => setCreateOpen(true)}
             disabled={createConvention.isPending}
           >
             {createConvention.isPending
@@ -98,6 +100,13 @@ export default function PointConventionsPage() {
           serviceNames={serviceNames}
           disabled={externalLoading}
         />
+        {createOpen && (
+          <CreateConventionModal
+            open={createOpen}
+            onClose={() => setCreateOpen(false)}
+            sectors={sectorsQ.data as Array<{ id: string; name: string }>}
+          />
+        )}
       </section>
 
       <section className="rounded-2xl border">
@@ -114,7 +123,7 @@ export default function PointConventionsPage() {
                   <th className="p-3">{t("table.point")}</th>
                   <th className="p-3">{t("table.sector")}</th>
                   <th className="p-3">{t("table.documents")}</th>
-                  <th className="p-3">{t("table.actions")}</th>
+                  {/* <th className="p-3">{t("table.actions")}</th> */}
                 </tr>
               </thead>
               <tbody>
@@ -174,7 +183,7 @@ export default function PointConventionsPage() {
                         </span>
                       )}
                     </td>
-                    <td className="p-3 align-top">
+                    {/* <td className="p-3 align-top">
                       <div className="flex items-center gap-2">
                         {(c.status === "NEW" || c.status === "UPLOADED") && (
                           <UploadSigned conventionId={c.id} />
@@ -195,7 +204,7 @@ export default function PointConventionsPage() {
                           </Button>
                         )}
                       </div>
-                    </td>
+                    </td> */}
                   </tr>
                 ))}
               </tbody>
@@ -439,6 +448,151 @@ function ServicesMultiSelect({
       ) : (
         <p className="text-sm text-muted-foreground">{t("ui.noServices")}</p>
       )}
+    </div>
+  );
+}
+
+function CreateConventionModal({
+  open,
+  onClose,
+  sectors,
+}: {
+  open: boolean;
+  onClose: () => void;
+  sectors?: Array<{ id: string; name: string }>;
+}) {
+  const { t } = useI18n();
+  const [selectedSector, setSelectedSector] = useState<string>(
+    sectors?.[0]?.id ?? ""
+  );
+  const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const qc = useQueryClient();
+  const createConvention = useCreateConvention();
+
+  const servicesQ = useQuery({
+    queryKey: ["admin", "services", selectedSector || "none", "modal"],
+    queryFn: () => listServices(selectedSector || undefined),
+    enabled: !!selectedSector,
+  });
+
+  const services =
+    (servicesQ.data as { id: string; name: string }[] | undefined) ?? undefined;
+
+  const toggleService = (id: string) =>
+    setServiceIds((s) =>
+      s.includes(id) ? s.filter((x) => x !== id) : [...s, id]
+    );
+
+  async function handleSubmit() {
+    if (!file) return;
+    setSubmitting(true);
+    try {
+      // create convention first
+      const conv = await createConvention.mutateAsync();
+
+      // build form data and upload to the convention's upload route
+      const fd = new FormData();
+      fd.append("file", file);
+      if (selectedSector) fd.append("sectorId", selectedSector);
+      if (serviceIds.length)
+        fd.append("serviceIds", JSON.stringify(serviceIds));
+
+      await api.post(`/api/conventions/${conv.id}/upload`, fd);
+
+      // refresh queries so UI updates
+      qc.invalidateQueries({ queryKey: ["conventions"] });
+      qc.invalidateQueries({ queryKey: ["admin-conventions"] });
+
+      onClose();
+    } catch (err) {
+      console.error("Create+upload failed", err);
+      throw err;
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="bg-white rounded-lg p-6 z-10 w-[min(96%,40rem)]">
+        <h3 className="text-lg font-medium mb-2">{t("convention.create")}</h3>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-sm mb-1">{t("table.point")}</label>
+            <div className="p-2 border rounded">{t("detail.gtcPointName")}</div>
+          </div>
+          <div>
+            <label className="block text-sm mb-1">{t("ui.sector")}</label>
+            <select
+              value={selectedSector}
+              onChange={(e) => setSelectedSector(e.target.value)}
+              className="w-full rounded-md border px-3 py-2"
+            >
+              <option value="">{t("ui.selectSector")}</option>
+              {sectors?.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-sm mb-1">
+              {t("point.services.title")}
+            </label>
+            {servicesQ.isLoading ? (
+              <div>{t("ui.loading")}</div>
+            ) : services && services.length ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {services.map((svc) => (
+                  <label
+                    key={svc.id}
+                    className="inline-flex items-center gap-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={serviceIds.includes(svc.id)}
+                      onChange={() => toggleService(svc.id)}
+                    />
+                    <span className="truncate">{svc.name}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                {t("ui.noServices")}
+              </div>
+            )}
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-sm mb-1">
+              {t("upload.uploadSigned")}
+            </label>
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="ghost" onClick={onClose}>
+            {t("ui.cancel")}
+          </Button>
+          <Button disabled={!file || submitting} onClick={handleSubmit}>
+            {submitting ? t("upload.uploading") : t("upload.uploadSigned")}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

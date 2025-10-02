@@ -46,6 +46,8 @@ export function useCreateConvention() {
 type UploadSignedVars = {
   file: File;
   onUploadProgress?: (e: AxiosProgressEvent) => void;
+  sectorId?: string;
+  serviceIds?: string[];
 };
 
 export function useUploadSigned(conventionId: string) {
@@ -55,9 +57,11 @@ export function useUploadSigned(conventionId: string) {
     Error,
     UploadSignedVars
   >({
-    mutationFn: async ({ file, onUploadProgress }) => {
+    mutationFn: async ({ file, onUploadProgress, sectorId, serviceIds }) => {
       const fd = new FormData();
       fd.append("file", file);
+      if (sectorId) fd.append("sectorId", sectorId);
+      if (serviceIds && serviceIds.length) fd.append("serviceIds", JSON.stringify(serviceIds));
       const r = await api.post(`/api/conventions/${conventionId}/upload`, fd, { onUploadProgress });
       return r.data;
     },

@@ -139,6 +139,20 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
     if (!belongs) return res.status(403).json({ error: "Forbidden" });
   }
 
+
+  // Allow optional multipart fields: sectorId and serviceIds
+  const body = req.body || {};
+  const providedSectorId = body.sectorId as string | undefined;
+  let providedServiceIds: string[] | undefined;
+  if (body.serviceIds) {
+    try {
+      if (typeof body.serviceIds === 'string') providedServiceIds = JSON.parse(body.serviceIds);
+      else if (Array.isArray(body.serviceIds)) providedServiceIds = body.serviceIds as string[];
+    } catch (e) {
+      // ignore parse errors; leave undefined
+    }
+  }
+
   // Handle file from multer.any() - files are in req.files array
   let file: Express.Multer.File | undefined;
   if (req.files) {
@@ -166,8 +180,40 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
 
   const stored = await storage.put({ buffer: file.buffer, mime: String(mime), originalName: file.originalname });
 
+  // Validate provided sector/service payload and persist changes where appropriate
+  // We'll update convention.sectorId if provided (and permitted) and create gtc point -> service links
   const { doc, statusChanged } = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    const created = await tx.conventionDocument.create({
+    // If a sectorId was provided, validate it exists. For both admins and point users
+    // we'll allow applying the provided sectorId but we validate the sector record exists.
+    // This change intentionally permits GTC_POINT users to change the convention sector via upload.
+    let newSectorId: string | undefined = undefined;
+    if (providedSectorId) {
+      const foundSector = await tx.sector.findUnique({ where: { id: providedSectorId } });
+      if (!foundSector) {
+        // invalid sector id, log and ignore
+        console.warn(`Upload: provided sectorId ${providedSectorId} does not exist; ignoring`);
+      } else {
+        newSectorId = providedSectorId;
+      }
+    }
+
+    // If serviceIds provided, validate they belong to the (provided or existing) sector
+    let validServiceIds: string[] | undefined;
+    if (providedServiceIds && providedServiceIds.length) {
+      const sectorToCheck = newSectorId ?? conv.sectorId;
+      const found = await tx.service.findMany({ where: { id: { in: providedServiceIds }, sectorId: sectorToCheck } });
+      const foundIds = found.map((s) => s.id);
+      // If some provided ids are invalid for the sector, log a warning and proceed with the valid ones
+      const invalid = providedServiceIds.filter((id) => !foundIds.includes(id));
+      if (invalid.length) {
+        console.warn(
+          `Upload: some provided serviceIds are invalid for sector ${sectorToCheck}: ${invalid.join(",")}`
+        );
+      }
+      validServiceIds = foundIds.length ? foundIds : undefined;
+    }
+
+    const createdDoc = await tx.conventionDocument.create({
       data: {
         conventionId: conv.id,
         kind: "SIGNED",
@@ -181,11 +227,36 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
     });
 
     let changed = false;
+    // Update status to UPLOADED if needed
     if (was !== "UPLOADED") {
       await tx.convention.update({ where: { id: conv.id }, data: { status: "UPLOADED" } });
       changed = true;
     }
-    return { doc: created, statusChanged: changed };
+
+    // If we have a newSectorId different from existing, update the convention
+    if (newSectorId && newSectorId !== conv.sectorId) {
+      await tx.convention.update({ where: { id: conv.id }, data: { sectorId: newSectorId } });
+    }
+
+    // If serviceIds were provided, ensure the gtcPoint has corresponding GtcPointService links
+    if (validServiceIds && validServiceIds.length) {
+      // createMany with skipDuplicates to avoid unique constraint errors
+      const links = validServiceIds.map((sid) => ({ gtcPointId: conv.gtcPointId, serviceId: sid }));
+      try {
+        await tx.gtcPointService.createMany({ data: links, skipDuplicates: true });
+      } catch (e) {
+        // ignore; createMany may not be supported by some providers - fall back to upsert loop
+        for (const sid of validServiceIds) {
+          await tx.gtcPointService.upsert({
+            where: { id: `${conv.gtcPointId}-${sid}` },
+            create: { gtcPointId: conv.gtcPointId, serviceId: sid, status: "ENABLED" },
+            update: {},
+          } as any).catch(() => { });
+        }
+      }
+    }
+
+    return { doc: createdDoc, statusChanged: changed };
   }, {
     maxWait: 10000, // 10 seconds
     timeout: 15000, // 15 seconds
@@ -267,3 +338,92 @@ conventionsRouter.get("/:id/documents/:docId/download", requireRole("GTC_POINT",
   res.setHeader("Content-Disposition", `attachment; filename="${doc.fileName}"`);
   res.sendFile(absPath);
 });
+
+// 4.3b Create a convention and upload signed PDF in a single request
+// Accepts multipart/form-data with fields: sectorId, serviceIds (optional, JSON array or repeated fields), optional gtcPointId (admin)
+conventionsRouter.post(
+  "/with-upload",
+  requireRole("GTC_POINT", "ADMIN"),
+  flaggedUpload({ multiple: false, fieldName: "file" }),
+  async (req: Request, res: Response) => {
+    if (process.env.UPLOADS_ENABLED !== "true") {
+      return res.status(503).json({ error: "UploadsDisabled", message: "File uploads are disabled on this deployment." });
+    }
+
+    const body = req.body || {};
+    // sectorId may be provided; for GTC_POINT derive from profile
+    let sectorId = body.sectorId as string | undefined;
+    let gtcPointId = body.gtcPointId as string | undefined;
+
+    if (req.user!.role === "GTC_POINT") {
+      const me = await prisma.user.findUnique({ where: { id: req.user!.id }, include: { gtcPoint: { include: { sector: true } } } });
+      if (!me?.gtcPoint) return res.status(409).json({ error: "User is not attached to a GTC Point" });
+      gtcPointId = me.gtcPoint.id;
+      sectorId = me.gtcPoint.sectorId;
+    } else {
+      // admin must provide gtcPointId and sectorId
+      if (!gtcPointId || !sectorId) return res.status(400).json({ error: "gtcPointId and sectorId are required for admin" });
+    }
+
+    // file from multer
+    let file: Express.Multer.File | undefined;
+    if (req.files) {
+      const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+      file = files.find((f: any) => f.fieldname === 'file');
+    }
+    if (!file) return res.status(400).json({ error: "file is required (multipart/form-data)" });
+
+    // PDF magic bytes: %PDF
+    const b = file.buffer;
+    const isPdfMagic = b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+    if (!isPdfMagic) return res.status(400).json({ error: "File does not look like a valid PDF" });
+
+    const mime = file.mimetype || "application/pdf";
+    if (!String(mime).startsWith("application/pdf")) return res.status(400).json({ error: "Only PDF uploads are allowed" });
+
+    // parse serviceIds if present (allow JSON string or repeated fields)
+    let serviceIds: string[] | undefined;
+    if (body.serviceIds) {
+      try {
+        if (typeof body.serviceIds === 'string') {
+          // try JSON parse
+          serviceIds = JSON.parse(body.serviceIds);
+        } else if (Array.isArray(body.serviceIds)) {
+          serviceIds = body.serviceIds as string[];
+        }
+      } catch (e) {
+        // ignore parse errors
+      }
+    }
+
+    // create convention and store file in a transaction
+    const stored = await storage.put({ buffer: file.buffer, mime: String(mime), originalName: file.originalname });
+
+    const { doc, conv } = await prisma.$transaction(async (tx) => {
+      const createdConv = await tx.convention.create({ data: { gtcPointId: gtcPointId!, sectorId: sectorId!, status: "UPLOADED" as any } });
+      const created = await tx.conventionDocument.create({
+        data: {
+          conventionId: createdConv.id,
+          kind: "SIGNED",
+          fileName: stored.fileName,
+          path: stored.path,
+          mime: stored.mime,
+          size: stored.size,
+          checksum: stored.checksum,
+          uploadedById: req.user!.id,
+        },
+      });
+
+      return { doc: created, conv: createdConv };
+    });
+
+    try {
+      await onConventionCreated(conv.id);
+    } catch (e) { }
+    try {
+      await onConventionUploaded(conv.id);
+    } catch (e) { }
+
+    res.status(201).json({ ok: true, convention: conv, document: doc });
+  }
+);
