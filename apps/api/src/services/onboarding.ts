@@ -162,6 +162,21 @@ export async function approveOnboarding(id: string, adminUserId: string) {
     }
   });
 
+  // Ensure the GtcPoint is linked to the sector in the join table so a point
+  // can belong to multiple sectors. Use a find/create pattern which is
+  // more robust across Prisma client generations and avoids relying on the
+  // composite upsert input name.
+  try {
+    const existingLink = await prisma.gtcPointSector.findFirst({ where: { gtcPointId: point.id, sectorId: ob.sectorId } });
+    if (!existingLink) {
+      await prisma.gtcPointSector.create({ data: { gtcPointId: point.id, sectorId: ob.sectorId } });
+    }
+  } catch (e) {
+    // Log the error so it's visible during debugging; if migrations are missing
+    // this will reveal the root cause instead of silently swallowing it.
+    console.warn("Could not create GtcPointSector join row:", e);
+  }
+
   if (ob.includeServices && ob.services && ob.services.length) {
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       for (const s of ob.services as any[]) {

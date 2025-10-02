@@ -23,26 +23,35 @@ export default function Page() {
         const sectors = r.data || [];
         setAllSectors(sectors);
 
-        // Load my points (will include sectorId for GTC_POINT or SECTOR_OWNER links)
+        // Load my sectors. Prefer the dedicated endpoint for GTC_POINT if available,
+        // otherwise fall back to /api/me/points which contains legacy sectorId values.
         try {
-          const me = await api.get(`/api/me/points`, {
-            params: { page: 1, pageSize: 200 },
-          });
-          type PointItem = { sectorId?: string };
-          const items = (me.data?.items || []) as PointItem[];
-          const ids = Array.from(
-            new Set(
-              items
-                .map((i) => i?.sectorId)
-                .filter(
-                  (x): x is string => typeof x === "string" && x.length > 0
-                )
-            )
-          );
-          setMySectorIds(ids);
-        } catch (err) {
-          // If me/points is not available (no auth), just leave mySectorIds empty
-          console.warn("Could not load my sectors", err);
+          try {
+            const r = await api.get(`/api/point/sectors`);
+            const items = (r.data?.items || []) as Array<{ id: string }>;
+            const ids = Array.from(new Set(items.map((i) => i.id)));
+            setMySectorIds(ids);
+          } catch {
+            // Fallback to legacy me/points when /api/point/sectors isn't accessible
+            const me = await api.get(`/api/me/points`, {
+              params: { page: 1, pageSize: 200 },
+            });
+            type PointItem = { sectorId?: string };
+            const items = (me.data?.items || []) as PointItem[];
+            const ids = Array.from(
+              new Set(
+                items
+                  .map((i) => i?.sectorId)
+                  .filter(
+                    (x): x is string => typeof x === "string" && x.length > 0
+                  )
+              )
+            );
+            setMySectorIds(ids);
+          }
+        } catch {
+          // If neither endpoint is available (no auth), just leave mySectorIds empty
+          console.warn("Could not load my sectors");
         }
       } catch (e) {
         console.error(e);

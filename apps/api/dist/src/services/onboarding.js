@@ -141,6 +141,21 @@ async function approveOnboarding(id, adminUserId) {
             sectorId: ob.sectorId
         }
     });
+    // Ensure the GtcPoint is linked to the sector in the join table so a point
+    // can belong to multiple sectors. Use a find/create pattern which is
+    // more robust across Prisma client generations and avoids relying on the
+    // composite upsert input name.
+    try {
+        const existingLink = await prisma_1.prisma.gtcPointSector.findFirst({ where: { gtcPointId: point.id, sectorId: ob.sectorId } });
+        if (!existingLink) {
+            await prisma_1.prisma.gtcPointSector.create({ data: { gtcPointId: point.id, sectorId: ob.sectorId } });
+        }
+    }
+    catch (e) {
+        // Log the error so it's visible during debugging; if migrations are missing
+        // this will reveal the root cause instead of silently swallowing it.
+        console.warn("Could not create GtcPointSector join row:", e);
+    }
     if (ob.includeServices && ob.services && ob.services.length) {
         await prisma_1.prisma.$transaction(async (tx) => {
             for (const s of ob.services) {
@@ -158,29 +173,46 @@ async function approveOnboarding(id, adminUserId) {
             }
         });
     }
-    const registrationToken = token();
-    const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
-    await prisma_1.prisma.pointOnboarding.update({
-        where: { id: ob.id },
-        data: { status: "APPROVED", approvedAt: new Date(), approvedByUserId: adminUserId, gtcPointId: point.id, registrationToken, tokenExpiresAt: expires },
-    });
-    const link = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/register/${registrationToken}`;
-    await (0, mailer_1.sendEmail)({
-        to: ob.email,
-        subject: "Link per la registrazione del tuo Punto GTC",
-        html: `
-      <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
-        <p>La tua richiesta di onboarding è stata approvata. Completa il tuo account impostando una password.</p>
-        <p>
-          <a href="${link}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
-            Completa la registrazione
-          </a>
-        </p>
-        <p style="font-size:13px;color:#666">Se il pulsante non funziona, copia e incolla il seguente URL nel tuo browser:</p>
-        <p style="word-break:break-all"><a href="${link}">${link}</a></p>
-      </div>
-    `,
-    });
+    // If there is already a user account linked to this GtcPoint, don't create a registration token
+    const existingUser = await prisma_1.prisma.user.findFirst({ where: { gtcPointId: point.id } });
+    if (!existingUser) {
+        const registrationToken = token();
+        const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+        await prisma_1.prisma.pointOnboarding.update({
+            where: { id: ob.id },
+            data: { status: "APPROVED", approvedAt: new Date(), approvedByUserId: adminUserId, gtcPointId: point.id, registrationToken, tokenExpiresAt: expires },
+        });
+        const link = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/register/${registrationToken}`;
+        await (0, mailer_1.sendEmail)({
+            to: ob.email,
+            subject: "Link per la registrazione del tuo Punto GTC",
+            html: `
+        <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+          <p>La tua richiesta di onboarding è stata approvata. Completa il tuo account impostando una password.</p>
+          <p>
+            <a href="${link}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
+              Completa la registrazione
+            </a>
+          </p>
+          <p style="font-size:13px;color:#666">Se il pulsante non funziona, copia e incolla il seguente URL nel tuo browser:</p>
+          <p style="word-break:break-all"><a href="${link}">${link}</a></p>
+        </div>
+      `,
+        });
+    }
+    else {
+        // Point already has a user account; mark onboarding as COMPLETED (no registration required)
+        await prisma_1.prisma.pointOnboarding.update({
+            where: { id: ob.id },
+            data: {
+                status: "COMPLETED",
+                approvedAt: new Date(),
+                approvedByUserId: adminUserId,
+                completedAt: new Date(),
+                gtcPointId: point.id,
+            },
+        });
+    }
     // notify admins and sector owners about approval
     const admins = await prisma_1.prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
     const owners = await prisma_1.prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true } });

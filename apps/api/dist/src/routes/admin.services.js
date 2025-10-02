@@ -7,10 +7,31 @@ const client_1 = require("@prisma/client");
 const prisma_1 = require("../lib/prisma");
 const auth_1 = require("../middleware/auth");
 exports.adminServices = (0, express_1.Router)();
-exports.adminServices.use(auth_1.requireAuth, (0, auth_1.requireRole)("ADMIN"));
+exports.adminServices.use(auth_1.requireAuth);
 exports.adminServices.get("/", async (req, res) => {
     // Optional filter: ?sectorId=...
     const sectorId = typeof req.query.sectorId === "string" ? req.query.sectorId : undefined;
+    // Non-admin users can only request services scoped to a sector they belong to.
+    const user = req.user;
+    if (user.role !== "ADMIN") {
+        // GTC_POINT may read services across all sectors (broad read access)
+        if (user.role === "GTC_POINT") {
+            // allow listing without sectorId filter
+        }
+        else {
+            // For other non-admins we require a sectorId and ownership checks
+            if (!sectorId)
+                return res.status(403).json({ error: "Forbidden" });
+            if (user.role === "SECTOR_OWNER") {
+                const owns = await prisma_1.prisma.userSector.findFirst({ where: { userId: user.id, sectorId } });
+                if (!owns)
+                    return res.status(403).json({ error: "Forbidden" });
+            }
+            else {
+                return res.status(403).json({ error: "Forbidden" });
+            }
+        }
+    }
     const where = sectorId ? { sectorId } : undefined;
     const items = await prisma_1.prisma.service.findMany({ where, orderBy: { createdAt: "desc" }, include: { sector: true } });
     res.json(items);
@@ -22,6 +43,8 @@ const createSchema = zod_1.z.object({
     active: zod_1.z.boolean().optional().default(true),
 });
 exports.adminServices.post("/", async (req, res) => {
+    if (req.user.role !== 'ADMIN')
+        return res.status(403).json({ error: 'Forbidden' });
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success)
         return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
@@ -54,9 +77,32 @@ exports.adminServices.get("/:id", async (req, res) => {
     const service = await prisma_1.prisma.service.findUnique({ where: { id } });
     if (!service)
         return res.status(404).json({ error: "Not found" });
+    // Non-admin users can only fetch a service if it's scoped to a sector they belong to
+    const user = req.user;
+    if (user.role !== "ADMIN") {
+        // GTC_POINT may read any service across sectors
+        if (user.role === "GTC_POINT") {
+            // allow
+        }
+        else {
+            const sectorId = service.sectorId;
+            if (!sectorId)
+                return res.status(403).json({ error: "Forbidden" });
+            if (user.role === "SECTOR_OWNER") {
+                const owns = await prisma_1.prisma.userSector.findFirst({ where: { userId: user.id, sectorId } });
+                if (!owns)
+                    return res.status(403).json({ error: "Forbidden" });
+            }
+            else {
+                return res.status(403).json({ error: "Forbidden" });
+            }
+        }
+    }
     res.json(service);
 });
 exports.adminServices.patch("/:id", async (req, res) => {
+    if (req.user.role !== 'ADMIN')
+        return res.status(403).json({ error: 'Forbidden' });
     const { id } = idParam.parse(req.params);
     const body = updateSchema.safeParse(req.body);
     if (!body.success)
@@ -80,6 +126,8 @@ exports.adminServices.patch("/:id", async (req, res) => {
     }
 });
 exports.adminServices.delete("/:id", async (req, res) => {
+    if (req.user.role !== 'ADMIN')
+        return res.status(403).json({ error: 'Forbidden' });
     const { id } = idParam.parse(req.params);
     const links = await prisma_1.prisma.gtcPointService.count({ where: { serviceId: id } });
     if (links > 0)
