@@ -56,6 +56,7 @@ model Sector {
   conventions Convention[]
   leads       Lead[]
   pointOnboardings PointOnboarding[]
+  services   Service[]
 }
 
 // Join table to allow many-to-many relationship between Users and Sectors
@@ -93,8 +94,12 @@ model Service {
   active     Boolean           @default(true)
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
+  sectorId   String
+  sector     Sector            @relation(fields: [sectorId], references: [id])
   pointLinks GtcPointService[]
   onboardingLinks PointOnboardingService[]
+
+  @@index([sectorId])
 }
 
 model GtcPointService {
