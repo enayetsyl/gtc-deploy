@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   useCreateConvention,
   useMyConventions,
@@ -9,6 +10,7 @@ import {
 import PrefillForm from "./PrefillForm";
 import UploadSigned from "./UploadSigned";
 import { useSectorsPublic } from "@/hooks/useSectors";
+import { listServices } from "@/lib/admin-api";
 import {
   Select,
   SelectContent,
@@ -21,6 +23,8 @@ import { useI18n } from "@/providers/i18n-provider";
 
 export default function PointConventionsPage() {
   const [page] = useState(1);
+  const [sectorId, setSectorId] = useState<string>("");
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const { data, isLoading } = useMyConventions(page, 20);
@@ -63,7 +67,13 @@ export default function PointConventionsPage() {
       <section className="rounded-2xl border p-4 space-y-4">
         <h2 className="font-medium">{t("convention.step1")}</h2>
         {/* Sectors dropdown: fetch public sectors and allow selection */}
-        <SectorsDropdown />
+        <SectorsDropdown selected={sectorId} onChange={setSectorId} />
+        {/* Services multi-select: shows services for selected sector */}
+        <ServicesMultiSelect
+          sectorId={sectorId}
+          value={selectedServices}
+          onChange={setSelectedServices}
+        />
         <PrefillForm />
       </section>
 
@@ -314,10 +324,15 @@ export default function PointConventionsPage() {
   );
 }
 
-function SectorsDropdown() {
+function SectorsDropdown({
+  selected,
+  onChange,
+}: {
+  selected: string;
+  onChange: (v: string) => void;
+}) {
   const sectorsQ = useSectorsPublic();
   const { t } = useI18n();
-  const [selected, setSelected] = useState<string>("");
 
   const items = (sectorsQ.data || []) as Array<{ id: string; name: string }>;
 
@@ -329,7 +344,7 @@ function SectorsDropdown() {
       {sectorsQ.isLoading ? (
         <p className="text-sm text-muted-foreground">{t("ui.loading")}</p>
       ) : items.length ? (
-        <Select value={selected} onValueChange={(v) => setSelected(v)}>
+        <Select value={selected} onValueChange={(v) => onChange(v)}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder={t("ui.selectSector")} />
           </SelectTrigger>
@@ -343,6 +358,63 @@ function SectorsDropdown() {
         </Select>
       ) : (
         <p className="text-sm text-muted-foreground">{t("ui.noSectors")}</p>
+      )}
+    </div>
+  );
+}
+
+function ServicesMultiSelect({
+  sectorId,
+  value,
+  onChange,
+}: {
+  sectorId: string;
+  value: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const { t } = useI18n();
+  const q = useQuery({
+    queryKey: ["admin", "services", sectorId || "none"],
+    queryFn: () => listServices(sectorId || undefined),
+    enabled: !!sectorId,
+  });
+
+  if (!sectorId) return null;
+
+  if (q.isLoading)
+    return <p className="text-sm text-muted-foreground">{t("ui.loading")}</p>;
+
+  const items: { id: string; name: string }[] = q.data || [];
+
+  const toggle = (id: string) => {
+    if (value.includes(id)) onChange(value.filter((s) => s !== id));
+    else onChange([...value, id]);
+  };
+
+  return (
+    <div>
+      <label className="text-sm text-muted-foreground block mb-2">
+        {t("point.services.title")}
+      </label>
+      {items.length ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {items.map((svc) => (
+            <label
+              key={svc.id}
+              className="inline-flex items-center gap-2 text-sm"
+            >
+              <input
+                type="checkbox"
+                checked={value.includes(svc.id)}
+                onChange={() => toggle(svc.id)}
+                className="rounded border"
+              />
+              <span className="truncate">{svc.name}</span>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">{t("ui.noServices")}</p>
       )}
     </div>
   );
