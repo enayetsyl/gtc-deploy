@@ -76,6 +76,10 @@ export default function Page() {
   const [askEmail, setAskEmail] = useState("");
   const [askLoading, setAskLoading] = useState(false);
 
+console.log(
+'ask sector', askSector
+)
+
   async function openAskModal(sectorId: string, sectorName: string) {
     setAskSector({ id: sectorId, name: sectorName });
     setAskSelected([]);
@@ -207,6 +211,7 @@ export default function Page() {
               <label className="block text-sm mb-1">{t("form.name")}</label>
               <Input
                 value={askName}
+                readOnly
                 onChange={(e) => setAskName(e.target.value)}
               />
             </div>
@@ -214,6 +219,7 @@ export default function Page() {
               <label className="block text-sm mb-1">{t("form.email")}</label>
               <Input
                 value={askEmail}
+                readOnly
                 onChange={(e) => setAskEmail(e.target.value)}
               />
             </div>

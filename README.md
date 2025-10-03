@@ -199,7 +199,7 @@ See `apps/api/README.md` for more.
 
 Ticket
 
-1. point/convention- After download form should reset.
+1. 
 2. Refresh token route at the backend implement
 3. point.sectors.askTitle - value need to added
 4. point sector ask - name and email should be read only
