@@ -8,8 +8,7 @@
     "migrate": "prisma migrate dev",
     "worker": "tsx watch src/queues/worker.ts",
     "worker:prod": "node dist/src/queues/worker.js",
-        "seed": "ts-node prisma/seed.ts"
-
+    "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
