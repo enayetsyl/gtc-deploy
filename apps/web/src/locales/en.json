@@ -102,6 +102,7 @@
   "ui.show": "Show",
   "ui.hide": "Hide",
   "ui.sector": "Sector",
+  "ui.noResults": "No results.",
   "table.phone": "Phone",
   "table.message": "Message",
   "table.attachments": "Attachments",

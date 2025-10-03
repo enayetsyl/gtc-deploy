@@ -103,6 +103,7 @@
   "ui.show": "Mostra",
   "ui.hide": "Nascondi",
   "ui.sector": "Settore",
+  "ui.noResults": "Nessun risultato.",
   "table.phone": "Telefono",
   "table.message": "Messaggio",
   "table.attachments": "Allegati",
