@@ -6,7 +6,7 @@ import { useI18n } from "@/providers/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { toast } from "sonner";
+// toast is unused because onboarding modal is currently disabled
 
 export default function Page() {
   const { t } = useI18n();
@@ -14,124 +14,123 @@ export default function Page() {
     Array<{ id: string; name: string }>
   >([]);
   const [mySectorIds, setMySectorIds] = useState<string[]>([]);
+  const [sectorsLoaded, setSectorsLoaded] = useState(false);
+  const [mySectorsLoaded, setMySectorsLoaded] = useState(false);
 
   useEffect(() => {
+    const ac = new AbortController();
+    let mounted = true;
+
+    function isAbortError(err: unknown): boolean {
+      if (typeof err !== "object" || err === null) return false;
+      const maybeName = (err as { name?: unknown }).name;
+      return typeof maybeName === "string" && maybeName === "AbortError";
+    }
+
     (async () => {
       try {
         // Load all public sectors
-        const r = await api.get(`/api/sectors/public`);
-        const sectors = r.data || [];
-        setAllSectors(sectors);
+        try {
+          const r = await api.get(`/api/sectors/public`, { signal: ac.signal });
+          const sectors = r.data || [];
+          if (mounted) setAllSectors(sectors);
+        } catch (err) {
+          if (isAbortError(err)) return;
+          console.error("Could not load public sectors", err);
+        } finally {
+          if (mounted) setSectorsLoaded(true);
+        }
 
         // Load my sectors. Prefer the dedicated endpoint for GTC_POINT if available,
         // otherwise fall back to /api/me/points which contains legacy sectorId values.
         try {
           try {
-            const r = await api.get(`/api/point/sectors`);
+            const r = await api.get(`/api/point/sectors`, {
+              signal: ac.signal,
+            });
             const items = (r.data?.items || []) as Array<{ id: string }>;
             const ids = Array.from(new Set(items.map((i) => i.id)));
-            setMySectorIds(ids);
+            if (mounted) setMySectorIds(ids);
           } catch {
             // Fallback to legacy me/points when /api/point/sectors isn't accessible
-            const me = await api.get(`/api/me/points`, {
-              params: { page: 1, pageSize: 200 },
-            });
-            type PointItem = { sectorId?: string };
-            const items = (me.data?.items || []) as PointItem[];
-            const ids = Array.from(
-              new Set(
-                items
-                  .map((i) => i?.sectorId)
-                  .filter(
-                    (x): x is string => typeof x === "string" && x.length > 0
-                  )
-              )
-            );
-            setMySectorIds(ids);
+            try {
+              const me = await api.get(`/api/me/points`, {
+                params: { page: 1, pageSize: 200 },
+                signal: ac.signal,
+              });
+              if (!mounted) return;
+              type PointItem = { sectorId?: string };
+              const items = (me.data?.items || []) as PointItem[];
+              const ids = Array.from(
+                new Set(
+                  items
+                    .map((i) => i?.sectorId)
+                    .filter(
+                      (x): x is string => typeof x === "string" && x.length > 0
+                    )
+                )
+              );
+              if (mounted) setMySectorIds(ids);
+            } catch (err) {
+              if (isAbortError(err)) return;
+              console.warn("Could not load my sectors (legacy)", err);
+            }
           }
-        } catch {
-          // If neither endpoint is available (no auth), just leave mySectorIds empty
-          console.warn("Could not load my sectors");
+        } catch (e) {
+          console.warn("Could not load my sectors", e);
+        } finally {
+          if (mounted) setMySectorsLoaded(true);
         }
       } catch (e) {
         console.error(e);
       }
     })();
+
+    return () => {
+      mounted = false;
+      ac.abort();
+    };
   }, []);
 
-  const mySectors = allSectors.filter((s) => mySectorIds.includes(s.id));
-  const otherSectors = allSectors.filter((s) => !mySectorIds.includes(s.id));
+  // Wait until both loads have completed to avoid initial flicker where everything
+  // shows up in "other" before the user's sector ids arrive.
+  const ready = sectorsLoaded && mySectorsLoaded;
 
-  // Modal state for asking to join a sector
-  const [askOpen, setAskOpen] = useState(false);
-  const [askSector, setAskSector] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [askServices, setAskServices] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
-  const [askSelected, setAskSelected] = useState<string[]>([]);
-  const [askName, setAskName] = useState("");
-  const [askEmail, setAskEmail] = useState("");
-  const [askLoading, setAskLoading] = useState(false);
+  const mySectors = ready
+    ? allSectors.filter((s) => mySectorIds.includes(s.id))
+    : [];
+  const otherSectors = ready
+    ? allSectors.filter((s) => !mySectorIds.includes(s.id))
+    : [];
 
+  // Modal for asking to join a sector is currently not rendered; keep code
+  // commented in the JSX below. Removing modal state to avoid unused-variable
+  // lint warnings. Re-add when enabling the modal UI.
 
-
-  async function openAskModal(sectorId: string, sectorName: string) {
-    setAskSector({ id: sectorId, name: sectorName });
-    setAskSelected([]);
-    setAskServices([]);
-    setAskName("");
-    setAskEmail("");
-    setAskOpen(true);
-    try {
-      // Try to prefill name/email from /api/me when available
-      try {
-        const me = await api.get(`/api/me`);
-        const user = me.data as { name?: string; email?: string };
-        if (user?.name) setAskName(user.name);
-        if (user?.email) setAskEmail(user.email);
-      } catch {
-        // ignore if /api/me not available
-      }
-      const { data } = await api.get<{ id: string; name: string }[]>(
-        "/api/admin/services",
-        { params: { sectorId } }
-      );
-      setAskServices(data || []);
-    } catch (err) {
-      // show error but allow user to continue without services
-      console.warn("Could not load services for sector", err);
-      toast.error(t("ui.failedToLoad"));
-      setAskServices([]);
-    }
-  }
-
-  async function applyAsk() {
-    if (!askSector) return;
-    if (!askName || !askEmail) {
-      toast.error(t("admin.onboarding.errors.missingNameEmail"));
-      return;
-    }
-    setAskLoading(true);
-    try {
-      await api.post("/api/admin/points/onboarding", {
-        sectorId: askSector.id,
-        email: askEmail,
-        name: askName,
-        includeServices: askSelected.length > 0,
-        serviceIds: askSelected.length > 0 ? askSelected : undefined,
-      });
-      toast.success(t("admin.onboarding.inviteCreated"));
-      setAskOpen(false);
-    } catch (err) {
-      console.error(err);
-      toast.error(t("ui.createFailed"));
-    } finally {
-      setAskLoading(false);
-    }
-  }
+  // async function applyAsk() {
+  //   if (!askSector) return;
+  //   if (!askName || !askEmail) {
+  //     toast.error(t("admin.onboarding.errors.missingNameEmail"));
+  //     return;
+  //   }
+  //   setAskLoading(true);
+  //   try {
+  //     await api.post("/api/admin/points/onboarding", {
+  //       sectorId: askSector.id,
+  //       email: askEmail,
+  //       name: askName,
+  //       includeServices: askSelected.length > 0,
+  //       serviceIds: askSelected.length > 0 ? askSelected : undefined,
+  //     });
+  //     toast.success(t("admin.onboarding.inviteCreated"));
+  //     setAskOpen(false);
+  //   } catch (err) {
+  //     console.error(err);
+  //     toast.error(t("ui.createFailed"));
+  //   } finally {
+  //     setAskLoading(false);
+  //   }
+  // }
 
   return (
     <div className="p-4 mb-10 space-y-6">
@@ -143,7 +142,9 @@ export default function Page() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {mySectors.length === 0 ? (
+            {!ready ? (
+              <p className="text-sm text-muted-foreground">{t("ui.loading")}</p>
+            ) : mySectors.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {t("point.sectors.none")}
               </p>
@@ -169,7 +170,9 @@ export default function Page() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {otherSectors.length === 0 ? (
+            {!ready ? (
+              <p className="text-sm text-muted-foreground">{t("ui.loading")}</p>
+            ) : otherSectors.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 {t("ui.noSectors")}
               </p>
@@ -181,12 +184,12 @@ export default function Page() {
                     className="p-3 rounded-md border border-divider bg-card-bg text-body flex items-center justify-between"
                   >
                     <span>{s.name}</span>
-                    <Button
+                    {/* <Button
                       size="sm"
                       onClick={() => openAskModal(s.id, s.name)}
                     >
                       Ask
-                    </Button>
+                    </Button> */}
                   </li>
                 ))}
               </ul>
@@ -195,7 +198,7 @@ export default function Page() {
         </Card>
       </div>
       {/* Ask modal */}
-      {askOpen && askSector && (
+      {/* {askOpen && askSector && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/40"
@@ -251,9 +254,7 @@ export default function Page() {
                     );
                   })
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    {t("ui.noServices")}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{t("ui.noServices")}</p>
                 )}
               </div>
             </div>
@@ -267,7 +268,7 @@ export default function Page() {
             </div>
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

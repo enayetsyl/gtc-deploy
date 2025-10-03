@@ -205,4 +205,4 @@ Ticket
 4. 
 5. 
 6. 
-7. Owner registration email should tell all the sector name in , separate.
+7. 
