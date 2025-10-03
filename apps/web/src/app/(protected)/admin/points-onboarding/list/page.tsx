@@ -41,7 +41,7 @@ export default function ReviewList() {
 
         <div className="mt-4 divide-y">
           {items.length === 0 ? (
-            <p className="text-sm text-muted mt-2">{t("ui.noResults")}</p>
+            <p className="text-sm  mt-2">{t("ui.noResults")}</p>
           ) : (
             items.map((i) => (
               <div

@@ -66,6 +66,7 @@ export default function PointConventionsPage() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+
   }
 
   return (
@@ -99,6 +100,8 @@ export default function PointConventionsPage() {
           sectorName={sectorName}
           serviceNames={serviceNames}
           disabled={externalLoading}
+          setSectorId={setSectorId}
+          setSelectedServices={setSelectedServices}
         />
         {createOpen && (
           <CreateConventionModal

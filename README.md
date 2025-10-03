@@ -195,3 +195,14 @@ The API uses Pino for structured logs. In development, logs are human-friendly; 
 - To log inside handlers: `req.log.info({ meta }, "your message")`
 
 See `apps/api/README.md` for more.
+
+
+Ticket
+
+1. point/convention- After download form should reset.
+2. Refresh token route at the backend implement
+3. point.sectors.askTitle - value need to added
+4. point sector ask - name and email should be read only
+5. admin/point/id/service - table should show sector name
+6. Admin/point/onboarding list - beside point name the sector should show
+7. Owner registration email should tell all the sector name in , separate.
