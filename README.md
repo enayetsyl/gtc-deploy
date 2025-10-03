@@ -195,3 +195,14 @@ The API uses Pino for structured logs. In development, logs are human-friendly; 
 - To log inside handlers: `req.log.info({ meta }, "your message")`
 
 See `apps/api/README.md` for more.
+
+
+Ticket
+
+1. 
+2. Refresh token route at the backend implement
+3. 
+4. 
+5. 
+6. 
+7. Owner registration email should tell all the sector name in , separate.

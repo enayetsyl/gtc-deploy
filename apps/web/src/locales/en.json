@@ -194,6 +194,7 @@
   "point.sectors.title": "Available Sectors",
   "point.sectors.mySectors": "Sectors I belong to",
   "point.sectors.otherSectors": "Other sectors",
+  "point.sectors.askTitle": "Request access to {sector}",
   "point.sectors.none": "You are not attached to any sectors.",
   "ui.noSectors": "No sectors available.",
   "admin.points.listTitle": "GTC Points",

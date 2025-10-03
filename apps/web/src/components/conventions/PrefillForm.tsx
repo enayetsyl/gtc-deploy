@@ -5,15 +5,20 @@ import { useI18n } from "@/providers/i18n-provider";
 import { downloadBlob } from "../../lib/axios";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { set } from "zod";
 
 export default function PrefillForm({
   sectorName,
   serviceNames,
   disabled,
+  setSectorId,
+  setSelectedServices,
 }: {
   sectorName?: string;
   serviceNames?: string[];
   disabled?: boolean;
+  setSectorId: (v: string) => void;
+  setSelectedServices: (v: string[]) => void;
 }) {
   const [applicantName, setApplicantName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,7 +35,11 @@ export default function PrefillForm({
         // pass services as names (backend expects string[] for services)
         ...(serviceNames ? { services: serviceNames } : {}),
       });
+      setApplicantName("");
+      setSectorId("");
+      setSelectedServices([]);
       downloadBlob(blob, "convention-prefill.pdf");
+      // reset input on successful download
     } finally {
       setLoading(false);
     }
