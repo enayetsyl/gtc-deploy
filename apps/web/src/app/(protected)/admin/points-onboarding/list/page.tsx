@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/axios";
 import Link from "next/link";
 
-type OnboardItem = { id: string; name: string; email: string; status?: string };
+type OnboardItem = { id: string; name: string; email: string; status?: string; sector: { name: string };}
 
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
@@ -23,6 +23,9 @@ export default function ReviewList() {
       }
     })();
   }, []);
+
+
+
   return (
     <main className="space-y-6 mb-10">
       <section className="rounded-xl border p-6 bg-card">
@@ -58,6 +61,10 @@ export default function ReviewList() {
                   <div className="text-xs text-muted-text truncate">
                     {i.email}
                   </div>
+                  <div className="text-xs text-muted-text truncate">
+                    {t("detail.sector")}: {i.sector.name}
+                  </div>
+                  
                 </div>
                 <div className="flex items-center gap-3 mt-2 sm:mt-0">
                   <StatusBadge status={i.status} />

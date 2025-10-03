@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/providers/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { toast } from "sonner";
 
 export default function Page() {
@@ -76,9 +76,7 @@ export default function Page() {
   const [askEmail, setAskEmail] = useState("");
   const [askLoading, setAskLoading] = useState(false);
 
-console.log(
-'ask sector', askSector
-)
+
 
   async function openAskModal(sectorId: string, sectorName: string) {
     setAskSector({ id: sectorId, name: sectorName });
