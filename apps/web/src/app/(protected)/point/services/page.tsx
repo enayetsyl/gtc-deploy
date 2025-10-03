@@ -65,11 +65,7 @@ export default function PointServicesPage() {
         <CardHeader>
           <CardTitle>
             {t("point.services.title")}
-            {/* {sectors && sectors.length > 0 && (
-              <div className="mt-1 text-sm text-muted-foreground">
-                {sectors.map((s) => s.name).join(", ")}
-              </div>
-            )} */}
+        
           </CardTitle>
         </CardHeader>
         <CardContent>
