@@ -91,60 +91,70 @@ export default function PointServicesPage() {
           {isError && (
             <p className="text-destructive">{t("ui.failedToLoad")}</p>
           )}
-          {!isLoading && data && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[34%]">
-                    {t("table.service")}
-                  </TableHead>
-                  <TableHead className="w-[20%]">{t("table.code")}</TableHead>
-                  <TableHead>{t("table.sector")}</TableHead>
-                  <TableHead>{t("table.status")}</TableHead>
-                  <TableHead className="text-right">{t("ui.action")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((row) => {
-                  const canRequest = row.status === "DISABLED";
-                  return (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium">
-                        {row.service.name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {row.service.code}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {row.service.sector?.name ?? "-"}
-                      </TableCell>
-                      <TableCell>
-                        <ServiceStatusBadge status={row.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          disabled={
-                            !canRequest || pendingServiceId === row.serviceId
-                          }
-                          onClick={() => handleRequest(row.serviceId)}
-                        >
-                          {pendingServiceId === row.serviceId && (
-                            <Spinner className="w-4 h-4 mr-2" />
-                          )}
-                          {canRequest
-                            ? t("point.services.request")
-                            : row.status === "PENDING_REQUEST"
-                            ? t("ui.pending")
-                            : t("ui.none")}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+          {!isLoading &&
+            (Array.isArray(data) && data.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[34%]">
+                      {t("table.service")}
+                    </TableHead>
+                    <TableHead className="w-[20%]">{t("table.code")}</TableHead>
+                    <TableHead>{t("table.sector")}</TableHead>
+                    <TableHead>{t("table.status")}</TableHead>
+                    <TableHead className="text-right">
+                      {t("ui.action")}
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(Array.isArray(data) ? data : []).map((row) => {
+                    const canRequest = row.status === "DISABLED";
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell className="font-medium">
+                          {row.service.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {row.service.code}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {row.service.sector?.name ?? "-"}
+                        </TableCell>
+                        <TableCell>
+                          <ServiceStatusBadge status={row.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            disabled={
+                              !canRequest || pendingServiceId === row.serviceId
+                            }
+                            onClick={() => handleRequest(row.serviceId)}
+                          >
+                            {pendingServiceId === row.serviceId && (
+                              <Spinner className="w-4 h-4 mr-2" />
+                            )}
+                            {canRequest
+                              ? t("point.services.request")
+                              : row.status === "PENDING_REQUEST"
+                              ? t("ui.pending")
+                              : t("ui.none")}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              // If data is not an array or empty, show a user-friendly message
+              !isError && (
+                <p className="text-sm text-muted-foreground">
+                  {t("ui.noServices")}
+                </p>
+              )
+            ))}
         </CardContent>
       </Card>
 
