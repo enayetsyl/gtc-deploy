@@ -156,7 +156,12 @@ function AdminRow({
                 }
               }}
             >
-              {approving && <Spinner className="w-4 h-4 mr-2" />}
+              {/* Always render the Spinner node but hide it when not needed to avoid
+                  DOM insertion/removal ordering issues that can surface as
+                  "insertBefore" errors in some environments (HMR/dev). */}
+              <Spinner
+                className={approving ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"}
+              />
               {t("convention.approve")}
             </Button>
             <Button
@@ -171,7 +176,9 @@ function AdminRow({
                 }
               }}
             >
-              {declining && <Spinner className="w-4 h-4 mr-2" />}
+              <Spinner
+                className={declining ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"}
+              />
               {t("convention.decline")}
             </Button>
             <Button
@@ -188,7 +195,9 @@ function AdminRow({
               }}
               title={t("convention.downloadAll")}
             >
-              {downloading && <Spinner className="w-4 h-4 mr-2" />}
+              <Spinner
+                className={downloading ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"}
+              />
               {t("convention.downloadZip")}
             </Button>
           </div>
@@ -260,7 +269,9 @@ function AdminCard({
                   }
                 }}
               >
-                {approving && <Spinner className="w-4 h-4 mr-2" />}
+                <Spinner
+                  className={approving ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"}
+                />
                 {t("convention.approve")}
               </Button>
 
@@ -276,7 +287,9 @@ function AdminCard({
                   }
                 }}
               >
-                {declining && <Spinner className="w-4 h-4 mr-2" />}
+                <Spinner
+                  className={declining ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"}
+                />
                 {t("convention.decline")}
               </Button>
 
@@ -294,7 +307,11 @@ function AdminCard({
                 }}
                 title={t("convention.downloadAll")}
               >
-                {downloading && <Spinner className="w-4 h-4 mr-2" />}
+                <Spinner
+                  className={
+                    downloading ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"
+                  }
+                />
                 {t("convention.downloadZip")}
               </Button>
             </div>
