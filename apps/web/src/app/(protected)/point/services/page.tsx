@@ -31,7 +31,7 @@ export default function PointServicesPage() {
     queryKey: qk.pointServices,
     queryFn: getPointServices,
     // Ensure we call the API every time this route/component mounts
-    refetchOnMount: "always",
+    retryOnMount: true,
   });
 
   const requestMut = useMutation<
