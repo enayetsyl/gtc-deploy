@@ -8,7 +8,6 @@ import {
   requestServiceById,
   ServiceLink,
 } from "@/lib/clients/servicesClient";
-import { api } from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import Spinner from "@/components/ui/Spinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,16 +30,8 @@ export default function PointServicesPage() {
   const { data, isLoading, isError } = useQuery<ServiceLink[]>({
     queryKey: qk.pointServices,
     queryFn: getPointServices,
-  });
-
-  const { data: sectors } = useQuery<{ id: string; name: string }[]>({
-    queryKey: ["point", "sectors"],
-    queryFn: async () => {
-      const { data } = await api.get<{ items: { id: string; name: string }[] }>(
-        "/api/point/sectors"
-      );
-      return data.items;
-    },
+    // Ensure we call the API every time this route/component mounts
+    refetchOnMount: "always",
   });
 
   const requestMut = useMutation<
@@ -74,11 +65,7 @@ export default function PointServicesPage() {
         <CardHeader>
           <CardTitle>
             {t("point.services.title")}
-            {/* {sectors && sectors.length > 0 && (
-              <div className="mt-1 text-sm text-muted-foreground">
-                {sectors.map((s) => s.name).join(", ")}
-              </div>
-            )} */}
+        
           </CardTitle>
         </CardHeader>
         <CardContent>
