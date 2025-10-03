@@ -75,7 +75,11 @@ export default function AdminPointServicesPage() {
           qk.adminPointServices(pointId),
           ctx.prev
         );
-      toast.error(t("toast.updateFailed"));
+      const errObj = _err as unknown as {
+        response?: { data?: { error?: string } };
+      };
+      const msg = errObj.response?.data?.error ?? t("toast.updateFailed");
+      toast.error(String(msg));
     },
     onSuccess: (link) => {
       toast.success(
@@ -114,71 +118,108 @@ export default function AdminPointServicesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-medium">
-                      {row.service.name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {row.service.code}
-                    </TableCell>
-                    <TableCell>
-                      <ServiceStatusBadge status={row.status} />
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        size="sm"
-                       
-                        disabled={
-                          (togglePending?.serviceId === row.serviceId &&
-                            togglePending.action === "ENABLE") ||
-                          row.status === "ENABLED"
-                        }
-                        onClick={() =>
-                          toggle.mutate({
-                            serviceId: row.serviceId,
-                            action: "ENABLE",
-                          })
-                        }
-                      >
-                        {togglePending?.serviceId === row.serviceId &&
-                        togglePending.action === "ENABLE" ? (
-                          <span className="inline-flex items-center">
-                            <Spinner />
-                            {t("admin.points.services.enable")}
-                          </span>
-                        ) : (
-                          t("admin.points.services.enable")
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        
-                        disabled={
-                          (togglePending?.serviceId === row.serviceId &&
-                            togglePending.action === "DISABLE") ||
-                          row.status === "DISABLED"
-                        }
-                        onClick={() =>
-                          toggle.mutate({
-                            serviceId: row.serviceId,
-                            action: "DISABLE",
-                          })
-                        }
-                      >
-                        {togglePending?.serviceId === row.serviceId &&
-                        togglePending.action === "DISABLE" ? (
-                          <span className="inline-flex items-center">
-                            <Spinner />
-                            {t("admin.points.services.disable")}
-                          </span>
-                        ) : (
-                          t("admin.points.services.disable")
-                        )}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {data.map(
+                  (row) => (
+                    // debug: log the returned ServiceLink to help trace 'Service not found' issues
+                    (console.debug?.("AdminPointServices row:", {
+                      id: row.id,
+                      serviceId: row.serviceId,
+                      serviceIdNested: row.service?.id,
+                      serviceCode: row.service?.code,
+                      status: row.status,
+                    }),
+                    null),
+                    (
+                      <TableRow key={row.id}>
+                        <TableCell className="font-medium">
+                          {row.service.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {row.service.code}
+                        </TableCell>
+                        <TableCell>
+                          <ServiceStatusBadge status={row.status} />
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          {/** prefer nested service id when available */}
+                          {/** compute id once to use consistently */}
+                          {(() => {
+                            // prefer the top-level serviceId (from the join table) which maps to Service.id
+                            const svcId = row.serviceId ?? row.service?.id;
+                            return (
+                              <>
+                                <Button
+                                  size="sm"
+                                  disabled={
+                                    !svcId ||
+                                    (togglePending?.serviceId === svcId &&
+                                      togglePending.action === "ENABLE") ||
+                                    row.status === "ENABLED"
+                                  }
+                                  onClick={() => {
+                                    if (!svcId) {
+                                      console.warn(
+                                        "Attempted to enable service but svcId is missing",
+                                        row
+                                      );
+                                      return;
+                                    }
+                                    toggle.mutate({
+                                      serviceId: svcId,
+                                      action: "ENABLE",
+                                    });
+                                  }}
+                                >
+                                  {togglePending?.serviceId === svcId &&
+                                  togglePending.action === "ENABLE" ? (
+                                    <span className="inline-flex items-center">
+                                      <Spinner />
+                                      {t("admin.points.services.enable")}
+                                    </span>
+                                  ) : (
+                                    t("admin.points.services.enable")
+                                  )}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  disabled={
+                                    !svcId ||
+                                    (togglePending?.serviceId === svcId &&
+                                      togglePending.action === "DISABLE") ||
+                                    row.status === "DISABLED"
+                                  }
+                                  onClick={() => {
+                                    if (!svcId) {
+                                      console.warn(
+                                        "Attempted to disable service but svcId is missing",
+                                        row
+                                      );
+                                      return;
+                                    }
+                                    toggle.mutate({
+                                      serviceId: svcId,
+                                      action: "DISABLE",
+                                    });
+                                  }}
+                                >
+                                  {togglePending?.serviceId === svcId &&
+                                  togglePending.action === "DISABLE" ? (
+                                    <span className="inline-flex items-center">
+                                      <Spinner />
+                                      {t("admin.points.services.disable")}
+                                    </span>
+                                  ) : (
+                                    t("admin.points.services.disable")
+                                  )}
+                                </Button>
+                              </>
+                            );
+                          })()}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  )
+                )}
               </TableBody>
             </Table>
           )}

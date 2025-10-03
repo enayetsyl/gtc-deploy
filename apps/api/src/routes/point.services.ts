@@ -27,7 +27,7 @@ pointServices.get("/", async (req, res) => {
   }
   const items = await prisma.gtcPointService.findMany({
     where: { gtcPointId: pointId },
-    include: { service: true },
+    include: { service: { include: { sector: true } } },
     orderBy: { createdAt: "desc" },
   });
   res.json({ items });
@@ -52,9 +52,14 @@ pointServices.post("/requests", async (req, res) => {
   const parsed = requestSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
 
+  const point = await prisma.gtcPoint.findUnique({ where: { id: pointId } });
+  if (!point) return res.status(404).json({ error: "Point not found" });
+
+  // Resolve service by id or by composite (sectorId + code) so codes are unique per sector
   const svc = parsed.data.serviceId
     ? await prisma.service.findUnique({ where: { id: parsed.data.serviceId } })
-    : await prisma.service.findUnique({ where: { code: parsed.data.serviceCode! } });
+    : await prisma.service.findFirst({ where: { code: parsed.data.serviceCode!, sectorId: point.sectorId } });
+
   if (!svc || !svc.active) return res.status(404).json({ error: "Service not found or inactive" });
 
   const existing = await prisma.gtcPointService.findUnique({

@@ -2,7 +2,7 @@ import { api } from "./axios";
 
 export type Sector = { id: string; name: string; createdAt: string; updatedAt: string };
 export type Point = { id: string; name: string; email: string; sectorId: string; createdAt: string; updatedAt: string; sector?: Sector };
-export type Service = { id: string; code: string; name: string; active: boolean; createdAt: string; updatedAt: string };
+export type Service = { id: string; code: string; name: string; active: boolean; sectorId: string; createdAt: string; updatedAt: string; sector?: Sector };
 export type SectorOwner = {
   id: string;
   name: string;
@@ -64,15 +64,16 @@ export async function deletePoint(id: string) {
   return data;
 }
 
-export async function listServices() {
-  const { data } = await api.get<Service[]>(`/api/admin/services`);
+export async function listServices(sectorId?: string) {
+  // API returns services including their sector relation. Optionally filter by sectorId.
+  const { data } = await api.get<Service[]>(`/api/admin/services`, { params: sectorId ? { sectorId } : {} });
   return data;
 }
-export async function createService(payload: { code: string; name: string; active?: boolean }) {
+export async function createService(payload: { code: string; name: string; active?: boolean; sectorId: string }) {
   const { data } = await api.post<Service>(`/api/admin/services`, payload);
   return data;
 }
-export async function updateService(id: string, payload: Partial<{ code: string; name: string; active: boolean }>) {
+export async function updateService(id: string, payload: Partial<{ code: string; name: string; active: boolean; sectorId: string }>) {
   const { data } = await api.patch<Service>(`/api/admin/services/${id}`, payload);
   return data;
 }

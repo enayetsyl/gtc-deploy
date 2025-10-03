@@ -2,8 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { api, API_BASE } from "@/lib/axios";
-// ...existing UI imports
+import { api } from "@/lib/axios";
 import { Button } from "@/components/ui/button";
 import Spinner from "@/components/ui/Spinner";
 import { useI18n } from "@/providers/i18n-provider";
@@ -87,12 +86,12 @@ export default function Client({ id }: { id: string }) {
   if (!item)
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
-        Loading…
+        {t("ui.loading")}
       </div>
     );
 
   const isSubmitted = item.status === "SUBMITTED";
-  const statusLabel = item.status ?? t("status.unknown") ?? "Unknown";
+  const statusLabel = item.status ?? t("status.unknown");
   const statusClasses =
     item.status === "SUBMITTED"
       ? "bg-emerald-100 text-emerald-800"
@@ -176,7 +175,7 @@ export default function Client({ id }: { id: string }) {
             <div className="relative w-full h-40 sm:h-48">
               <Image
                 src={`${item.signaturePath}`}
-                alt="signature"
+                alt={t("detail.signatureAlt")}
                 fill
                 className="object-contain"
                 unoptimized

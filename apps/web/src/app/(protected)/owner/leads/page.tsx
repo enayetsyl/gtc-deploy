@@ -92,13 +92,13 @@ export default function OwnerLeadsPage() {
                         {l.name}
                       </TableCell>
                       <TableCell className="text-sm text-body">
-                        {l.email || "—"}
+                        {l.email || t("ui.none")}
                       </TableCell>
                       <TableCell className="text-sm text-body">
-                        {l.phone || "—"}
+                        {l.phone || t("ui.none")}
                       </TableCell>
                       <TableCell className="max-w-[320px] truncate text-sm text-body">
-                        {l.message || "—"}
+                        {l.message || t("ui.none")}
                       </TableCell>
                       <TableCell className="space-x-2">
                         {l.attachments?.length ? (

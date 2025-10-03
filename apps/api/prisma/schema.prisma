@@ -56,6 +56,8 @@ model Sector {
   conventions Convention[]
   leads       Lead[]
   pointOnboardings PointOnboarding[]
+  services   Service[]
+  pointLinks GtcPointSector[]
 }
 
 // Join table to allow many-to-many relationship between Users and Sectors
@@ -84,17 +86,23 @@ model GtcPoint {
   users       User[]            @relation("PointUsers")
   conventions Convention[]
   onboardings PointOnboarding[]
+  sectors     GtcPointSector[]
 }
 
 model Service {
   id         String            @id @default(cuid())
-  code       String            @unique
+  code       String
   name       String
   active     Boolean           @default(true)
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
+  sectorId   String
+  sector     Sector            @relation(fields: [sectorId], references: [id])
   pointLinks GtcPointService[]
   onboardingLinks PointOnboardingService[]
+
+  @@index([sectorId])
+  @@unique([sectorId, code])
 }
 
 model GtcPointService {
@@ -237,6 +245,20 @@ model PointOnboardingService {
   service            Service         @relation(fields: [serviceId], references: [id])
 
   @@unique([onboardingId, serviceId])
+}
+
+// Join table to allow many-to-many relationship between GtcPoint and Sector
+model GtcPointSector {
+  id         String   @id @default(cuid())
+  gtcPointId String
+  sectorId   String
+  createdAt  DateTime @default(now())
+
+  gtcPoint  GtcPoint @relation(fields: [gtcPointId], references: [id])
+  sector    Sector   @relation(fields: [sectorId], references: [id])
+
+  @@unique([gtcPointId, sectorId])
+  @@index([sectorId])
 }
 
 model Lead {

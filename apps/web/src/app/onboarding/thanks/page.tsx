@@ -26,13 +26,25 @@ export default function OnboardingThanksPage() {
         </p>
 
         <p style={{ color: "#444", lineHeight: 1.6, marginTop: "1rem" }}>
-          If you have any questions, contact your sector owner or email{" "}
-          <a href="mailto:support@gtc.example">support@gtc.example</a>.
+          {(() => {
+            const supportEmail = "support@gtc.example";
+            const contact = t("onboarding.contactSupport", {
+              email: "__EMAIL__",
+            });
+            const parts = contact.split("__EMAIL__");
+            return (
+              <>
+                {parts[0]}
+                <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
+                {parts[1]}
+              </>
+            );
+          })()}
         </p>
 
         <div style={{ marginTop: "1.25rem" }}>
           <Link href="/" style={{ color: "#0366d6" }}>
-            Return to home
+            {t("onboarding.returnHome")}
           </Link>
         </div>
       </div>

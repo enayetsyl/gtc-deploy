@@ -5,6 +5,7 @@ import { type AxiosError } from "axios";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSubmitLeadPublic } from "@/hooks/useLeads";
+import { useI18n } from "@/providers/i18n-provider";
 import { Button } from "@/components/ui/button";
 import Spinner from "@/components/ui/Spinner";
 import { Input } from "@/components/ui/input";
@@ -22,24 +23,41 @@ import {
 } from "@/components/ui/select";
 import { useSectorsPublic } from "@/hooks/useSectors";
 
-const LeadSchema = z.object({
-  sectorId: z.string().min(1, "Select a sector"),
-  name: z.string().min(2, "Enter your name"),
-  email: z.string().email().optional().or(z.literal("")),
-  phone: z.string().min(6).max(32).optional().or(z.literal("")),
-  message: z.string().max(2000).optional().or(z.literal("")),
-  gdprAgree: z
-    .boolean()
-    .refine((v) => v === true, { message: "You must agree" }),
-});
-
-type LeadFormValues = z.infer<typeof LeadSchema>;
+type LeadFormValues = {
+  sectorId: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  message?: string;
+  gdprAgree: boolean;
+};
 
 export default function LeadPage() {
+  const { t } = useI18n();
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<number | null>(null);
   const submit = useSubmitLeadPublic();
   const sectors = useSectorsPublic();
+  // build schema with localized messages
+  const LeadSchema = z.object({
+    sectorId: z.string().min(1, t("form.errors.sector.required")),
+    name: z.string().min(2, t("form.errors.name.required")),
+    email: z
+      .string()
+      .email(t("form.errors.email.invalid"))
+      .optional()
+      .or(z.literal("")),
+    phone: z
+      .string()
+      .min(6, t("form.errors.phone.invalid"))
+      .max(32, t("form.errors.phone.invalid"))
+      .optional()
+      .or(z.literal("")),
+    message: z.string().max(2000).optional().or(z.literal("")),
+    gdprAgree: z
+      .boolean()
+      .refine((v) => v === true, { message: t("form.errors.gdpr.required") }),
+  });
 
   const {
     register,
@@ -71,16 +89,16 @@ export default function LeadPage() {
         files,
         onUploadProgress: setProgress,
       });
-      toast.success("Lead submitted — We will get back to you soon.");
+      toast.success(t("lead.toast.success"));
       reset();
       setFiles([]);
     } catch (err: unknown) {
       const axiosErr = err as AxiosError<{ error?: string }> | undefined;
       const status = axiosErr?.response?.status;
       if (status === 429) {
-        toast.error("Too many submissions — Please try again later.");
+        toast.error(t("lead.toast.tooMany"));
       } else {
-        toast.error("Submission failed — Please check fields and try again.");
+        toast.error(t("lead.toast.failure"));
       }
     } finally {
       setProgress(null);
@@ -93,13 +111,11 @@ export default function LeadPage() {
   }>;
   const sectorValue = watch("sectorId");
 
-  console.log("sector", sectors.data);
-
   return (
     <div className="mx-auto max-w-2xl p-6">
       <Card>
         <CardHeader>
-          <CardTitle>Contact / Lead</CardTitle>
+          <CardTitle>{t("lead.title")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
@@ -107,10 +123,12 @@ export default function LeadPage() {
             <input type="hidden" {...register("sectorId")} />
 
             <div>
-              <Label htmlFor="sectorId" className="mb-1">Sector</Label>
+              <Label htmlFor="sectorId" className="mb-1">
+                {t("lead.sector.label")}
+              </Label>
               {sectors.isLoading ? (
                 <p className="text-sm text-muted-foreground">
-                  Loading sectors…
+                  {t("ui.loading")}
                 </p>
               ) : sectorItems.length ? (
                 <Select
@@ -123,7 +141,7 @@ export default function LeadPage() {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select sector" />
+                    <SelectValue placeholder={t("ui.selectSector")} />
                   </SelectTrigger>
                   <SelectContent>
                     {sectorItems.map((s) => (
@@ -137,11 +155,11 @@ export default function LeadPage() {
                 <>
                   <Input
                     id="sectorId"
-                    placeholder="Enter sector ID"
+                    placeholder={t("lead.sector.enterIdPlaceholder")}
                     {...register("sectorId")}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    No public sector list available. Enter sector ID manually.
+                    {t("lead.sector.noList")}
                   </p>
                 </>
               )}
@@ -153,7 +171,9 @@ export default function LeadPage() {
             </div>
 
             <div>
-              <Label htmlFor="name" className="mb-1">Name</Label>
+              <Label htmlFor="name" className="mb-1">
+                {t("form.name")}
+              </Label>
               <Input id="name" {...register("name")} />
               {errors.name && (
                 <p className="text-sm text-red-500">{errors.name.message}</p>
@@ -162,7 +182,9 @@ export default function LeadPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="email" className="mb-1">Email</Label>
+                <Label htmlFor="email" className="mb-1">
+                  {t("form.email")}
+                </Label>
                 <Input id="email" type="email" {...register("email")} />
                 {errors.email && (
                   <p className="text-sm text-red-500">
@@ -171,7 +193,9 @@ export default function LeadPage() {
                 )}
               </div>
               <div>
-                <Label htmlFor="phone" className="mb-1">Phone</Label>
+                <Label htmlFor="phone" className="mb-1">
+                  {t("lead.phone")}
+                </Label>
                 <Input id="phone" {...register("phone")} />
                 {errors.phone && (
                   <p className="text-sm text-red-500">
@@ -182,12 +206,14 @@ export default function LeadPage() {
             </div>
 
             <div>
-              <Label htmlFor="message" className="mb-1">Message</Label>
+              <Label htmlFor="message" className="mb-1">
+                {t("lead.message")}
+              </Label>
               <Textarea id="message" rows={4} {...register("message")} />
             </div>
 
             <div>
-              <Label className="mb-1">Attachments</Label>
+              <Label className="mb-1">{t("lead.attachments")}</Label>
               <input
                 type="file"
                 multiple
@@ -199,7 +225,7 @@ export default function LeadPage() {
               />
               {files.length > 0 && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  {files.length} file(s) selected
+                  {t("lead.filesSelected", { count: files.length })}
                 </p>
               )}
             </div>
@@ -210,7 +236,7 @@ export default function LeadPage() {
                 checked={watch("gdprAgree")}
                 onCheckedChange={(v) => setValue("gdprAgree", Boolean(v))}
               />
-              <Label htmlFor="gdpr">I agree to the privacy policy (GDPR)</Label>
+              <Label htmlFor="gdpr">{t("lead.gdpr")}</Label>
             </div>
             {errors.gdprAgree && (
               <p className="text-sm text-red-500">{errors.gdprAgree.message}</p>
@@ -227,7 +253,9 @@ export default function LeadPage() {
 
             <Button type="submit" disabled={submit.isPending}>
               {submit.isPending && <Spinner className="w-4 h-4 mr-2" />}
-              {submit.isPending ? "Submitting…" : "Submit"}
+              {submit.isPending
+                ? t("lead.button.submitting")
+                : t("lead.button.submit")}
             </Button>
           </form>
         </CardContent>

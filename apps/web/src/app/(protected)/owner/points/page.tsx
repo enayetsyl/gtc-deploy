@@ -74,7 +74,7 @@ export default function OwnerPointsPage() {
                     <th className="text-left">{t("table.name")}</th>
                     <th className="text-left">{t("table.email")}</th>
                     <th className="text-left">{t("table.created")}</th>
-                    <th className="text-left">Services</th>
+                    <th className="text-left">{t("admin.points.services")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -177,21 +177,20 @@ export default function OwnerPointsPage() {
 }
 
 function PointServices({ pointId }: { pointId: string }) {
+  const { t } = useI18n();
   const { data, isLoading, isError } = useQuery<ServiceLink[]>({
     queryKey: ["admin", "points", pointId, "services"],
     queryFn: () => getAdminPointServices(pointId),
   });
 
-  if (isLoading) return <div className="text-sm">Loading services…</div>;
+  if (isLoading) return <div className="text-sm">{t("ui.loading")}</div>;
   if (isError)
     return (
-      <div className="text-sm text-destructive">Failed to load services.</div>
+      <div className="text-sm text-destructive">{t("ui.failedToLoad")}</div>
     );
 
   if (!data || data.length === 0)
-    return (
-      <div className="text-sm text-muted-text">No services configured.</div>
-    );
+    return <div className="text-sm text-muted-text">{t("ui.noServices")}</div>;
 
   return (
     <div className="space-y-2">

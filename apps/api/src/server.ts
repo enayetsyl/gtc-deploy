@@ -17,6 +17,7 @@ import { devNotify } from "./routes/dev";
 import { conventionsRouter } from "./routes/conventions";
 import { adminConventions } from "./routes/admin.conventions";
 import { pointServices } from "./routes/point.services";
+import { pointSectors } from "./routes/point.sectors";
 import { adminLeads } from "./routes/admin.leads";
 import { meLeads } from "./routes/me.leads";
 import { leadsPublic } from "./routes/leads.public";
@@ -25,6 +26,7 @@ import { sectorsPublic } from "./routes/sectors.public";
 import { pointsOnboardingPublic } from "./routes/points.onboarding.public";
 import { uploadthingRouter } from "./routes/uploadthing";
 import { debugRouter } from "./routes/debug";
+import { httpLogger } from "./middleware/logger";
 
 // Debug - remove in production
 import { testUploadThingConnection } from "./debug/uploadthing-test";
@@ -42,6 +44,7 @@ app.use(cors({
 }));
 app.use(cookieParser());
 app.use(express.json());
+app.use(httpLogger);
 
 // Note: /uploads static serving can be removed once fully migrated to UploadThing
 // app.use("/uploads", express.static(path.resolve("uploads")));
@@ -57,6 +60,7 @@ app.use("/api/dev", devNotify);
 app.use("/api/conventions", conventionsRouter);
 app.use("/api/admin/conventions", adminConventions);
 app.use("/api/point/services", pointServices);
+app.use("/api/point/sectors", pointSectors);
 app.use("/api/leads/public", leadsPublic);
 app.use("/api/leads", leadFiles);
 app.use("/api/me/leads", meLeads);

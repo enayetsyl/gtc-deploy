@@ -54,9 +54,15 @@ export default function LoginPage() {
             | undefined;
           const data = response?.data as Record<string, unknown> | undefined;
           const error = data?.error;
-          if (typeof error === "string") return error;
+          if (typeof error === "string") {
+            // Map known server error messages to localized keys
+            if (error === "Invalid credentials") {
+              return t("auth.login.errors.invalidCredentials");
+            }
+            return error;
+          }
         }
-        return "Login failed";
+        return t("auth.login.errors.generic");
       };
       setErrors((prev) => ({ ...prev, root: getErrMsg(e) }));
     },
@@ -76,8 +82,37 @@ export default function LoginPage() {
     if (!parsed.success) {
       const fieldErrs: typeof errors = {};
       parsed.error.issues.forEach((i) => {
-        const k = i.path[0] as "email" | "password";
-        fieldErrs[k] = i.message;
+        type ZodIssueWithDetails = z.ZodIssue & {
+          validation?: string;
+          minimum?: number;
+        };
+        const issue = i as ZodIssueWithDetails;
+        const field = i.path[0] as "email" | "password";
+        // Map common zod issue codes/validations to localized messages
+        if (field === "email") {
+          // zod: invalid_string with validation "email"
+          if (issue.code === "invalid_string" && issue.validation === "email") {
+            fieldErrs.email = t("form.errors.email.invalid");
+            return;
+          }
+          // required / empty
+          if (issue.code === "too_small") {
+            fieldErrs.email = t("form.errors.email.required");
+            return;
+          }
+        }
+
+        if (field === "password") {
+          // too_small contains details in issue.minimum if available
+          if (issue.code === "too_small") {
+            const min = issue.minimum ?? 6;
+            fieldErrs.password = t("form.errors.password.min", { min });
+            return;
+          }
+        }
+
+        // Fallback to raw message if mapping not found
+        fieldErrs[field] = i.message;
       });
       setErrors(fieldErrs);
       return;

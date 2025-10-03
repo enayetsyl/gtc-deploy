@@ -41,7 +41,11 @@ exports.adminPoints.get("/onboarding", (0, auth_1.requireRole)("ADMIN"), async (
     res.json({ items });
 });
 // POST /api/admin/points/onboarding
-exports.adminPoints.post("/onboarding", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
+exports.adminPoints.post("/onboarding", async (req, res) => {
+    // Allow ADMIN or GTC_POINT to create onboarding requests
+    const user = req.user;
+    if (user.role !== 'ADMIN' && user.role !== 'GTC_POINT')
+        return res.status(403).json({ error: 'Forbidden' });
     const parsed = onboardingCreateSchema.safeParse(req.body);
     if (!parsed.success)
         return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
@@ -127,7 +131,9 @@ exports.adminPoints.get("/:id/services", async (req, res) => {
 });
 const svcActionSchema = zod_1.z.object({ action: zod_1.z.enum(["ENABLE", "DISABLE"]) });
 /** PATCH /api/admin/points/:id/services/:serviceId  { action: "ENABLE"|"DISABLE" } */
-exports.adminPoints.patch("/:id/services/:serviceId", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
+exports.adminPoints.patch("/:id/services/:serviceId", async (req, res) => {
+    // allow ADMIN or SECTOR_OWNER (only for their sector)
+    const user = req.user;
     const { id } = idParam.parse(req.params);
     const serviceId = zod_1.z.string().min(1).parse(req.params.serviceId);
     const body = svcActionSchema.safeParse(req.body);
@@ -136,6 +142,28 @@ exports.adminPoints.patch("/:id/services/:serviceId", (0, auth_1.requireRole)("A
     const svc = await prisma_1.prisma.service.findUnique({ where: { id: serviceId } });
     if (!svc)
         return res.status(404).json({ error: "Service not found" });
+    // If user is SECTOR_OWNER, ensure they own the point's sector
+    if (user.role === 'SECTOR_OWNER') {
+        const point = await prisma_1.prisma.gtcPoint.findUnique({ where: { id }, select: { sectorId: true } });
+        if (!point)
+            return res.status(404).json({ error: 'Point not found' });
+        const owns = await prisma_1.prisma.userSector.findFirst({ where: { userId: user.id, sectorId: point.sectorId } });
+        if (!owns)
+            return res.status(403).json({ error: 'Forbidden' });
+    }
+    else if (user.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    // Ensure point exists. If service and point sectors differ, allow the operation
+    // but log a warning. Historically we blocked toggles across sectors which
+    // prevented legitimate administrative actions; relax that constraint here.
+    const pointForCheck = await prisma_1.prisma.gtcPoint.findUnique({ where: { id }, select: { sectorId: true } });
+    if (!pointForCheck)
+        return res.status(404).json({ error: 'Point not found' });
+    if (pointForCheck.sectorId !== svc.sectorId) {
+        // Keep authorization in place, but permit toggling even when sectors differ.
+        console.warn(`Service ${serviceId} sector (${svc.sectorId}) differs from point ${id} sector (${pointForCheck.sectorId}). Proceeding with toggle as authorized user ${user.id}`);
+    }
     const status = body.data.action === "ENABLE" ? "ENABLED" : "DISABLED";
     const link = await prisma_1.prisma.gtcPointService.upsert({
         where: { gtcPointId_serviceId: { gtcPointId: id, serviceId } },

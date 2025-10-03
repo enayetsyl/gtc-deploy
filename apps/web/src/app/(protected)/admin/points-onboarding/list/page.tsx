@@ -6,11 +6,13 @@ import Link from "next/link";
 type OnboardItem = { id: string; name: string; email: string; status?: string };
 
 import { useI18n } from "@/providers/i18n-provider";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 export default function ReviewList() {
   const { t } = useI18n();
   const [items, setItems] = useState<OnboardItem[]>([]);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
       try {
@@ -59,6 +61,34 @@ export default function ReviewList() {
                 </div>
                 <div className="flex items-center gap-3 mt-2 sm:mt-0">
                   <StatusBadge status={i.status} />
+                  {/* Show resend button for draft, submitted, approved, accepted */}
+                  {["draft", "submitted", "approved", "accepted"].includes(
+                    (i.status || "").toLowerCase()
+                  ) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="whitespace-nowrap"
+                      onClick={async () => {
+                        try {
+                          setLoadingId(i.id);
+                          await api.post(
+                            `/api/admin/points/onboarding/${i.id}/resend-email`
+                          );
+                          toast.success(t("toast.resendSuccess"));
+                        } catch (err) {
+                          console.error(err);
+                          toast.error(t("toast.resendFailed"));
+                        } finally {
+                          setLoadingId(null);
+                        }
+                      }}
+                    >
+                      {loadingId === i.id
+                        ? t("ui.sending")
+                        : t("admin.onboarding.resendEmail")}
+                    </Button>
+                  )}
                   <Button size="sm" className="whitespace-nowrap">
                     <Link href={`/admin/points-onboarding/${i.id}`}>
                       {t("ui.view")}
@@ -75,41 +105,50 @@ export default function ReviewList() {
 }
 
 function StatusBadge({ status }: { status?: string | null }) {
+  const { t } = useI18n();
   const s = (status || "unknown").toLowerCase();
   let bg = "bg-color-muted text-muted-foreground";
+  let key = "status.unknown";
 
-  // Map PointOnboardingStatus and legacy values to color classes
+  // Map PointOnboardingStatus and legacy values to color classes and i18n keys
   switch (s) {
     case "draft":
       // not yet submitted
       bg = "bg-neutral-400 text-black";
+      key = "status.draft";
       break;
     case "submitted":
       // waiting review
       bg = "bg-brand-teal-400 text-black";
+      key = "status.submitted";
       break;
     case "approved":
     case "accepted":
       bg = "bg-brand-blue-500 text-white";
+      key = "status.approved";
       break;
     case "completed":
       // success states
       bg = "bg-brand-teal-500 text-white";
+      key = "status.completed";
       break;
     case "declined":
     case "rejected":
     case "denied":
       // failure states
       bg = "bg-alert-error text-white";
+      key = "status.declined";
       break;
     default:
       bg = "bg-color-muted text-muted-foreground";
+      key = "status.unknown";
   }
+
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${bg}`}
     >
-      {status ?? "UNKNOWN"}
+      {t(key)}
     </span>
   );
 }

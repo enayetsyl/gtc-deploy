@@ -96,7 +96,38 @@ export default function CreateSectorOwnerPage() {
               sendInvite,
             });
             if (!parsed.success) {
-              setErr(parsed.error.issues[0]?.message ?? "Validation error");
+              // Map zod issues to localized messages
+              const issue = parsed.error.issues[0];
+              const field = issue.path[0] as string | undefined;
+              // Default fallback
+              let msg = t("form.errors.validation");
+
+              // Use issue.code / validation to map common cases
+              type ZodIssueWithDetails = typeof issue & {
+                validation?: string;
+                minimum?: number;
+              };
+              const detailed = issue as ZodIssueWithDetails;
+
+              if (field === "name") {
+                if (detailed.code === "too_small") {
+                  const min = detailed.minimum ?? 2;
+                  msg = t("form.errors.name.min", { min });
+                }
+              } else if (field === "email") {
+                if (
+                  detailed.code === "invalid_string" &&
+                  detailed.validation === "email"
+                ) {
+                  msg = t("form.errors.email.invalid");
+                }
+              } else if (field === "sectorId") {
+                if (detailed.code === "too_small") {
+                  msg = t("form.errors.sector.required");
+                }
+              }
+
+              setErr(msg);
               return;
             }
             const payload: {

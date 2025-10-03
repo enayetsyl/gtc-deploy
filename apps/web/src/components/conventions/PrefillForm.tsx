@@ -6,7 +6,15 @@ import { downloadBlob } from "../../lib/axios";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 
-export default function PrefillForm() {
+export default function PrefillForm({
+  sectorName,
+  serviceNames,
+  disabled,
+}: {
+  sectorName?: string;
+  serviceNames?: string[];
+  disabled?: boolean;
+}) {
   const [applicantName, setApplicantName] = useState("");
   const [loading, setLoading] = useState(false);
   const { t } = useI18n();
@@ -14,7 +22,14 @@ export default function PrefillForm() {
   async function handlePrefill() {
     try {
       setLoading(true);
-      const blob = await prefillPdf({ applicantName });
+      const blob = await prefillPdf({
+        applicantName,
+        sectorName,
+        title: t("convention.title") as string,
+        pointName: undefined,
+        // pass services as names (backend expects string[] for services)
+        ...(serviceNames ? { services: serviceNames } : {}),
+      });
       downloadBlob(blob, "convention-prefill.pdf");
     } finally {
       setLoading(false);
@@ -30,8 +45,18 @@ export default function PrefillForm() {
           value={applicantName}
           onChange={(e) => setApplicantName(e.target.value)}
         />
+        {sectorName && (
+          <div className="text-xs text-muted-foreground mt-1">
+            {t("ui.sector")}: {sectorName}
+          </div>
+        )}
+        {serviceNames && serviceNames.length > 0 && (
+          <div className="text-xs text-muted-foreground mt-1">
+            {t("onboarding.servicesPreselected")}: {serviceNames.join(", ")}
+          </div>
+        )}
       </div>
-      <Button onClick={handlePrefill} disabled={loading}>
+      <Button onClick={handlePrefill} disabled={loading || disabled}>
         {loading ? t("prefill.building") : t("prefill.download")}
       </Button>
     </div>

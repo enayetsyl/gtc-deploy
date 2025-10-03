@@ -47,19 +47,19 @@ export default function UploadWidget({
   const validateAndSet = useCallback(
     (file: File) => {
       if (maxSizeMB && file.size > maxSizeMB * 1024 * 1024) {
-        setError(`File is too large (max ${maxSizeMB}MB).`);
+        setError(t("file.errors.tooLarge", { max: String(maxSizeMB) }));
         onSelect(null);
         return;
       }
       if (!matchesAccept(file, accept)) {
-        setError("File type not allowed.");
+        setError(t("file.errors.typeNotAllowed"));
         onSelect(null);
         return;
       }
       setError(null);
       onSelect(file);
     },
-    [accept, maxSizeMB, onSelect]
+    [accept, maxSizeMB, onSelect, t]
   );
 
   const handleFiles = (files: FileList | null) => {
@@ -95,12 +95,12 @@ export default function UploadWidget({
             <div className="flex flex-col">
               <span className="font-medium">{value.name}</span>
               <span className="text-xs text-muted-foreground">
-                {(value.size / 1024).toFixed(0)} KB
+                {t("file.sizeKb", { size: (value.size / 1024).toFixed(0) })}
               </span>
             </div>
           ) : (
             <div className="text-muted-foreground">
-              {t("file.dropOrBrowse", { browse: "browse" })}
+              {t("file.dropOrBrowse", { browse: t("file.choose") })}
             </div>
           )}
         </div>

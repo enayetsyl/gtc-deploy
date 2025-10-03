@@ -7,8 +7,9 @@ const auth_1 = require("../middleware/auth");
 const onboarding_1 = require("../services/onboarding");
 const prisma_1 = require("../lib/prisma");
 exports.adminPointsOnboarding = (0, express_1.Router)();
-exports.adminPointsOnboarding.use(auth_1.requireAuth, (0, auth_1.requireRole)("ADMIN"));
-exports.adminPointsOnboarding.get("/", async (req, res) => {
+exports.adminPointsOnboarding.use(auth_1.requireAuth);
+// Admin-only: list onboarding
+exports.adminPointsOnboarding.get("/", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const status = req.query.status ?? undefined;
     const where = {};
     if (status)
@@ -23,6 +24,7 @@ const createSchema = zod_1.z.object({
     includeServices: zod_1.z.boolean().default(false),
     serviceIds: zod_1.z.array(zod_1.z.string().min(1)).optional(),
 });
+// Create onboarding (allowed by ADMIN and GTC_POINT)
 exports.adminPointsOnboarding.post("/", async (req, res) => {
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success)
@@ -30,12 +32,14 @@ exports.adminPointsOnboarding.post("/", async (req, res) => {
     const ob = await (0, onboarding_1.createOnboardingLink)(parsed.data);
     res.status(201).json(ob);
 });
-exports.adminPointsOnboarding.post("/:id/approve", async (req, res) => {
+// Admin-only: approve
+exports.adminPointsOnboarding.post("/:id/approve", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const { id } = zod_1.z.object({ id: zod_1.z.string().min(1) }).parse(req.params);
     const result = await (0, onboarding_1.approveOnboarding)(id, req.user.id);
     res.json(result);
 });
-exports.adminPointsOnboarding.post("/:id/decline", async (req, res) => {
+// Admin-only: decline
+exports.adminPointsOnboarding.post("/:id/decline", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
     const { id } = zod_1.z.object({ id: zod_1.z.string().min(1) }).parse(req.params);
     await (0, onboarding_1.declineOnboarding)(id, req.user.id);
     res.json({ ok: true });

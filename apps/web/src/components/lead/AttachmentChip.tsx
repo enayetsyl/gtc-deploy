@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { useDownloadLeadAttachment } from "@/hooks/useLeads";
+import { useI18n } from "@/providers/i18n-provider";
 
 export function AttachmentChip({
   leadId,
@@ -13,6 +14,7 @@ export function AttachmentChip({
   name: string;
 }) {
   const dl = useDownloadLeadAttachment();
+  const { t } = useI18n();
 
   async function onClick() {
     const blob = await dl.mutateAsync({ leadId, attId });
@@ -34,7 +36,7 @@ export function AttachmentChip({
       disabled={dl.isPending}
       className="gap-2"
       title={name}
-      aria-label={`Download attachment ${name}`}
+      aria-label={t("file.downloadAttachment", { name })}
     >
       <Download className="h-4 w-4" />
       <span

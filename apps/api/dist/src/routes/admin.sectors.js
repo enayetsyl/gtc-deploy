@@ -120,14 +120,18 @@ exports.adminSectors.post("/sector-owners", async (req, res) => {
         const link = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/invite/accept?token=${encodeURIComponent(token)}`;
         await (0, mailer_1.sendEmail)({
             to: user.email,
-            subject: "You're invited as Sector Owner",
-            html: `<p>Hello ${user.name},</p><p>You've been added as a Sector Owner for <strong>${primarySector?.name ?? "your sector(s)"}</strong>. To activate your account and set your password, click: <a href="${link}">${link}</a></p>`,
+            subject: "Sei stato invitato come Responsabile del Settore",
+            html: `
+        <p>Ciao ${user.name},</p>
+        <p>Sei stato aggiunto come Responsabile del Settore per <strong>${primarySector?.name ?? "i tuoi settori"}</strong>.</p>
+        <p>
+          <a href="${link}" style="display:inline-block;padding:12px 20px;background-color:#2563eb;color:#ffffff;border-radius:6px;text-decoration:none;font-weight:600;">Attiva l'account e imposta la password</a>
+        </p>
+        <p style="color:#6b7280;font-size:13px">Se il pulsante non funziona, copia e incolla questo link nel tuo browser:</p>
+        <p style="word-break:break-all;"><a href="${link}">${link}</a></p>
+      `,
         });
     }
-    // NOTE: multi-sector membership is not persisted beyond primary sector without a DB migration.
-    // We only set the user's primary `sectorId` to preserve compatibility. To fully support
-    // many-to-many sector ownership, we should add a join table (e.g. UserSector) in Prisma
-    // and migrate the database. If you want that, I can prepare the migration in a follow-up.
     res.status(201).json(user);
 });
 const idParam = zod_1.z.object({ id: zod_1.z.string().min(1) });

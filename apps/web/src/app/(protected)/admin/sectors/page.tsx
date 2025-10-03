@@ -37,7 +37,7 @@ export default function SectorsPage() {
       setName("");
       qc.invalidateQueries({ queryKey: ["admin", "sectors"] });
     },
-    onError: () => setErr("Failed to create sector"),
+    onError: () => setErr(t("admin.sectors.createFailed")),
   });
 
   const updateMut = useMutation({
@@ -47,7 +47,7 @@ export default function SectorsPage() {
       setEditing(null);
       qc.invalidateQueries({ queryKey: ["admin", "sectors"] });
     },
-    onError: () => setErr("Failed to update"),
+    onError: () => setErr(t("admin.sectors.updateFailed")),
     onMutate: (p: { id: string; name: string }) => setUpdatePendingId(p.id),
     onSettled: () => setUpdatePendingId(null),
   });
@@ -55,7 +55,7 @@ export default function SectorsPage() {
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteSector(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "sectors"] }),
-    onError: () => setErr("Delete failed (maybe sector has points)"),
+    onError: () => setErr(t("admin.sectors.deleteFailed")),
     onMutate: (id: string) => setDeletePendingId(id),
     onSettled: () => setDeletePendingId(null),
   });
@@ -71,10 +71,24 @@ export default function SectorsPage() {
             e.preventDefault();
             setErr(null);
             const parsed = sectorSchema.safeParse({ name });
-            if (!parsed.success)
-              return setErr(
-                parsed.error.issues[0]?.message ?? "Validation error"
-              );
+            if (!parsed.success) {
+              const issue = parsed.error.issues[0];
+              const field = issue.path[0] as string | undefined;
+              let msg = t("form.errors.validation");
+
+              type ZodIssueWithDetails = typeof issue & {
+                validation?: string;
+                minimum?: number;
+              };
+              const detailed = issue as ZodIssueWithDetails;
+
+              if (field === "name" && detailed.code === "too_small") {
+                const min = detailed.minimum ?? 2;
+                msg = t("form.errors.name.min", { min });
+              }
+
+              return setErr(msg);
+            }
             createMut.mutate(parsed.data);
           }}
           className="flex gap-2"

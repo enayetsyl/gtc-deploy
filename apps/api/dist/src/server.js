@@ -24,6 +24,7 @@ const dev_1 = require("./routes/dev");
 const conventions_1 = require("./routes/conventions");
 const admin_conventions_1 = require("./routes/admin.conventions");
 const point_services_1 = require("./routes/point.services");
+const point_sectors_1 = require("./routes/point.sectors");
 const admin_leads_1 = require("./routes/admin.leads");
 const me_leads_1 = require("./routes/me.leads");
 const leads_public_1 = require("./routes/leads.public");
@@ -32,6 +33,7 @@ const sectors_public_1 = require("./routes/sectors.public");
 const points_onboarding_public_1 = require("./routes/points.onboarding.public");
 const uploadthing_1 = require("./routes/uploadthing");
 const debug_1 = require("./routes/debug");
+const logger_1 = require("./middleware/logger");
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)({
     origin: (origin, callback) => {
@@ -46,6 +48,7 @@ exports.app.use((0, cors_1.default)({
 }));
 exports.app.use((0, cookie_parser_1.default)());
 exports.app.use(express_1.default.json());
+exports.app.use(logger_1.httpLogger);
 // Note: /uploads static serving can be removed once fully migrated to UploadThing
 // app.use("/uploads", express.static(path.resolve("uploads")));
 exports.app.use("/api/health", health_js_1.router);
@@ -60,6 +63,7 @@ exports.app.use("/api/dev", dev_1.devNotify);
 exports.app.use("/api/conventions", conventions_1.conventionsRouter);
 exports.app.use("/api/admin/conventions", admin_conventions_1.adminConventions);
 exports.app.use("/api/point/services", point_services_1.pointServices);
+exports.app.use("/api/point/sectors", point_sectors_1.pointSectors);
 exports.app.use("/api/leads/public", leads_public_1.leadsPublic);
 exports.app.use("/api/leads", leads_files_1.leadFiles);
 exports.app.use("/api/me/leads", me_leads_1.meLeads);

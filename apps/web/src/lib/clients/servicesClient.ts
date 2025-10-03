@@ -1,6 +1,6 @@
 import { api } from "../axios";
 
-export type ServiceLite = { id: string; code: string; name: string; active: boolean };
+export type ServiceLite = { id: string; code: string; name: string; active: boolean; sector?: { id: string; name: string } };
 export type ServiceLink = {
   id: string;
   gtcPointId: string;

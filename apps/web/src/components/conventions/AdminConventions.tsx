@@ -77,8 +77,8 @@ export default function AdminConventionsPage() {
                     <AdminRow
                       key={c.id}
                       id={c.id}
-                      point={c.gtcPoint?.name ?? "—"}
-                      sector={c.sector?.name ?? "—"}
+                      point={c.gtcPoint?.name ?? t("ui.none")}
+                      sector={c.sector?.name ?? t("ui.none")}
                       status={c.status}
                     />
                   ))}
@@ -92,8 +92,8 @@ export default function AdminConventionsPage() {
                 <AdminCard
                   key={c.id}
                   id={c.id}
-                  point={c.gtcPoint?.name ?? "—"}
-                  sector={c.sector?.name ?? "—"}
+                  point={c.gtcPoint?.name ?? t("ui.none")}
+                  sector={c.sector?.name ?? t("ui.none")}
                   status={c.status}
                 />
               ))}
@@ -131,7 +131,9 @@ function AdminRow({
       <td className="p-3 align-top">
         {point} <span className="text-muted-foreground">/ {sector}</span>
       </td>
-      <td className="p-3 align-top font-medium">{status}</td>
+      <td className="p-3 align-top font-medium">
+        {t(`status.${status.toLowerCase()}`) || status}
+      </td>
       <td className="p-3 align-top">
         {canDecide ? (
           <div className="flex items-center gap-2">
@@ -154,7 +156,12 @@ function AdminRow({
                 }
               }}
             >
-              {approving && <Spinner className="w-4 h-4 mr-2" />}
+              {/* Always render the Spinner node but hide it when not needed to avoid
+                  DOM insertion/removal ordering issues that can surface as
+                  "insertBefore" errors in some environments (HMR/dev). */}
+              <Spinner
+                className={approving ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"}
+              />
               {t("convention.approve")}
             </Button>
             <Button
@@ -169,7 +176,9 @@ function AdminRow({
                 }
               }}
             >
-              {declining && <Spinner className="w-4 h-4 mr-2" />}
+              <Spinner
+                className={declining ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"}
+              />
               {t("convention.decline")}
             </Button>
             <Button
@@ -186,8 +195,10 @@ function AdminRow({
               }}
               title={t("convention.downloadAll")}
             >
-              {downloading && <Spinner className="w-4 h-4 mr-2" />}
-              ZIP
+              <Spinner
+                className={downloading ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"}
+              />
+              {t("convention.downloadZip")}
             </Button>
           </div>
         ) : (
@@ -230,7 +241,9 @@ function AdminCard({
             <div className="text-sm text-muted-foreground">{sector}</div>
           </div>
         </div>
-        <div className="ml-2 text-sm font-medium">{status}</div>
+        <div className="ml-2 text-sm font-medium">
+          {t(`status.${status.toLowerCase()}`) || status}
+        </div>
       </div>
 
       <div className="mt-3">
@@ -256,7 +269,9 @@ function AdminCard({
                   }
                 }}
               >
-                {approving && <Spinner className="w-4 h-4 mr-2" />}
+                <Spinner
+                  className={approving ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"}
+                />
                 {t("convention.approve")}
               </Button>
 
@@ -272,7 +287,9 @@ function AdminCard({
                   }
                 }}
               >
-                {declining && <Spinner className="w-4 h-4 mr-2" />}
+                <Spinner
+                  className={declining ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"}
+                />
                 {t("convention.decline")}
               </Button>
 
@@ -290,8 +307,12 @@ function AdminCard({
                 }}
                 title={t("convention.downloadAll")}
               >
-                {downloading && <Spinner className="w-4 h-4 mr-2" />}
-                ZIP
+                <Spinner
+                  className={
+                    downloading ? "w-4 h-4 mr-2" : "w-4 h-4 mr-2 hidden"
+                  }
+                />
+                {t("convention.downloadZip")}
               </Button>
             </div>
           </div>

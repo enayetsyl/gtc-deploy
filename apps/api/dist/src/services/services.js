@@ -13,8 +13,8 @@ async function onServiceRequested(gtcPointId, serviceId) {
     ]);
     if (!point || !service)
         return;
-    const subject = `Service request: ${service.name} from ${point.name}`;
-    const html = `<p><b>Point:</b> ${point.name} / ${point.sector?.name ?? ""}<br/><b>Service:</b> ${service.name} (${service.code})</p>`;
+    const subject = `Richiesta di servizio: ${service.name} dal punto ${point.name}`;
+    const html = `<p><b>Punto:</b> ${point.name} / ${point.sector?.name ?? ""}<br/><b>Servizio:</b> ${service.name} (${service.code})</p>`;
     const admins = await (0, conventions_1.getAdmins)();
     await (0, notifications_1.notifyUsers)(admins, {
         type: "SERVICE_REQUEST",
@@ -30,8 +30,8 @@ async function onServiceStatusChanged(gtcPointId, serviceId, status) {
     ]);
     if (!point || !service)
         return;
-    const subject = `Service ${status === "ENABLED" ? "enabled" : "disabled"}: ${service.name}`;
-    const html = `<p>Your service <b>${service.name}</b> has been <b>${status}</b>.</p>`;
+    const subject = `Servizio ${status === "ENABLED" ? "ATTIVATO" : "DISATTIVATO"}: ${service.name}`;
+    const html = `<p>Il tuo servizio <b>${service.name}</b> è stato <b>${status === "ENABLED" ? "attivato" : "disattivato"}</b>.</p>`;
     const users = await (0, conventions_1.getPointUsers)(gtcPointId);
     await (0, notifications_1.notifyUsers)(users, {
         type: "SERVICE_STATUS",
