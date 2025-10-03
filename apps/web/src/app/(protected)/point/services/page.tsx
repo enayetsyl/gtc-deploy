@@ -32,6 +32,7 @@ export default function PointServicesPage() {
     queryFn: getPointServices,
     // Ensure we call the API every time this route/component mounts
     retryOnMount: true,
+    
   });
 
   const requestMut = useMutation<
