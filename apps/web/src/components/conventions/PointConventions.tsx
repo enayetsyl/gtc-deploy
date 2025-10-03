@@ -66,7 +66,6 @@ export default function PointConventionsPage() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-
   }
 
   return (
@@ -414,12 +413,34 @@ function ServicesMultiSelect({
     enabled: !!sectorId,
   });
 
+  // Fetch current point's services so we can exclude already-enabled services
+  const myServicesQ = useQuery({
+    queryKey: ["point", "services"],
+    queryFn: async () => {
+      const res = await api.get<{
+        items: Array<{ serviceId: string; status: string }>;
+      }>(`/api/point/services`);
+      return res.data;
+    },
+    // only enabled when sector is selected and user is a point; keep it passive otherwise
+    enabled: !!sectorId,
+  });
+
   if (!sectorId) return null;
 
-  if (q.isLoading)
+  if (q.isLoading || myServicesQ.isLoading)
     return <p className="text-sm text-muted-foreground">{t("ui.loading")}</p>;
 
   const items: { id: string; name: string }[] = q.data || [];
+
+  const ownedEnabledIds = new Set<string>(
+    (myServicesQ.data?.items || [])
+      .filter((it) => it.status === "ENABLED")
+      .map((it) => it.serviceId)
+  );
+
+  // Only show services that are not already enabled for this point
+  const visibleItems = items.filter((svc) => !ownedEnabledIds.has(svc.id));
 
   const toggle = (id: string) => {
     if (value.includes(id)) onChange(value.filter((s) => s !== id));
@@ -431,9 +452,9 @@ function ServicesMultiSelect({
       <label className="text-sm text-muted-foreground block mb-2">
         {t("point.services.title")}
       </label>
-      {items.length ? (
+      {visibleItems.length ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {items.map((svc) => (
+          {visibleItems.map((svc) => (
             <label
               key={svc.id}
               className="inline-flex items-center gap-2 text-sm"
@@ -483,6 +504,24 @@ function CreateConventionModal({
   const services =
     (servicesQ.data as { id: string; name: string }[] | undefined) ?? undefined;
 
+  // fetch my point's services so modal doesn't offer services already enabled
+  const myServicesModalQ = useQuery({
+    queryKey: ["point", "services", "modal"],
+    queryFn: async () => {
+      const res = await api.get<{
+        items: Array<{ serviceId: string; status: string }>;
+      }>(`/api/point/services`);
+      return res.data;
+    },
+    enabled: !!selectedSector,
+  });
+
+  const ownedEnabledModalIds = new Set<string>(
+    (myServicesModalQ.data?.items || [])
+      .filter((it) => it.status === "ENABLED")
+      .map((it) => it.serviceId)
+  );
+
   const toggleService = (id: string) =>
     setServiceIds((s) =>
       s.includes(id) ? s.filter((x) => x !== id) : [...s, id]
@@ -526,10 +565,10 @@ function CreateConventionModal({
         <h3 className="text-lg font-medium mb-2">{t("convention.create")}</h3>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <div>
+          {/* <div>
             <label className="block text-sm mb-1">{t("table.point")}</label>
             <div className="p-2 border rounded">{t("detail.gtcPointName")}</div>
-          </div>
+          </div> */}
           <div>
             <label className="block text-sm mb-1">{t("ui.sector")}</label>
             <select
@@ -550,23 +589,25 @@ function CreateConventionModal({
             <label className="block text-sm mb-1">
               {t("point.services.title")}
             </label>
-            {servicesQ.isLoading ? (
+            {servicesQ.isLoading || myServicesModalQ.isLoading ? (
               <div>{t("ui.loading")}</div>
             ) : services && services.length ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {services.map((svc) => (
-                  <label
-                    key={svc.id}
-                    className="inline-flex items-center gap-2 text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={serviceIds.includes(svc.id)}
-                      onChange={() => toggleService(svc.id)}
-                    />
-                    <span className="truncate">{svc.name}</span>
-                  </label>
-                ))}
+                {services
+                  .filter((svc) => !ownedEnabledModalIds.has(svc.id))
+                  .map((svc) => (
+                    <label
+                      key={svc.id}
+                      className="inline-flex items-center gap-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={serviceIds.includes(svc.id)}
+                        onChange={() => toggleService(svc.id)}
+                      />
+                      <span className="truncate">{svc.name}</span>
+                    </label>
+                  ))}
               </div>
             ) : (
               <div className="text-sm text-muted-foreground">

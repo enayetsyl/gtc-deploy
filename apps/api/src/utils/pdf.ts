@@ -6,6 +6,8 @@ export async function buildPrefillPdf(fields: {
   pointName?: string;       // optional
   sectorName?: string;      // optional
   services?: string[];      // optional list of service names
+  // optional data URL containing PNG image to embed in signature box
+  signatureDataUrl?: string | null;
 }) {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595, 842]); // A4
@@ -44,7 +46,36 @@ export async function buildPrefillPdf(fields: {
   page.drawText("Firma (dopo stampa & firma):", { x: 50, y, size: 10, font });
   // move down and draw signature rectangle
   y -= 16;
-  page.drawRectangle({ x: 50, y: y - 50, width: 220, height: 50, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+  const sigBoxX = 50;
+  const sigBoxY = y - 50;
+  const sigBoxW = 220;
+  const sigBoxH = 50;
+  page.drawRectangle({ x: sigBoxX, y: sigBoxY, width: sigBoxW, height: sigBoxH, borderColor: rgb(0, 0, 0), borderWidth: 1 });
+  // If a signature data URL is provided, embed it into the box area (scale to fit)
+  if (fields.signatureDataUrl) {
+    try {
+      // expect data URL like: data:image/png;base64,....
+      const m = /^data:image\/(png|jpeg);base64,(.+)$/.exec(fields.signatureDataUrl);
+      if (m && m[2]) {
+        const imgBytes = Buffer.from(m[2], "base64");
+        const img = await doc.embedPng(imgBytes);
+        const imgDims = img.scale(1);
+        // compute scale to fit into box with padding
+        const pad = 6;
+        const maxW = sigBoxW - pad * 2;
+        const maxH = sigBoxH - pad * 2;
+        const scale = Math.min(maxW / imgDims.width, maxH / imgDims.height, 1);
+        const drawW = imgDims.width * scale;
+        const drawH = imgDims.height * scale;
+        const drawX = sigBoxX + (sigBoxW - drawW) / 2;
+        const drawY = sigBoxY + (sigBoxH - drawH) / 2;
+        page.drawImage(img, { x: drawX, y: drawY, width: drawW, height: drawH });
+      }
+    } catch (e) {
+      // embedding failed - continue without signature
+      console.warn("Failed to embed signature image into PDF:", e);
+    }
+  }
   y -= 60;
 
   const bytes = await doc.save();

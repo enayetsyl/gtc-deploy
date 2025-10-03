@@ -73,7 +73,7 @@ export function useUploadSigned(conventionId: string) {
 }
 
 
-export async function prefillPdf(params: { applicantName?: string; pointName?: string; title?: string; sectorName?: string; services?: string[] }) {
+export async function prefillPdf(params: { applicantName?: string; pointName?: string; title?: string; sectorName?: string; services?: string[]; signature?: string }) {
   const { data } = await api.post(`/api/conventions/prefill`, params, { responseType: "blob" });
   return data as Blob;
 }
