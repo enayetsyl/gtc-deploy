@@ -159,10 +159,15 @@ adminPoints.patch("/:id/services/:serviceId", async (req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
-  // Ensure service belongs to the same sector as the point
+  // Ensure point exists. If service and point sectors differ, allow the operation
+  // but log a warning. Historically we blocked toggles across sectors which
+  // prevented legitimate administrative actions; relax that constraint here.
   const pointForCheck = await prisma.gtcPoint.findUnique({ where: { id }, select: { sectorId: true } });
   if (!pointForCheck) return res.status(404).json({ error: 'Point not found' });
-  if (pointForCheck.sectorId !== svc.sectorId) return res.status(403).json({ error: "Service does not belong to this point's sector" });
+  if (pointForCheck.sectorId !== svc.sectorId) {
+    // Keep authorization in place, but permit toggling even when sectors differ.
+    console.warn(`Service ${serviceId} sector (${svc.sectorId}) differs from point ${id} sector (${pointForCheck.sectorId}). Proceeding with toggle as authorized user ${user.id}`);
+  }
 
   const status = body.data.action === "ENABLE" ? "ENABLED" : "DISABLED";
   const link = await prisma.gtcPointService.upsert({

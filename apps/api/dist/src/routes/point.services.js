@@ -28,7 +28,7 @@ exports.pointServices.get("/", async (req, res) => {
     }
     const items = await prisma_1.prisma.gtcPointService.findMany({
         where: { gtcPointId: pointId },
-        include: { service: true },
+        include: { service: { include: { sector: true } } },
         orderBy: { createdAt: "desc" },
     });
     res.json({ items });
