@@ -203,6 +203,6 @@ Ticket
 2. Refresh token route at the backend implement
 3. 
 4. 
-5. admin/point/id/service - table should show sector name
-6. Admin/point/onboarding list - beside point name the sector should show
+5. 
+6. 
 7. Owner registration email should tell all the sector name in , separate.
