@@ -24,6 +24,7 @@ adminPoints.get("/", requireRole("ADMIN"), async (req, res) => {
 
 // Onboarding routes (moved from admin.points.onboarding.ts)
 import { createOnboardingLink, approveOnboarding, declineOnboarding } from "../services/onboarding";
+import { resendOnboardingEmail } from "../services/onboarding";
 
 const onboardingCreateSchema = z.object({
   sectorId: z.string().min(1),
@@ -179,4 +180,16 @@ adminPoints.patch("/:id/services/:serviceId", async (req, res) => {
   await onServiceStatusChanged(id, serviceId, status as any);
 
   res.json(link);
+});
+
+// POST /api/admin/points/onboarding/:id/resend-email
+adminPoints.post("/onboarding/:id/resend-email", requireRole("ADMIN"), async (req, res) => {
+  const { id } = z.object({ id: z.string().min(1) }).parse(req.params);
+  try {
+    await resendOnboardingEmail(id);
+    res.json({ ok: true });
+  } catch (e: any) {
+    console.error("resendOnboardingEmail error", e);
+    res.status(400).json({ error: e?.message ?? 'Failed' });
+  }
 });

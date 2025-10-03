@@ -293,6 +293,110 @@ export async function declineOnboarding(id: string, adminUserId: string) {
   }
 }
 
+export async function resendOnboardingEmail(id: string) {
+  const ob = await (prisma as any).pointOnboarding.findUnique({ where: { id }, include: { services: true } });
+  if (!ob) throw new Error("Not found");
+
+  const status = (ob.status || "DRAFT").toUpperCase();
+
+  // DRAFT -> resend onboarding link
+  if (status === "DRAFT") {
+    let onboardingToken = ob.onboardingToken;
+    if (!onboardingToken) {
+      onboardingToken = token();
+      const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+      await (prisma as any).pointOnboarding.update({ where: { id: ob.id }, data: { onboardingToken, tokenExpiresAt: expires } });
+    }
+    const link = `${env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/${onboardingToken}`;
+    await sendEmail({
+      to: ob.email,
+      subject: "Completa l'onboarding del tuo Punto GTC",
+      html: `
+        <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+          <p>Apri il link per completare i tuoi dati e firmare elettronicamente.</p>
+          <p>
+            <a href="${link}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
+              Completa l'onboarding
+            </a>
+          </p>
+          <p style="font-size:13px;color:#666">Se il pulsante non funziona, copia e incolla il seguente URL nel tuo browser:</p>
+          <p style="word-break:break-all"><a href="${link}">${link}</a></p>
+        </div>
+      `,
+    });
+    return;
+  }
+
+  // SUBMITTED -> resend admin notification
+  if (status === "SUBMITTED") {
+    const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true, email: true } });
+    const owners = await prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true, email: true } });
+    const adminIds = admins.map((a: any) => a.id);
+    const ownerIds = owners.map((o: any) => o.id);
+    const adminAndOwners = Array.from(new Set([...adminIds, ...ownerIds]));
+    const adminLink = `${env.webBaseUrl.replace(/\/$/, "")}/admin/points-onboarding/${ob.id}`;
+
+    if (adminAndOwners.length) {
+      await notifyUsers(adminAndOwners, {
+        type: "GENERIC",
+        subject: "Nuova richiesta di onboarding Punto GTC",
+        contentHtml: `
+          <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+            <p>Il Punto <strong>${ob.name}</strong> &lt;${ob.email}&gt; ha inviato i dettagli di onboarding.</p>
+            <p>
+              <a href="${adminLink}" style="display:inline-block;padding:10px 16px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">Rivedi onboarding</a>
+            </p>
+          </div>
+        `,
+        email: {
+          subject: "Nuova richiesta di onboarding Punto GTC",
+          html: `
+            <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+              <p>Il Punto <strong>${ob.name}</strong> &lt;${ob.email}&gt; ha inviato i dettagli di onboarding.</p>
+              <p>
+                <a href="${adminLink}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">Rivedi onboarding</a>
+              </p>
+              <p style="font-size:13px;color:#666">Se il pulsante non funziona, copia e incolla il seguente URL nel tuo browser:</p>
+              <p style="word-break:break-all"><a href="${adminLink}">${adminLink}</a></p>
+            </div>
+          `,
+        },
+      });
+    }
+    return;
+  }
+
+  // APPROVED / ACCEPTED -> resend registration email (or create registration token if missing)
+  if (status === "APPROVED" || status === "ACCEPTED") {
+    let registrationToken = ob.registrationToken;
+    if (!registrationToken) {
+      registrationToken = token();
+      const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+      await (prisma as any).pointOnboarding.update({ where: { id: ob.id }, data: { registrationToken, tokenExpiresAt: expires } });
+    }
+    const link = `${env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/register/${registrationToken}`;
+    await sendEmail({
+      to: ob.email,
+      subject: "Link per la registrazione del tuo Punto GTC",
+      html: `
+        <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+          <p>La tua richiesta di onboarding è stata approvata. Completa il tuo account impostando una password.</p>
+          <p>
+            <a href="${link}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
+              Completa la registrazione
+            </a>
+          </p>
+          <p style="font-size:13px;color:#666">Se il pulsante non funziona, copia e incolla il seguente URL nel tuo browser:</p>
+          <p style="word-break:break-all"><a href="${link}">${link}</a></p>
+        </div>
+      `,
+    });
+    return;
+  }
+
+  throw new Error("Cannot resend email for current onboarding status");
+}
+
 export async function completeRegistration(registrationToken: string, passwordHash: string) {
   const ob = await (prisma as any).pointOnboarding.findFirst({ where: { registrationToken } });
   if (!ob) throw new Error("Invalid token");

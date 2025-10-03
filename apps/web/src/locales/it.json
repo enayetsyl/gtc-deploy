@@ -114,6 +114,7 @@
 
   "admin.onboarding.submitted": "Onboarding inviati",
   "admin.onboarding.createInvite": "Crea invito",
+  "admin.onboarding.resendEmail": "Reinvia email",
   "admin.onboarding.includeServices": "Includi servizi",
   "admin.onboarding.selectServices": "Seleziona i servizi da includere per questo onboarding:",
   "admin.onboarding.listItem": "Nome: {name} — Email: {email} — Stato: {status}",
@@ -147,6 +148,7 @@
   "ui.createFailed": "Creazione fallita",
   "ui.save": "Salva",
   "ui.saving": "Salvataggio…",
+  "ui.sending": "Invio in corso…",
   "ui.cancel": "Annulla",
 
   "admin.sectors.createTitle": "Crea settore",
@@ -209,6 +211,8 @@
   "admin.points.services.changesHelp": "Le modifiche notificano il punto in tempo reale (in-app + email).",
   "toast.updateFailed": "Aggiornamento fallito",
   "toast.updateSuccess": "Servizio {status} per il punto",
+  "toast.resendSuccess": "Email reinviata",
+  "toast.resendFailed": "Reinvio email fallito",
   "ui.enable": "Abilita",
   "ui.disable": "Disabilita",
   "ui.failedToLoad": "Caricamento fallito.",

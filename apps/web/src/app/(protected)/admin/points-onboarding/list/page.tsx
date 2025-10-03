@@ -6,11 +6,13 @@ import Link from "next/link";
 type OnboardItem = { id: string; name: string; email: string; status?: string };
 
 import { useI18n } from "@/providers/i18n-provider";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 export default function ReviewList() {
   const { t } = useI18n();
   const [items, setItems] = useState<OnboardItem[]>([]);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
       try {
@@ -59,6 +61,34 @@ export default function ReviewList() {
                 </div>
                 <div className="flex items-center gap-3 mt-2 sm:mt-0">
                   <StatusBadge status={i.status} />
+                  {/* Show resend button for draft, submitted, approved, accepted */}
+                  {["draft", "submitted", "approved", "accepted"].includes(
+                    (i.status || "").toLowerCase()
+                  ) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="whitespace-nowrap"
+                      onClick={async () => {
+                        try {
+                          setLoadingId(i.id);
+                          await api.post(
+                            `/api/admin/points/onboarding/${i.id}/resend-email`
+                          );
+                          toast.success(t("toast.resendSuccess"));
+                        } catch (err) {
+                          console.error(err);
+                          toast.error(t("toast.resendFailed"));
+                        } finally {
+                          setLoadingId(null);
+                        }
+                      }}
+                    >
+                      {loadingId === i.id
+                        ? t("ui.sending")
+                        : t("admin.onboarding.resendEmail")}
+                    </Button>
+                  )}
                   <Button size="sm" className="whitespace-nowrap">
                     <Link href={`/admin/points-onboarding/${i.id}`}>
                       {t("ui.view")}
