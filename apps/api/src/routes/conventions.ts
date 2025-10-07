@@ -6,7 +6,6 @@ import { requireAuth, requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
 import { Prisma } from "@prisma/client";
 import { storage } from "../storage/provider";
-import { buildPrefillPdf } from "../utils/pdf";
 import { onConventionUploaded, onConventionCreated } from "../services/conventions";
 import { lookup as mimeLookup } from "mime-types";
 import path from "node:path";
@@ -57,13 +56,14 @@ conventionsRouter.delete("/:id", requireRole("GTC_POINT", "ADMIN"), async (req, 
 // 4.1 Create a convention (GTC point or admin)
 const createSchema = z.object({
   gtcPointId: z.string().uuid().optional(), // admin may specify; point users derive from profile
-  sectorId: z.string().uuid().optional(),   // admin may specify
+  sectorId: z.string().uuid().optional(), // admin may specify
+  serviceIds: z.array(z.string().uuid()).optional(),
 });
 conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) => {
-  const parsed = createSchema.safeParse(req.body);
+  const parsed = createSchema.safeParse(req.body || {});
   if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
 
-  let { gtcPointId, sectorId } = parsed.data;
+  let { gtcPointId, sectorId, serviceIds } = parsed.data;
 
   // If GTC_POINT user, derive from their mapping
   if (req.user!.role === "GTC_POINT") {
@@ -79,49 +79,51 @@ conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) 
     if (!gtcPointId || !sectorId) return res.status(400).json({ error: "gtcPointId and sectorId are required for admin" });
   }
 
-  const conv = await prisma.convention.create({
-    data: { gtcPointId: gtcPointId!, sectorId: sectorId!, status: "NEW" as any },
+  // Create convention and optionally attach services for the gtc point
+  const result = await prisma.$transaction(async (tx) => {
+    const conv = await tx.convention.create({
+      data: { gtcPointId: gtcPointId!, sectorId: sectorId!, status: "NEW" as any },
+    });
+
+    // If serviceIds are provided, validate they belong to the sector and create gtcPointService links
+    if (serviceIds && serviceIds.length) {
+      // find services that belong to this sector
+      const found = await tx.service.findMany({ where: { id: { in: serviceIds }, sectorId } });
+      const validIds = found.map((s) => s.id);
+      if (validIds.length) {
+        const links = validIds.map((sid) => ({ gtcPointId: gtcPointId!, serviceId: sid, status: 'ENABLED' as any }));
+        try {
+          await tx.gtcPointService.createMany({ data: links, skipDuplicates: true });
+        } catch (e) {
+          // fallback to upsert loop if createMany unsupported
+          for (const sid of validIds) {
+            try {
+              await tx.gtcPointService.upsert({
+                where: { id: `${gtcPointId}-${sid}` },
+                create: { gtcPointId: gtcPointId!, serviceId: sid, status: 'ENABLED' as any },
+                update: {},
+              } as any);
+            } catch (_) {
+              // ignore individual failures
+            }
+          }
+        }
+      }
+    }
+
+    return conv;
   });
-  // Notify sector owners about the new convention
+
   try {
-    await onConventionCreated(conv.id);
+    await onConventionCreated(result.id);
   } catch (e) {
-    // non-blocking notification
-  }
-  res.status(201).json(conv);
-});
-
-// 4.2 Prefill PDF (no DB write) – return a flattened simple PDF
-const prefillSchema = z.object({
-  applicantName: z.string().min(1).optional(),
-  pointName: z.string().min(1).optional(),
-  title: z.string().min(1).optional(),
-  sectorName: z.string().min(1).optional(),
-  services: z.array(z.string()).optional(),
-  signature: z.string().optional(), // Data URL (PNG) for embedding signature
-});
-conventionsRouter.post("/prefill", requireRole("GTC_POINT", "ADMIN"), async (req, res) => {
-  const parsed = prefillSchema.safeParse(req.body || {});
-  if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
-
-  let pointName = parsed.data.pointName;
-  if (!pointName && req.user!.role === "GTC_POINT") {
-    const me = await prisma.user.findUnique({ where: { id: req.user!.id }, include: { gtcPoint: true } });
-    pointName = me?.gtcPoint?.name || undefined;
+    // non-blocking
   }
 
-  const pdf = await buildPrefillPdf({
-    title: parsed.data.title,
-    applicantName: parsed.data.applicantName,
-    pointName,
-    sectorName: parsed.data.sectorName,
-    services: parsed.data.services,
-    signatureDataUrl: parsed.data.signature,
-  });
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="convention-prefill.pdf"`);
-  res.send(pdf);
+  res.status(201).json(result);
 });
+
+
 
 // 4.3 Upload signed convention file (feature-flagged). When UPLOADS_ENABLED!=='true', this becomes a no-op
 conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flaggedUpload({ multiple: false, fieldName: "file" }), async (req: Request, res: Response) => {

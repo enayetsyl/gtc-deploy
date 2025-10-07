@@ -205,4 +205,5 @@ Ticket
 4. 
 5. 
 6. 
-7. 
+7. point onbording loading status
+8. 

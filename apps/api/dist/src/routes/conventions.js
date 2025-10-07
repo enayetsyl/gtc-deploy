@@ -59,12 +59,13 @@ exports.conventionsRouter.delete("/:id", (0, auth_1.requireRole)("GTC_POINT", "A
 const createSchema = zod_1.z.object({
     gtcPointId: zod_1.z.string().uuid().optional(), // admin may specify; point users derive from profile
     sectorId: zod_1.z.string().uuid().optional(), // admin may specify
+    serviceIds: zod_1.z.array(zod_1.z.string().uuid()).optional(),
 });
 exports.conventionsRouter.post("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"), async (req, res) => {
-    const parsed = createSchema.safeParse(req.body);
+    const parsed = createSchema.safeParse(req.body || {});
     if (!parsed.success)
         return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
-    let { gtcPointId, sectorId } = parsed.data;
+    let { gtcPointId, sectorId, serviceIds } = parsed.data;
     // If GTC_POINT user, derive from their mapping
     if (req.user.role === "GTC_POINT") {
         const me = await prisma_1.prisma.user.findUnique({
@@ -81,17 +82,47 @@ exports.conventionsRouter.post("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"
         if (!gtcPointId || !sectorId)
             return res.status(400).json({ error: "gtcPointId and sectorId are required for admin" });
     }
-    const conv = await prisma_1.prisma.convention.create({
-        data: { gtcPointId: gtcPointId, sectorId: sectorId, status: "NEW" },
+    // Create convention and optionally attach services for the gtc point
+    const result = await prisma_1.prisma.$transaction(async (tx) => {
+        const conv = await tx.convention.create({
+            data: { gtcPointId: gtcPointId, sectorId: sectorId, status: "NEW" },
+        });
+        // If serviceIds are provided, validate they belong to the sector and create gtcPointService links
+        if (serviceIds && serviceIds.length) {
+            // find services that belong to this sector
+            const found = await tx.service.findMany({ where: { id: { in: serviceIds }, sectorId } });
+            const validIds = found.map((s) => s.id);
+            if (validIds.length) {
+                const links = validIds.map((sid) => ({ gtcPointId: gtcPointId, serviceId: sid, status: 'ENABLED' }));
+                try {
+                    await tx.gtcPointService.createMany({ data: links, skipDuplicates: true });
+                }
+                catch (e) {
+                    // fallback to upsert loop if createMany unsupported
+                    for (const sid of validIds) {
+                        try {
+                            await tx.gtcPointService.upsert({
+                                where: { id: `${gtcPointId}-${sid}` },
+                                create: { gtcPointId: gtcPointId, serviceId: sid, status: 'ENABLED' },
+                                update: {},
+                            });
+                        }
+                        catch (_) {
+                            // ignore individual failures
+                        }
+                    }
+                }
+            }
+        }
+        return conv;
     });
-    // Notify sector owners about the new convention
     try {
-        await (0, conventions_1.onConventionCreated)(conv.id);
+        await (0, conventions_1.onConventionCreated)(result.id);
     }
     catch (e) {
-        // non-blocking notification
+        // non-blocking
     }
-    res.status(201).json(conv);
+    res.status(201).json(result);
 });
 // 4.2 Prefill PDF (no DB write) – return a flattened simple PDF
 const prefillSchema = zod_1.z.object({
@@ -100,6 +131,7 @@ const prefillSchema = zod_1.z.object({
     title: zod_1.z.string().min(1).optional(),
     sectorName: zod_1.z.string().min(1).optional(),
     services: zod_1.z.array(zod_1.z.string()).optional(),
+    signature: zod_1.z.string().optional(), // Data URL (PNG) for embedding signature
 });
 exports.conventionsRouter.post("/prefill", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"), async (req, res) => {
     const parsed = prefillSchema.safeParse(req.body || {});
@@ -116,6 +148,7 @@ exports.conventionsRouter.post("/prefill", (0, auth_1.requireRole)("GTC_POINT", 
         pointName,
         sectorName: parsed.data.sectorName,
         services: parsed.data.services,
+        signatureDataUrl: parsed.data.signature,
     });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="convention-prefill.pdf"`);

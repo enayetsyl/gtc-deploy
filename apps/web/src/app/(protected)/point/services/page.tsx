@@ -32,7 +32,6 @@ export default function PointServicesPage() {
     queryFn: getPointServices,
     // Ensure we call the API every time this route/component mounts
     retryOnMount: true,
-    
   });
 
   const requestMut = useMutation<
@@ -63,12 +62,11 @@ export default function PointServicesPage() {
   return (
     <div className="container mx-auto py-6 space-y-6 mb-10">
       <Card>
-        <CardHeader>
-          <CardTitle>
-            {t("point.services.title")}
-        
-          </CardTitle>
-        </CardHeader>
+        {(isLoading || isError || (Array.isArray(data) && data.length > 0)) && (
+          <CardHeader>
+            <CardTitle>{t("point.services.title")}</CardTitle>
+          </CardHeader>
+        )}
         <CardContent>
           {isLoading && (
             <p className="flex items-center">
