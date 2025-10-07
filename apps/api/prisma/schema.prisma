@@ -149,9 +149,8 @@ model Notification {
 }
 
 enum ConventionStatus {
-  NEW
-  UPLOADED
-  APPROVED
+  PENDING
+  ACCEPTED
   DECLINED
 }
 
@@ -173,7 +172,7 @@ model Convention {
   id               String           @id @default(cuid())
   gtcPointId       String
   sectorId         String
-  status           ConventionStatus @default(NEW)
+  status           ConventionStatus @default(PENDING)
   internalSalesRep String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt

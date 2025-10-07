@@ -147,11 +147,11 @@ export default function PointConventionsPage() {
                     </td>
                     <td className="p-3 align-top">
                       <div className="flex items-center gap-2">
-                        {(c.status === "NEW" || c.status === "UPLOADED") && (
+                        {String(c.status) === "PENDING" && (
                           <UploadSigned conventionId={c.id} />
                         )}
 
-                        {c.status === "NEW" && (
+                        {String(c.status) === "PENDING" && (
                           <Button
                             variant="destructive"
                             size="sm"
@@ -249,11 +249,11 @@ export default function PointConventionsPage() {
                   </div>
 
                   <div className="mt-3 flex items-center justify-end gap-2">
-                    {(c.status === "NEW" || c.status === "UPLOADED") && (
+                    {String(c.status) === "PENDING" && (
                       <UploadSigned conventionId={c.id} />
                     )}
 
-                    {c.status === "NEW" && (
+                    {String(c.status) === "PENDING" && (
                       <Button
                         variant="destructive"
                         size="sm"
@@ -372,9 +372,29 @@ function CreateConventionModal({
     try {
       // create convention with optional sectorId and serviceIds
       // call backend directly so we can pass payload in one request
+      // validate IDs: backend expects UUID strings. Only include values that
+      // match a UUID pattern to avoid server-side validation errors (Zod).
+      const isUuid = (v: unknown) =>
+        typeof v === "string" &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          v
+        );
+
       const payload: Record<string, unknown> = {};
-      if (selectedSector) payload.sectorId = selectedSector;
-      if (serviceIds.length) payload.serviceIds = serviceIds;
+      if (selectedSector && isUuid(selectedSector))
+        payload.sectorId = selectedSector;
+      else if (selectedSector)
+        console.warn("Omitting invalid sectorId from payload:", selectedSector);
+
+      if (serviceIds.length) {
+        const valid = serviceIds.filter((s) => isUuid(s));
+        if (valid.length) payload.serviceIds = valid;
+        if (valid.length !== serviceIds.length)
+          console.warn(
+            "Filtered out invalid serviceIds from payload:",
+            serviceIds.filter((s) => !isUuid(s))
+          );
+      }
 
       // call API directly to pass sectorId/serviceIds with creation
       await api.post(`/api/conventions`, payload);

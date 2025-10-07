@@ -10,22 +10,22 @@ const zod_1 = require("zod");
 const upload_1 = require("../middleware/upload");
 const auth_1 = require("../middleware/auth");
 const prisma_1 = require("../lib/prisma");
+const client_1 = require("@prisma/client");
 const provider_1 = require("../storage/provider");
-const pdf_1 = require("../utils/pdf");
 const conventions_1 = require("../services/conventions");
 const mime_types_1 = require("mime-types");
 const node_path_1 = __importDefault(require("node:path"));
 const promises_1 = __importDefault(require("node:fs/promises"));
 exports.conventionsRouter = (0, express_1.Router)();
 exports.conventionsRouter.use(auth_1.requireAuth);
-// 4.1b Delete a convention (only allowed when status is NEW)
+// 4.1b Delete a convention (only allowed when status is PENDING)
 exports.conventionsRouter.delete("/:id", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"), async (req, res) => {
     const id = req.params.id;
     const conv = await prisma_1.prisma.convention.findUnique({ include: { documents: true, gtcPoint: true }, where: { id } });
     if (!conv)
         return res.status(404).json({ error: "Convention not found" });
-    // Only allow delete if NEW
-    if (conv.status !== "NEW")
+    // Only allow delete if PENDING
+    if (conv.status !== client_1.ConventionStatus.PENDING)
         return res.status(409).json({ error: "Convention is finalized and cannot be deleted" });
     // Authorization: GTC_POINT may only delete their own convention
     if (req.user.role === "GTC_POINT") {
@@ -85,7 +85,7 @@ exports.conventionsRouter.post("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"
     // Create convention and optionally attach services for the gtc point
     const result = await prisma_1.prisma.$transaction(async (tx) => {
         const conv = await tx.convention.create({
-            data: { gtcPointId: gtcPointId, sectorId: sectorId, status: "NEW" },
+            data: { gtcPointId: gtcPointId, sectorId: sectorId, status: client_1.ConventionStatus.PENDING },
         });
         // If serviceIds are provided, validate they belong to the sector and create gtcPointService links
         if (serviceIds && serviceIds.length) {
@@ -93,7 +93,7 @@ exports.conventionsRouter.post("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"
             const found = await tx.service.findMany({ where: { id: { in: serviceIds }, sectorId } });
             const validIds = found.map((s) => s.id);
             if (validIds.length) {
-                const links = validIds.map((sid) => ({ gtcPointId: gtcPointId, serviceId: sid, status: 'ENABLED' }));
+                const links = validIds.map((sid) => ({ gtcPointId: gtcPointId, serviceId: sid, status: client_1.ServiceStatus.ENABLED }));
                 try {
                     await tx.gtcPointService.createMany({ data: links, skipDuplicates: true });
                 }
@@ -103,7 +103,7 @@ exports.conventionsRouter.post("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"
                         try {
                             await tx.gtcPointService.upsert({
                                 where: { id: `${gtcPointId}-${sid}` },
-                                create: { gtcPointId: gtcPointId, serviceId: sid, status: 'ENABLED' },
+                                create: { gtcPointId: gtcPointId, serviceId: sid, status: client_1.ServiceStatus.ENABLED },
                                 update: {},
                             });
                         }
@@ -123,36 +123,6 @@ exports.conventionsRouter.post("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"
         // non-blocking
     }
     res.status(201).json(result);
-});
-// 4.2 Prefill PDF (no DB write) – return a flattened simple PDF
-const prefillSchema = zod_1.z.object({
-    applicantName: zod_1.z.string().min(1).optional(),
-    pointName: zod_1.z.string().min(1).optional(),
-    title: zod_1.z.string().min(1).optional(),
-    sectorName: zod_1.z.string().min(1).optional(),
-    services: zod_1.z.array(zod_1.z.string()).optional(),
-    signature: zod_1.z.string().optional(), // Data URL (PNG) for embedding signature
-});
-exports.conventionsRouter.post("/prefill", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"), async (req, res) => {
-    const parsed = prefillSchema.safeParse(req.body || {});
-    if (!parsed.success)
-        return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
-    let pointName = parsed.data.pointName;
-    if (!pointName && req.user.role === "GTC_POINT") {
-        const me = await prisma_1.prisma.user.findUnique({ where: { id: req.user.id }, include: { gtcPoint: true } });
-        pointName = me?.gtcPoint?.name || undefined;
-    }
-    const pdf = await (0, pdf_1.buildPrefillPdf)({
-        title: parsed.data.title,
-        applicantName: parsed.data.applicantName,
-        pointName,
-        sectorName: parsed.data.sectorName,
-        services: parsed.data.services,
-        signatureDataUrl: parsed.data.signature,
-    });
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="convention-prefill.pdf"`);
-    res.send(pdf);
 });
 // 4.3 Upload signed convention file (feature-flagged). When UPLOADS_ENABLED!=='true', this becomes a no-op
 exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"), (0, upload_1.upload)({ multiple: false, fieldName: "file" }), async (req, res) => {
@@ -195,7 +165,7 @@ exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT
     }
     if (!file)
         return res.status(400).json({ error: "file is required (multipart/form-data)" });
-    if (conv.status === "APPROVED" || conv.status === "DECLINED") {
+    if (conv.status === client_1.ConventionStatus.ACCEPTED || conv.status === client_1.ConventionStatus.DECLINED) {
         return res.status(409).json({ error: "Convention is finalized; uploads are locked" });
     }
     const was = conv.status;
@@ -252,9 +222,9 @@ exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT
             },
         });
         let changed = false;
-        // Update status to UPLOADED if needed
-        if (was !== "UPLOADED") {
-            await tx.convention.update({ where: { id: conv.id }, data: { status: "UPLOADED" } });
+        // Update status to PENDING (uploaded state) if needed
+        if (was !== client_1.ConventionStatus.PENDING) {
+            await tx.convention.update({ where: { id: conv.id }, data: { status: client_1.ConventionStatus.PENDING } });
             changed = true;
         }
         // If we have a newSectorId different from existing, update the convention
@@ -408,7 +378,7 @@ exports.conventionsRouter.post("/with-upload", (0, auth_1.requireRole)("GTC_POIN
     // create convention and store file in a transaction
     const stored = await provider_1.storage.put({ buffer: file.buffer, mime: String(mime), originalName: file.originalname });
     const { doc, conv } = await prisma_1.prisma.$transaction(async (tx) => {
-        const createdConv = await tx.convention.create({ data: { gtcPointId: gtcPointId, sectorId: sectorId, status: "UPLOADED" } });
+        const createdConv = await tx.convention.create({ data: { gtcPointId: gtcPointId, sectorId: sectorId, status: client_1.ConventionStatus.PENDING } });
         const created = await tx.conventionDocument.create({
             data: {
                 conventionId: createdConv.id,

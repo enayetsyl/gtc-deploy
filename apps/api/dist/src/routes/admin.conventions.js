@@ -8,6 +8,7 @@ const express_1 = require("express");
 const zod_1 = require("zod");
 const auth_1 = require("../middleware/auth");
 const prisma_1 = require("../lib/prisma");
+const client_1 = require("@prisma/client");
 const conventions_1 = require("../services/conventions");
 const node_path_1 = __importDefault(require("node:path"));
 const promises_1 = __importDefault(require("node:fs/promises"));
@@ -17,7 +18,21 @@ exports.adminConventions = (0, express_1.Router)();
 exports.adminConventions.use(auth_1.requireAuth, (0, auth_1.requireRole)("ADMIN"));
 // list (basic filters)
 exports.adminConventions.get("/", async (req, res) => {
-    const status = req.query.status?.toUpperCase();
+    const rawStatus = req.query.status?.toUpperCase();
+    // Accept both old and new status names for compatibility
+    const status = (() => {
+        if (!rawStatus)
+            return undefined;
+        if (rawStatus === "NEW" || rawStatus === "UPLOADED")
+            return "PENDING";
+        if (rawStatus === "APPROVED")
+            return "ACCEPTED";
+        if (rawStatus === "DECLINED")
+            return "DECLINED";
+        if (rawStatus === "PENDING" || rawStatus === "ACCEPTED")
+            return rawStatus;
+        return undefined;
+    })();
     const where = status ? { status: status } : {};
     const items = await prisma_1.prisma.convention.findMany({
         where,
@@ -41,7 +56,7 @@ exports.adminConventions.patch("/:id", async (req, res) => {
     const conv = await prisma_1.prisma.convention.update({
         where: { id },
         data: {
-            status: approved ? "APPROVED" : "DECLINED",
+            status: approved ? client_1.ConventionStatus.ACCEPTED : client_1.ConventionStatus.DECLINED,
             internalSalesRep: body.data.internalSalesRep,
         },
     });

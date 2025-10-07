@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
+import { ConventionStatus } from "@prisma/client";
 import { onConventionDecision } from "../services/conventions";
 import path from "node:path";
 import fs from "node:fs/promises";
@@ -13,12 +14,16 @@ adminConventions.use(requireAuth, requireRole("ADMIN"));
 
 // list (basic filters)
 adminConventions.get("/", async (req, res) => {
-  const status = (req.query.status as string | undefined)?.toUpperCase() as
-    | "NEW"
-    | "UPLOADED"
-    | "APPROVED"
-    | "DECLINED"
-    | undefined;
+  const rawStatus = (req.query.status as string | undefined)?.toUpperCase();
+  // Accept both old and new status names for compatibility
+  const status = ((): string | undefined => {
+    if (!rawStatus) return undefined;
+    if (rawStatus === "NEW" || rawStatus === "UPLOADED") return "PENDING";
+    if (rawStatus === "APPROVED") return "ACCEPTED";
+    if (rawStatus === "DECLINED") return "DECLINED";
+    if (rawStatus === "PENDING" || rawStatus === "ACCEPTED") return rawStatus;
+    return undefined;
+  })();
 
   const where = status ? { status: status as any } : {};
   const items = await prisma.convention.findMany({
@@ -44,7 +49,7 @@ adminConventions.patch("/:id", async (req, res) => {
   const conv = await prisma.convention.update({
     where: { id },
     data: {
-      status: approved ? "APPROVED" : "DECLINED",
+      status: approved ? ConventionStatus.ACCEPTED : ConventionStatus.DECLINED,
       internalSalesRep: body.data.internalSalesRep,
     },
   });

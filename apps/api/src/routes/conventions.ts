@@ -4,7 +4,7 @@ import { z } from "zod";
 import { upload as flaggedUpload } from "../middleware/upload";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, ConventionStatus, ServiceStatus } from "@prisma/client";
 import { storage } from "../storage/provider";
 import { onConventionUploaded, onConventionCreated } from "../services/conventions";
 import { lookup as mimeLookup } from "mime-types";
@@ -14,14 +14,14 @@ import fs from "node:fs/promises";
 export const conventionsRouter = Router();
 conventionsRouter.use(requireAuth);
 
-// 4.1b Delete a convention (only allowed when status is NEW)
+// 4.1b Delete a convention (only allowed when status is PENDING)
 conventionsRouter.delete("/:id", requireRole("GTC_POINT", "ADMIN"), async (req, res) => {
   const id = req.params.id;
   const conv = await prisma.convention.findUnique({ include: { documents: true, gtcPoint: true }, where: { id } });
   if (!conv) return res.status(404).json({ error: "Convention not found" });
 
-  // Only allow delete if NEW
-  if (conv.status !== "NEW") return res.status(409).json({ error: "Convention is finalized and cannot be deleted" });
+  // Only allow delete if PENDING
+  if (conv.status !== ConventionStatus.PENDING) return res.status(409).json({ error: "Convention is finalized and cannot be deleted" });
 
   // Authorization: GTC_POINT may only delete their own convention
   if (req.user!.role === "GTC_POINT") {
@@ -82,7 +82,7 @@ conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) 
   // Create convention and optionally attach services for the gtc point
   const result = await prisma.$transaction(async (tx) => {
     const conv = await tx.convention.create({
-      data: { gtcPointId: gtcPointId!, sectorId: sectorId!, status: "NEW" as any },
+      data: { gtcPointId: gtcPointId!, sectorId: sectorId!, status: ConventionStatus.PENDING },
     });
 
     // If serviceIds are provided, validate they belong to the sector and create gtcPointService links
@@ -91,7 +91,7 @@ conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) 
       const found = await tx.service.findMany({ where: { id: { in: serviceIds }, sectorId } });
       const validIds = found.map((s) => s.id);
       if (validIds.length) {
-        const links = validIds.map((sid) => ({ gtcPointId: gtcPointId!, serviceId: sid, status: 'ENABLED' as any }));
+        const links = validIds.map((sid) => ({ gtcPointId: gtcPointId!, serviceId: sid, status: ServiceStatus.ENABLED }));
         try {
           await tx.gtcPointService.createMany({ data: links, skipDuplicates: true });
         } catch (e) {
@@ -100,7 +100,7 @@ conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) 
             try {
               await tx.gtcPointService.upsert({
                 where: { id: `${gtcPointId}-${sid}` },
-                create: { gtcPointId: gtcPointId!, serviceId: sid, status: 'ENABLED' as any },
+                create: { gtcPointId: gtcPointId!, serviceId: sid, status: ServiceStatus.ENABLED },
                 update: {},
               } as any);
             } catch (_) {
@@ -166,7 +166,7 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
 
   if (!file) return res.status(400).json({ error: "file is required (multipart/form-data)" });
 
-  if (conv.status === "APPROVED" || conv.status === "DECLINED") {
+  if (conv.status === ConventionStatus.ACCEPTED || conv.status === ConventionStatus.DECLINED) {
     return res.status(409).json({ error: "Convention is finalized; uploads are locked" });
   }
 
@@ -231,9 +231,9 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
     });
 
     let changed = false;
-    // Update status to UPLOADED if needed
-    if (was !== "UPLOADED") {
-      await tx.convention.update({ where: { id: conv.id }, data: { status: "UPLOADED" } });
+    // Update status to PENDING (uploaded state) if needed
+    if (was !== ConventionStatus.PENDING) {
+      await tx.convention.update({ where: { id: conv.id }, data: { status: ConventionStatus.PENDING } });
       changed = true;
     }
 
@@ -278,12 +278,72 @@ conventionsRouter.get("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) =
   const page = Math.max(1, Number(req.query.page ?? 1));
   const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize ?? 20)));
 
-  const where =
+  // Normalize client-provided status values to the DB enum and validate them.
+  // This prevents accidental passing of unsupported enum values (eg. 'UPLOADED') to Prisma.
+  // Accept status as string, array, or JSON array. Normalize robustly.
+  const rawStatusRaw = req.query.status as unknown;
+  console.log('req status query', rawStatusRaw)
+  let rawStatus: string | undefined;
+  if (Array.isArray(rawStatusRaw)) {
+    rawStatus = String(rawStatusRaw[0]);
+  } else if (typeof rawStatusRaw === 'string') {
+    // try to parse JSON arrays like '["UPLOADED"]'
+    const s = rawStatusRaw.trim();
+    if (s.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(s);
+        if (Array.isArray(parsed) && parsed.length) rawStatus = String(parsed[0]);
+        else rawStatus = undefined;
+      } catch {
+        rawStatus = s;
+      }
+    } else if (s.includes(',')) {
+      // comma-separated list: take first
+      rawStatus = s.split(',')[0];
+    } else {
+      rawStatus = s;
+    }
+  } else {
+    rawStatus = undefined;
+  }
+
+  const normalizeStatus = (v?: string): string | undefined => {
+    if (!v) return undefined;
+    const s = String(v).trim().toUpperCase();
+    // map legacy/UI names -> DB enum
+    if (s === 'NEW' || s === 'UPLOADED') return ConventionStatus.PENDING;
+    if (s === 'APPROVED') return ConventionStatus.ACCEPTED;
+    if (s === 'DECLINED') return ConventionStatus.DECLINED;
+    if (s === 'PENDING' || s === 'ACCEPTED') return s;
+    return undefined;
+  };
+
+  const mappedStatus = normalizeStatus(rawStatus);
+console.log('mapped status', mappedStatus)
+  const baseWhere =
     req.user!.role === "ADMIN"
       ? {}
       : {
         gtcPoint: { users: { some: { id: req.user!.id } } },
       };
+
+  // Only include status in the query if it's a valid DB enum value. This avoids
+  // sending unknown enum values to Prisma which would raise a runtime error.
+  // Use a hard-coded allowed set so stale/generated Prisma client enums can't cause
+  // an unsupported value to be passed to the database.
+  const ALLOWED_STATUSES = new Set<string>(["PENDING", "ACCEPTED", "DECLINED"]);
+  // Debug: log raw and mapped status to diagnose unexpected enum values
+  try {
+    if (rawStatus) console.info('[conventions] rawStatus=', rawStatus, 'mappedStatus=', mappedStatus);
+  } catch (e) {
+    /* ignore logging errors */
+  }
+
+  const where = mappedStatus && ALLOWED_STATUSES.has(String(mappedStatus))
+    ? { ...baseWhere, status: mappedStatus as any }
+    : baseWhere;
+
+console.dir(where, { depth: null });
 
   const [items, total] = await Promise.all([
     prisma.convention.findMany({
@@ -297,6 +357,7 @@ conventionsRouter.get("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) =
   ]);
 
   res.json({ items, total, page, pageSize });
+  // res.json({ "ok": true  });
 });
 
 
@@ -404,7 +465,7 @@ conventionsRouter.post(
     const stored = await storage.put({ buffer: file.buffer, mime: String(mime), originalName: file.originalname });
 
     const { doc, conv } = await prisma.$transaction(async (tx) => {
-      const createdConv = await tx.convention.create({ data: { gtcPointId: gtcPointId!, sectorId: sectorId!, status: "UPLOADED" as any } });
+      const createdConv = await tx.convention.create({ data: { gtcPointId: gtcPointId!, sectorId: sectorId!, status: ConventionStatus.PENDING } });
       const created = await tx.conventionDocument.create({
         data: {
           conventionId: createdConv.id,
