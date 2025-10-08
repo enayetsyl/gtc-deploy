@@ -35,6 +35,7 @@
   "file.sizeKb": "{size} KB",
   "file.errors.tooLarge": "Il file è troppo grande (max {max}MB).",
   "file.errors.typeNotAllowed": "Tipo di file non consentito.",
+  "file.errors.tooMany": "Puoi caricare fino a {max} file.",
   "file.downloadAttachment": "Scarica allegato {name}",
   "service.status.enabled": "Abilitato",
   "service.status.disabled": "Disabilitato",

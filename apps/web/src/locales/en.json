@@ -35,6 +35,7 @@
   "file.sizeKb": "{size} KB",
   "file.errors.tooLarge": "File is too large (max {max}MB).",
   "file.errors.typeNotAllowed": "File type not allowed.",
+  "file.errors.tooMany": "You can upload up to {max} files.",
   "file.downloadAttachment": "Download attachment {name}",
   "service.status.enabled": "Enabled",
   "service.status.disabled": "Disabled",
