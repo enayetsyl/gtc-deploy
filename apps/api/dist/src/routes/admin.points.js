@@ -24,6 +24,7 @@ exports.adminPoints.get("/", (0, auth_1.requireRole)("ADMIN"), async (req, res) 
 });
 // Onboarding routes (moved from admin.points.onboarding.ts)
 const onboarding_1 = require("../services/onboarding");
+const onboarding_2 = require("../services/onboarding");
 const onboardingCreateSchema = zod_1.z.object({
     sectorId: zod_1.z.string().min(1),
     email: zod_1.z.string().email(),
@@ -172,4 +173,16 @@ exports.adminPoints.patch("/:id/services/:serviceId", async (req, res) => {
     });
     await (0, services_1.onServiceStatusChanged)(id, serviceId, status);
     res.json(link);
+});
+// POST /api/admin/points/onboarding/:id/resend-email
+exports.adminPoints.post("/onboarding/:id/resend-email", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {
+    const { id } = zod_1.z.object({ id: zod_1.z.string().min(1) }).parse(req.params);
+    try {
+        await (0, onboarding_2.resendOnboardingEmail)(id);
+        res.json({ ok: true });
+    }
+    catch (e) {
+        console.error("resendOnboardingEmail error", e);
+        res.status(400).json({ error: e?.message ?? 'Failed' });
+    }
 });

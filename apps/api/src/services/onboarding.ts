@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, PointOnboardingStatus, ServiceStatus } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { sendEmail } from "../lib/mailer";
 import { notifyUsers, notifyUser } from "./notifications";
@@ -21,7 +21,7 @@ export async function createOnboardingLink(input: CreateOnboardingInput) {
   const onboardingToken = token();
   const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
 
-  const ob = await (prisma as any).pointOnboarding.create({
+  const ob = await prisma.pointOnboarding.create({
     data: {
       sectorId: input.sectorId,
       email: input.email,
@@ -75,7 +75,7 @@ type SubmitOnboardingPayload = {
 };
 
 export async function submitOnboardingForm(onboardingToken: string, payload: SubmitOnboardingPayload) {
-  const ob = await (prisma as any).pointOnboarding.findUnique({ where: { onboardingToken } });
+  const ob = await prisma.pointOnboarding.findUnique({ where: { onboardingToken } });
   if (!ob) throw new Error("Invalid token");
   if (ob.status !== "DRAFT") throw new Error("Onboarding not in DRAFT");
   if (ob.tokenExpiresAt && ob.tokenExpiresAt < new Date()) throw new Error("Token expired");
@@ -87,14 +87,14 @@ export async function submitOnboardingForm(onboardingToken: string, payload: Sub
     signatureKey = payload.signature.key; // Store UploadThing key
   }
 
-  await (prisma as any).pointOnboarding.update({
+  await prisma.pointOnboarding.update({
     where: { id: ob.id },
     data: {
       vatOrTaxNumber: payload.vatOrTaxNumber ?? ob.vatOrTaxNumber,
       phone: payload.phone ?? ob.phone,
       signaturePath,
       // signatureUploadthingKey: signatureKey, // TODO: Add after migration
-      status: "SUBMITTED",
+      status: PointOnboardingStatus.SUBMITTED,
       submittedAt: new Date(),
       services:
         ob.includeServices && payload.services && payload.services.length
@@ -144,7 +144,7 @@ export async function submitOnboardingForm(onboardingToken: string, payload: Sub
 }
 
 export async function approveOnboarding(id: string, adminUserId: string) {
-  const ob = await (prisma as any).pointOnboarding.findUnique({ where: { id }, include: { services: true } });
+  const ob = await prisma.pointOnboarding.findUnique({ where: { id }, include: { services: true } });
   if (!ob) throw new Error("Not found");
   if (ob.status !== "SUBMITTED") throw new Error("Invalid state");
 
@@ -186,8 +186,8 @@ export async function approveOnboarding(id: string, adminUserId: string) {
         if (svc.sectorId !== point.sectorId) throw new Error(`Service ${s.serviceId} does not belong to sector ${point.sectorId}`);
         await tx.gtcPointService.upsert({
           where: { gtcPointId_serviceId: { gtcPointId: point.id, serviceId: s.serviceId } },
-          update: { status: "ENABLED" },
-          create: { gtcPointId: point.id, serviceId: s.serviceId, status: "ENABLED" },
+          update: { status: ServiceStatus.ENABLED },
+          create: { gtcPointId: point.id, serviceId: s.serviceId, status: ServiceStatus.ENABLED },
         });
       }
     });
@@ -200,9 +200,9 @@ export async function approveOnboarding(id: string, adminUserId: string) {
     const registrationToken = token();
     const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
 
-    await (prisma as any).pointOnboarding.update({
+    await prisma.pointOnboarding.update({
       where: { id: ob.id },
-      data: { status: "APPROVED", approvedAt: new Date(), approvedByUserId: adminUserId, gtcPointId: point.id, registrationToken, tokenExpiresAt: expires },
+      data: { status: PointOnboardingStatus.APPROVED, approvedAt: new Date(), approvedByUserId: adminUserId, gtcPointId: point.id, registrationToken, tokenExpiresAt: expires },
     });
 
     const link = `${env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/register/${registrationToken}`;
@@ -224,10 +224,10 @@ export async function approveOnboarding(id: string, adminUserId: string) {
     });
   } else {
     // Point already has a user account; mark onboarding as COMPLETED (no registration required)
-    await (prisma as any).pointOnboarding.update({
+    await prisma.pointOnboarding.update({
       where: { id: ob.id },
       data: {
-        status: "COMPLETED",
+        status: PointOnboardingStatus.COMPLETED,
         approvedAt: new Date(),
         approvedByUserId: adminUserId,
         completedAt: new Date(),
@@ -272,11 +272,11 @@ export async function approveOnboarding(id: string, adminUserId: string) {
 }
 
 export async function declineOnboarding(id: string, adminUserId: string) {
-  const ob = await (prisma as any).pointOnboarding.findUnique({ where: { id } });
+  const ob = await prisma.pointOnboarding.findUnique({ where: { id } });
   if (!ob) throw new Error("Not found");
-  if (ob.status !== "SUBMITTED") throw new Error("Invalid state");
+  if (ob.status !== PointOnboardingStatus.SUBMITTED) throw new Error("Invalid state");
 
-  await (prisma as any).pointOnboarding.update({ where: { id: ob.id }, data: { status: "DECLINED", approvedByUserId: adminUserId, approvedAt: new Date() } });
+  await prisma.pointOnboarding.update({ where: { id: ob.id }, data: { status: PointOnboardingStatus.DECLINED, approvedByUserId: adminUserId, approvedAt: new Date() } });
   await sendEmail({ to: ob.email, subject: "La tua richiesta di onboarding è stata rifiutata", html: `<p>La tua richiesta di onboarding è stata rifiutata dall'amministratore.</p>` });
 
   // notify admins and owners that it was declined
@@ -294,18 +294,18 @@ export async function declineOnboarding(id: string, adminUserId: string) {
 }
 
 export async function resendOnboardingEmail(id: string) {
-  const ob = await (prisma as any).pointOnboarding.findUnique({ where: { id }, include: { services: true } });
+  const ob = await prisma.pointOnboarding.findUnique({ where: { id }, include: { services: true } });
   if (!ob) throw new Error("Not found");
 
-  const status = (ob.status || "DRAFT").toUpperCase();
+  const status = (ob.status || PointOnboardingStatus.DRAFT).toString().toUpperCase();
 
   // DRAFT -> resend onboarding link
-  if (status === "DRAFT") {
+  if (status === PointOnboardingStatus.DRAFT) {
     let onboardingToken = ob.onboardingToken;
     if (!onboardingToken) {
       onboardingToken = token();
       const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
-      await (prisma as any).pointOnboarding.update({ where: { id: ob.id }, data: { onboardingToken, tokenExpiresAt: expires } });
+      await prisma.pointOnboarding.update({ where: { id: ob.id }, data: { onboardingToken, tokenExpiresAt: expires } });
     }
     const link = `${env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/${onboardingToken}`;
     await sendEmail({
@@ -328,7 +328,7 @@ export async function resendOnboardingEmail(id: string) {
   }
 
   // SUBMITTED -> resend admin notification
-  if (status === "SUBMITTED") {
+  if (status === PointOnboardingStatus.SUBMITTED) {
     const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true, email: true } });
     const owners = await prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true, email: true } });
     const adminIds = admins.map((a: any) => a.id);
@@ -367,12 +367,12 @@ export async function resendOnboardingEmail(id: string) {
   }
 
   // APPROVED / ACCEPTED -> resend registration email (or create registration token if missing)
-  if (status === "APPROVED" || status === "ACCEPTED") {
+  if (status === PointOnboardingStatus.APPROVED || status === "ACCEPTED") {
     let registrationToken = ob.registrationToken;
     if (!registrationToken) {
       registrationToken = token();
       const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
-      await (prisma as any).pointOnboarding.update({ where: { id: ob.id }, data: { registrationToken, tokenExpiresAt: expires } });
+      await prisma.pointOnboarding.update({ where: { id: ob.id }, data: { registrationToken, tokenExpiresAt: expires } });
     }
     const link = `${env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/register/${registrationToken}`;
     await sendEmail({
@@ -398,7 +398,7 @@ export async function resendOnboardingEmail(id: string) {
 }
 
 export async function completeRegistration(registrationToken: string, passwordHash: string) {
-  const ob = await (prisma as any).pointOnboarding.findFirst({ where: { registrationToken } });
+  const ob = await prisma.pointOnboarding.findFirst({ where: { registrationToken } });
   if (!ob) throw new Error("Invalid token");
   if (ob.status !== "APPROVED") throw new Error("Not approved");
   if (ob.tokenExpiresAt && ob.tokenExpiresAt < new Date()) throw new Error("Token expired");
@@ -406,7 +406,7 @@ export async function completeRegistration(registrationToken: string, passwordHa
 
   const user = await prisma.user.create({ data: { email: ob.email, name: ob.name, passwordHash, role: "GTC_POINT", gtcPointId: ob.gtcPointId } });
 
-  await (prisma as any).pointOnboarding.update({ where: { id: ob.id }, data: { status: "COMPLETED", completedAt: new Date() } });
+  await prisma.pointOnboarding.update({ where: { id: ob.id }, data: { status: PointOnboardingStatus.COMPLETED, completedAt: new Date() } });
 
   // Notify admins and sector owners
   const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });

@@ -4,8 +4,10 @@ exports.createOnboardingLink = createOnboardingLink;
 exports.submitOnboardingForm = submitOnboardingForm;
 exports.approveOnboarding = approveOnboarding;
 exports.declineOnboarding = declineOnboarding;
+exports.resendOnboardingEmail = resendOnboardingEmail;
 exports.completeRegistration = completeRegistration;
 const prisma_1 = require("../lib/prisma");
+const client_1 = require("@prisma/client");
 const node_crypto_1 = require("node:crypto");
 const mailer_1 = require("../lib/mailer");
 const notifications_1 = require("./notifications");
@@ -80,7 +82,7 @@ async function submitOnboardingForm(onboardingToken, payload) {
             phone: payload.phone ?? ob.phone,
             signaturePath,
             // signatureUploadthingKey: signatureKey, // TODO: Add after migration
-            status: "SUBMITTED",
+            status: client_1.PointOnboardingStatus.SUBMITTED,
             submittedAt: new Date(),
             services: ob.includeServices && payload.services && payload.services.length
                 ? { deleteMany: {}, create: payload.services.map((s) => ({ serviceId: s })) }
@@ -167,8 +169,8 @@ async function approveOnboarding(id, adminUserId) {
                     throw new Error(`Service ${s.serviceId} does not belong to sector ${point.sectorId}`);
                 await tx.gtcPointService.upsert({
                     where: { gtcPointId_serviceId: { gtcPointId: point.id, serviceId: s.serviceId } },
-                    update: { status: "ENABLED" },
-                    create: { gtcPointId: point.id, serviceId: s.serviceId, status: "ENABLED" },
+                    update: { status: client_1.ServiceStatus.ENABLED },
+                    create: { gtcPointId: point.id, serviceId: s.serviceId, status: client_1.ServiceStatus.ENABLED },
                 });
             }
         });
@@ -180,7 +182,7 @@ async function approveOnboarding(id, adminUserId) {
         const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
         await prisma_1.prisma.pointOnboarding.update({
             where: { id: ob.id },
-            data: { status: "APPROVED", approvedAt: new Date(), approvedByUserId: adminUserId, gtcPointId: point.id, registrationToken, tokenExpiresAt: expires },
+            data: { status: client_1.PointOnboardingStatus.APPROVED, approvedAt: new Date(), approvedByUserId: adminUserId, gtcPointId: point.id, registrationToken, tokenExpiresAt: expires },
         });
         const link = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/register/${registrationToken}`;
         await (0, mailer_1.sendEmail)({
@@ -205,7 +207,7 @@ async function approveOnboarding(id, adminUserId) {
         await prisma_1.prisma.pointOnboarding.update({
             where: { id: ob.id },
             data: {
-                status: "COMPLETED",
+                status: client_1.PointOnboardingStatus.COMPLETED,
                 approvedAt: new Date(),
                 approvedByUserId: adminUserId,
                 completedAt: new Date(),
@@ -248,9 +250,9 @@ async function declineOnboarding(id, adminUserId) {
     const ob = await prisma_1.prisma.pointOnboarding.findUnique({ where: { id } });
     if (!ob)
         throw new Error("Not found");
-    if (ob.status !== "SUBMITTED")
+    if (ob.status !== client_1.PointOnboardingStatus.SUBMITTED)
         throw new Error("Invalid state");
-    await prisma_1.prisma.pointOnboarding.update({ where: { id: ob.id }, data: { status: "DECLINED", approvedByUserId: adminUserId, approvedAt: new Date() } });
+    await prisma_1.prisma.pointOnboarding.update({ where: { id: ob.id }, data: { status: client_1.PointOnboardingStatus.DECLINED, approvedByUserId: adminUserId, approvedAt: new Date() } });
     await (0, mailer_1.sendEmail)({ to: ob.email, subject: "La tua richiesta di onboarding è stata rifiutata", html: `<p>La tua richiesta di onboarding è stata rifiutata dall'amministratore.</p>` });
     // notify admins and owners that it was declined
     const admins = await prisma_1.prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
@@ -263,6 +265,104 @@ async function declineOnboarding(id, adminUserId) {
         await (0, notifications_1.notifyUsers)(recipients, { type: "GENERIC", subject: "Onboarding Punto GTC rifiutato", contentHtml: `<p>L'onboarding per <strong>${ob.name}</strong> (&lt;${ob.email}&gt;) è stato rifiutato dall'amministratore.</p>` });
     }
 }
+async function resendOnboardingEmail(id) {
+    const ob = await prisma_1.prisma.pointOnboarding.findUnique({ where: { id }, include: { services: true } });
+    if (!ob)
+        throw new Error("Not found");
+    const status = (ob.status || client_1.PointOnboardingStatus.DRAFT).toString().toUpperCase();
+    // DRAFT -> resend onboarding link
+    if (status === client_1.PointOnboardingStatus.DRAFT) {
+        let onboardingToken = ob.onboardingToken;
+        if (!onboardingToken) {
+            onboardingToken = token();
+            const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+            await prisma_1.prisma.pointOnboarding.update({ where: { id: ob.id }, data: { onboardingToken, tokenExpiresAt: expires } });
+        }
+        const link = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/${onboardingToken}`;
+        await (0, mailer_1.sendEmail)({
+            to: ob.email,
+            subject: "Completa l'onboarding del tuo Punto GTC",
+            html: `
+        <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+          <p>Apri il link per completare i tuoi dati e firmare elettronicamente.</p>
+          <p>
+            <a href="${link}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
+              Completa l'onboarding
+            </a>
+          </p>
+          <p style="font-size:13px;color:#666">Se il pulsante non funziona, copia e incolla il seguente URL nel tuo browser:</p>
+          <p style="word-break:break-all"><a href="${link}">${link}</a></p>
+        </div>
+      `,
+        });
+        return;
+    }
+    // SUBMITTED -> resend admin notification
+    if (status === client_1.PointOnboardingStatus.SUBMITTED) {
+        const admins = await prisma_1.prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true, email: true } });
+        const owners = await prisma_1.prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true, email: true } });
+        const adminIds = admins.map((a) => a.id);
+        const ownerIds = owners.map((o) => o.id);
+        const adminAndOwners = Array.from(new Set([...adminIds, ...ownerIds]));
+        const adminLink = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/admin/points-onboarding/${ob.id}`;
+        if (adminAndOwners.length) {
+            await (0, notifications_1.notifyUsers)(adminAndOwners, {
+                type: "GENERIC",
+                subject: "Nuova richiesta di onboarding Punto GTC",
+                contentHtml: `
+          <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+            <p>Il Punto <strong>${ob.name}</strong> &lt;${ob.email}&gt; ha inviato i dettagli di onboarding.</p>
+            <p>
+              <a href="${adminLink}" style="display:inline-block;padding:10px 16px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">Rivedi onboarding</a>
+            </p>
+          </div>
+        `,
+                email: {
+                    subject: "Nuova richiesta di onboarding Punto GTC",
+                    html: `
+            <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+              <p>Il Punto <strong>${ob.name}</strong> &lt;${ob.email}&gt; ha inviato i dettagli di onboarding.</p>
+              <p>
+                <a href="${adminLink}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">Rivedi onboarding</a>
+              </p>
+              <p style="font-size:13px;color:#666">Se il pulsante non funziona, copia e incolla il seguente URL nel tuo browser:</p>
+              <p style="word-break:break-all"><a href="${adminLink}">${adminLink}</a></p>
+            </div>
+          `,
+                },
+            });
+        }
+        return;
+    }
+    // APPROVED / ACCEPTED -> resend registration email (or create registration token if missing)
+    if (status === client_1.PointOnboardingStatus.APPROVED || status === "ACCEPTED") {
+        let registrationToken = ob.registrationToken;
+        if (!registrationToken) {
+            registrationToken = token();
+            const expires = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+            await prisma_1.prisma.pointOnboarding.update({ where: { id: ob.id }, data: { registrationToken, tokenExpiresAt: expires } });
+        }
+        const link = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/register/${registrationToken}`;
+        await (0, mailer_1.sendEmail)({
+            to: ob.email,
+            subject: "Link per la registrazione del tuo Punto GTC",
+            html: `
+        <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+          <p>La tua richiesta di onboarding è stata approvata. Completa il tuo account impostando una password.</p>
+          <p>
+            <a href="${link}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">
+              Completa la registrazione
+            </a>
+          </p>
+          <p style="font-size:13px;color:#666">Se il pulsante non funziona, copia e incolla il seguente URL nel tuo browser:</p>
+          <p style="word-break:break-all"><a href="${link}">${link}</a></p>
+        </div>
+      `,
+        });
+        return;
+    }
+    throw new Error("Cannot resend email for current onboarding status");
+}
 async function completeRegistration(registrationToken, passwordHash) {
     const ob = await prisma_1.prisma.pointOnboarding.findFirst({ where: { registrationToken } });
     if (!ob)
@@ -274,7 +374,7 @@ async function completeRegistration(registrationToken, passwordHash) {
     if (!ob.gtcPointId)
         throw new Error("Missing gtcPointId");
     const user = await prisma_1.prisma.user.create({ data: { email: ob.email, name: ob.name, passwordHash, role: "GTC_POINT", gtcPointId: ob.gtcPointId } });
-    await prisma_1.prisma.pointOnboarding.update({ where: { id: ob.id }, data: { status: "COMPLETED", completedAt: new Date() } });
+    await prisma_1.prisma.pointOnboarding.update({ where: { id: ob.id }, data: { status: client_1.PointOnboardingStatus.COMPLETED, completedAt: new Date() } });
     // Notify admins and sector owners
     const admins = await prisma_1.prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
     const point = await prisma_1.prisma.gtcPoint.findUnique({ where: { id: ob.gtcPointId } });

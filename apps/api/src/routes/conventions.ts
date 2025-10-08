@@ -4,7 +4,7 @@ import { z } from "zod";
 import { upload as flaggedUpload } from "../middleware/upload";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, ServiceStatus, ConventionStatus } from "@prisma/client";
 import { storage } from "../storage/provider";
 import { buildPrefillPdf } from "../utils/pdf";
 import { onConventionUploaded, onConventionCreated } from "../services/conventions";
@@ -22,7 +22,7 @@ conventionsRouter.delete("/:id", requireRole("GTC_POINT", "ADMIN"), async (req, 
   if (!conv) return res.status(404).json({ error: "Convention not found" });
 
   // Only allow delete if NEW
-  if (conv.status !== "NEW") return res.status(409).json({ error: "Convention is finalized and cannot be deleted" });
+  if (String(conv.status) !== "NEW") return res.status(409).json({ error: "Convention is finalized and cannot be deleted" });
 
   // Authorization: GTC_POINT may only delete their own convention
   if (req.user!.role === "GTC_POINT") {
@@ -56,14 +56,19 @@ conventionsRouter.delete("/:id", requireRole("GTC_POINT", "ADMIN"), async (req, 
 
 // 4.1 Create a convention (GTC point or admin)
 const createSchema = z.object({
-  gtcPointId: z.string().uuid().optional(), // admin may specify; point users derive from profile
-  sectorId: z.string().uuid().optional(),   // admin may specify
+  // DB uses cuid() for ids in this project; accept cuid() rather than uuid()
+  gtcPointId: z.string().cuid().optional(), // admin may specify; point users derive from profile
+  sectorId: z.string().cuid().optional(),   // admin may specify
+  serviceIds: z.array(z.string().cuid()).optional(), // optional list of services to request/enable
 });
 conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
+  console.log('parsed', parsed)
   if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
 
-  let { gtcPointId, sectorId } = parsed.data;
+  let { gtcPointId, sectorId, serviceIds } = parsed.data;
+
+  console.log('req.user', req.user)
 
   // If GTC_POINT user, derive from their mapping
   if (req.user!.role === "GTC_POINT") {
@@ -73,15 +78,28 @@ conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) 
     });
     if (!me?.gtcPoint) return res.status(409).json({ error: "User is not attached to a GTC Point" });
     gtcPointId = me.gtcPoint.id;
-    sectorId = me.gtcPoint.sectorId;
+    // sectorId = me.gtcPoint.sectorId;
   } else {
     // admin path: both ids required
     if (!gtcPointId || !sectorId) return res.status(400).json({ error: "gtcPointId and sectorId are required for admin" });
   }
 
+  // rely on Prisma schema default for `status` (ConventionStatus @default(NEW))
   const conv = await prisma.convention.create({
-    data: { gtcPointId: gtcPointId!, sectorId: sectorId!, status: "NEW" as any },
+    data: { gtcPointId: gtcPointId!, sectorId: sectorId! },
   });
+
+  // If serviceIds provided, create PENDING_REQUEST links for the point (ignore invalid for sector)
+  if (serviceIds && serviceIds.length) {
+    const valid = await prisma.service.findMany({ where: { id: { in: serviceIds }, sectorId: sectorId! } });
+    for (const svc of valid) {
+      await prisma.gtcPointService.upsert({
+        where: { gtcPointId_serviceId: { gtcPointId: gtcPointId!, serviceId: svc.id } },
+        update: { status: ServiceStatus.PENDING_REQUEST },
+        create: { gtcPointId: gtcPointId!, serviceId: svc.id, status: ServiceStatus.PENDING_REQUEST },
+      });
+    }
+  }
   // Notify sector owners about the new convention
   try {
     await onConventionCreated(conv.id);
@@ -155,36 +173,57 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
     }
   }
 
-  // Handle file from multer.any() - files are in req.files array
-  let file: Express.Multer.File | undefined;
+  // Handle files from multer.any() - files are in req.files array. Accept up to 5 files.
+  let files: Express.Multer.File[] = [];
   if (req.files) {
-    const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
-    file = files.find((f: any) => f.fieldname === 'file');
+    const all = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+    // prefer field name 'files' (new) but accept legacy 'file'
+    files = all.filter((f: any) => f.fieldname === 'files' || f.fieldname === 'file');
   }
 
-  if (!file) return res.status(400).json({ error: "file is required (multipart/form-data)" });
+  if (!files.length) return res.status(400).json({ error: "file(s) are required (multipart/form-data)" });
+  if (files.length > 5) return res.status(400).json({ error: "At most 5 files are allowed" });
 
-  if (conv.status === "APPROVED" || conv.status === "DECLINED") {
+  if (String(conv.status) === "APPROVED" || String(conv.status) === "DECLINED") {
     return res.status(409).json({ error: "Convention is finalized; uploads are locked" });
   }
 
-  const was = conv.status;
+  const was = String(conv.status);
 
   // PDF magic bytes: %PDF
-  const b = file.buffer;
-  const isPdfMagic = b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
-  if (!isPdfMagic) return res.status(400).json({ error: "File does not look like a valid PDF" });
-
-  const mime = file.mimetype || mimeLookup(file.originalname) || "application/octet-stream";
-  if (!String(mime).startsWith("application/pdf")) {
-    return res.status(400).json({ error: "Only PDF uploads are allowed" });
+  // Validate each file and store them. We'll process within a transaction when creating DB records.
+  for (const f of files) {
+    const b = f.buffer;
+    const isPdfMagic = b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+    if (!isPdfMagic) return res.status(400).json({ error: `File ${f.originalname} does not look like a valid PDF` });
+    const mime = f.mimetype || mimeLookup(f.originalname) || "application/octet-stream";
+    if (!String(mime).startsWith("application/pdf")) {
+      return res.status(400).json({ error: `Only PDF uploads are allowed (${f.originalname})` });
+    }
   }
 
-  const stored = await storage.put({ buffer: file.buffer, mime: String(mime), originalName: file.originalname });
+  // Store files first (outside the DB transaction) to avoid long network calls inside transactions
+  const storedResults: Array<{ stored: any; file: Express.Multer.File }> = [];
+  try {
+    for (const f of files) {
+      const stored = await storage.put({ buffer: f.buffer, mime: f.mimetype || mimeLookup(f.originalname) || "application/pdf", originalName: f.originalname });
+      storedResults.push({ stored, file: f });
+    }
+  } catch (err) {
+    // If storage.put fails for any file, attempt to remove any previously stored files then fail
+    for (const r of storedResults) {
+      try {
+        if (r.stored && r.stored.path) await storage.remove(r.stored.path);
+      } catch (e) {
+        console.warn("Failed cleanup after storage error", e);
+      }
+    }
+    console.error("Error storing files before DB transaction", err);
+    return res.status(500).json({ error: "StorageError", message: "Failed to store uploaded files" });
+  }
 
-  // Validate provided sector/service payload and persist changes where appropriate
-  // We'll update convention.sectorId if provided (and permitted) and create gtc point -> service links
-  const { doc, statusChanged } = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+  // Now perform DB writes in a transaction using the stored results
+  const { statusChanged } = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     // If a sectorId was provided, validate it exists. For both admins and point users
     // we'll allow applying the provided sectorId but we validate the sector record exists.
     // This change intentionally permits GTC_POINT users to change the convention sector via upload.
@@ -215,23 +254,28 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
       validServiceIds = foundIds.length ? foundIds : undefined;
     }
 
-    const createdDoc = await tx.conventionDocument.create({
-      data: {
-        conventionId: conv.id,
-        kind: "SIGNED",
-        fileName: stored.fileName,
-        path: stored.path,
-        mime: stored.mime,
-        size: stored.size,
-        checksum: stored.checksum,
-        uploadedById: req.user!.id,
-      },
-    });
-
     let changed = false;
+    // create document records for each previously-stored file
+    for (const r of storedResults) {
+      const stored = r.stored;
+      await tx.conventionDocument.create({
+        data: {
+          conventionId: conv.id,
+          kind: "SIGNED",
+          fileName: stored.fileName,
+          path: stored.path,
+          mime: stored.mime,
+          size: stored.size,
+          checksum: stored.checksum,
+          uploadedById: req.user!.id,
+        },
+      });
+    }
     // Update status to UPLOADED if needed
     if (was !== "UPLOADED") {
-      await tx.convention.update({ where: { id: conv.id }, data: { status: "UPLOADED" } });
+      // Some generated Prisma clients may not include all enum members in the runtime const object.
+      // Use a literal cast here to avoid blocking the sweep; this can be tightened once the generated client is confirmed.
+      await tx.convention.update({ where: { id: conv.id }, data: { status: "UPLOADED" as any } });
       changed = true;
     }
 
@@ -251,14 +295,14 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
         for (const sid of validServiceIds) {
           await tx.gtcPointService.upsert({
             where: { id: `${conv.gtcPointId}-${sid}` },
-            create: { gtcPointId: conv.gtcPointId, serviceId: sid, status: "ENABLED" },
+            create: { gtcPointId: conv.gtcPointId, serviceId: sid, status: ServiceStatus.ENABLED },
             update: {},
           } as any).catch(() => { });
         }
       }
     }
 
-    return { doc: createdDoc, statusChanged: changed };
+    return { statusChanged: changed };
   }, {
     maxWait: 10000, // 10 seconds
     timeout: 15000, // 15 seconds
@@ -268,7 +312,9 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
     await onConventionUploaded(conv.id);
   }
 
-  res.status(201).json({ ok: true, document: doc, downloadUrl: `/uploads${stored.path}` });
+  // respond with list of created documents (we didn't capture createdDoc objects above, re-query latest docs)
+  const createdDocs = await prisma.conventionDocument.findMany({ where: { conventionId: conv.id }, orderBy: { createdAt: "desc" }, take: storedResults.length });
+  res.status(201).json({ ok: true, documents: createdDocs, downloadUrl: storedResults.length ? `/uploads${storedResults[0].stored.path}` : undefined });
 });
 
 // 4.4 List my conventions (point sees own, admin sees all)
@@ -367,21 +413,22 @@ conventionsRouter.post(
       if (!gtcPointId || !sectorId) return res.status(400).json({ error: "gtcPointId and sectorId are required for admin" });
     }
 
-    // file from multer
-    let file: Express.Multer.File | undefined;
+    // files from multer - accept multiple
+    let files: Express.Multer.File[] = [];
     if (req.files) {
-      const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
-      file = files.find((f: any) => f.fieldname === 'file');
+      const all = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+      files = all.filter((f: any) => f.fieldname === 'files' || f.fieldname === 'file');
     }
-    if (!file) return res.status(400).json({ error: "file is required (multipart/form-data)" });
+    if (!files.length) return res.status(400).json({ error: "file(s) are required (multipart/form-data)" });
+    if (files.length > 5) return res.status(400).json({ error: "At most 5 files are allowed" });
 
-    // PDF magic bytes: %PDF
-    const b = file.buffer;
-    const isPdfMagic = b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
-    if (!isPdfMagic) return res.status(400).json({ error: "File does not look like a valid PDF" });
-
-    const mime = file.mimetype || "application/pdf";
-    if (!String(mime).startsWith("application/pdf")) return res.status(400).json({ error: "Only PDF uploads are allowed" });
+    for (const file of files) {
+      const b = file.buffer;
+      const isPdfMagic = b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+      if (!isPdfMagic) return res.status(400).json({ error: `File ${file.originalname} does not look like a valid PDF` });
+      const mime = file.mimetype || "application/pdf";
+      if (!String(mime).startsWith("application/pdf")) return res.status(400).json({ error: `Only PDF uploads are allowed (${file.originalname})` });
+    }
 
     // parse serviceIds if present (allow JSON string or repeated fields)
     let serviceIds: string[] | undefined;
@@ -398,25 +445,44 @@ conventionsRouter.post(
       }
     }
 
-    // create convention and store file in a transaction
-    const stored = await storage.put({ buffer: file.buffer, mime: String(mime), originalName: file.originalname });
+    // store files first (avoid long network work in transaction)
+    const storedResults: Array<{ stored: any; file: Express.Multer.File }> = [];
+    try {
+      for (const file of files) {
+        const stored = await storage.put({ buffer: file.buffer, mime: file.mimetype || "application/pdf", originalName: file.originalname });
+        storedResults.push({ stored, file });
+      }
+    } catch (err) {
+      for (const r of storedResults) {
+        try {
+          if (r.stored && r.stored.path) await storage.remove(r.stored.path);
+        } catch (e) {
+          console.warn("Failed cleanup after storage error", e);
+        }
+      }
+      console.error("Error storing files before DB transaction (with-upload)", err);
+      return res.status(500).json({ error: "StorageError", message: "Failed to store uploaded files" });
+    }
 
-    const { doc, conv } = await prisma.$transaction(async (tx) => {
+    // create convention and documents in transaction
+    const { conv } = await prisma.$transaction(async (tx) => {
       const createdConv = await tx.convention.create({ data: { gtcPointId: gtcPointId!, sectorId: sectorId!, status: "UPLOADED" as any } });
-      const created = await tx.conventionDocument.create({
-        data: {
-          conventionId: createdConv.id,
-          kind: "SIGNED",
-          fileName: stored.fileName,
-          path: stored.path,
-          mime: stored.mime,
-          size: stored.size,
-          checksum: stored.checksum,
-          uploadedById: req.user!.id,
-        },
-      });
-
-      return { doc: created, conv: createdConv };
+      for (const r of storedResults) {
+        const stored = r.stored;
+        await tx.conventionDocument.create({
+          data: {
+            conventionId: createdConv.id,
+            kind: "SIGNED",
+            fileName: stored.fileName,
+            path: stored.path,
+            mime: stored.mime,
+            size: stored.size,
+            checksum: stored.checksum,
+            uploadedById: req.user!.id,
+          },
+        });
+      }
+      return { conv: createdConv };
     });
 
     try {
@@ -426,6 +492,7 @@ conventionsRouter.post(
       await onConventionUploaded(conv.id);
     } catch (e) { }
 
-    res.status(201).json({ ok: true, convention: conv, document: doc });
+    const createdDocs = await prisma.conventionDocument.findMany({ where: { conventionId: conv.id }, orderBy: { createdAt: "desc" }, take: storedResults.length });
+    res.status(201).json({ ok: true, convention: conv, documents: createdDocs });
   }
 );

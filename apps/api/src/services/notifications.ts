@@ -1,6 +1,7 @@
 import { prisma, } from "../lib/prisma";
 import { emitToUser } from "../sockets/io";
 import { sendEmail } from "../lib/mailer";
+import { NotificationType } from "@prisma/client";
 
 type NotifyInput = {
   userId: string;
@@ -18,7 +19,7 @@ export async function notifyUser(input: NotifyInput) {
   const notif = await prisma.notification.create({
     data: {
       userId: input.userId,
-      type: (input.type ?? "GENERIC") as any,
+      type: (input.type ? (input.type as NotificationType) : NotificationType.GENERIC),
       subject: input.subject,
       contentHtml: input.contentHtml,
     },

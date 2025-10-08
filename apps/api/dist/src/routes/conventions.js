@@ -10,6 +10,7 @@ const zod_1 = require("zod");
 const upload_1 = require("../middleware/upload");
 const auth_1 = require("../middleware/auth");
 const prisma_1 = require("../lib/prisma");
+const client_1 = require("@prisma/client");
 const provider_1 = require("../storage/provider");
 const pdf_1 = require("../utils/pdf");
 const conventions_1 = require("../services/conventions");
@@ -25,7 +26,7 @@ exports.conventionsRouter.delete("/:id", (0, auth_1.requireRole)("GTC_POINT", "A
     if (!conv)
         return res.status(404).json({ error: "Convention not found" });
     // Only allow delete if NEW
-    if (conv.status !== "NEW")
+    if (String(conv.status) !== "NEW")
         return res.status(409).json({ error: "Convention is finalized and cannot be deleted" });
     // Authorization: GTC_POINT may only delete their own convention
     if (req.user.role === "GTC_POINT") {
@@ -57,14 +58,16 @@ exports.conventionsRouter.delete("/:id", (0, auth_1.requireRole)("GTC_POINT", "A
 });
 // 4.1 Create a convention (GTC point or admin)
 const createSchema = zod_1.z.object({
-    gtcPointId: zod_1.z.string().uuid().optional(), // admin may specify; point users derive from profile
-    sectorId: zod_1.z.string().uuid().optional(), // admin may specify
+    // DB uses cuid() for ids in this project; accept cuid() rather than uuid()
+    gtcPointId: zod_1.z.string().cuid().optional(), // admin may specify; point users derive from profile
+    sectorId: zod_1.z.string().cuid().optional(), // admin may specify
+    serviceIds: zod_1.z.array(zod_1.z.string().cuid()).optional(), // optional list of services to request/enable
 });
 exports.conventionsRouter.post("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"), async (req, res) => {
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success)
         return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
-    let { gtcPointId, sectorId } = parsed.data;
+    let { gtcPointId, sectorId, serviceIds } = parsed.data;
     // If GTC_POINT user, derive from their mapping
     if (req.user.role === "GTC_POINT") {
         const me = await prisma_1.prisma.user.findUnique({
@@ -81,9 +84,21 @@ exports.conventionsRouter.post("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"
         if (!gtcPointId || !sectorId)
             return res.status(400).json({ error: "gtcPointId and sectorId are required for admin" });
     }
+    // rely on Prisma schema default for `status` (ConventionStatus @default(NEW))
     const conv = await prisma_1.prisma.convention.create({
-        data: { gtcPointId: gtcPointId, sectorId: sectorId, status: "NEW" },
+        data: { gtcPointId: gtcPointId, sectorId: sectorId },
     });
+    // If serviceIds provided, create PENDING_REQUEST links for the point (ignore invalid for sector)
+    if (serviceIds && serviceIds.length) {
+        const valid = await prisma_1.prisma.service.findMany({ where: { id: { in: serviceIds }, sectorId: sectorId } });
+        for (const svc of valid) {
+            await prisma_1.prisma.gtcPointService.upsert({
+                where: { gtcPointId_serviceId: { gtcPointId: gtcPointId, serviceId: svc.id } },
+                update: { status: client_1.ServiceStatus.PENDING_REQUEST },
+                create: { gtcPointId: gtcPointId, serviceId: svc.id, status: client_1.ServiceStatus.PENDING_REQUEST },
+            });
+        }
+    }
     // Notify sector owners about the new convention
     try {
         await (0, conventions_1.onConventionCreated)(conv.id);
@@ -100,6 +115,7 @@ const prefillSchema = zod_1.z.object({
     title: zod_1.z.string().min(1).optional(),
     sectorName: zod_1.z.string().min(1).optional(),
     services: zod_1.z.array(zod_1.z.string()).optional(),
+    signature: zod_1.z.string().optional(), // Data URL (PNG) for embedding signature
 });
 exports.conventionsRouter.post("/prefill", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"), async (req, res) => {
     const parsed = prefillSchema.safeParse(req.body || {});
@@ -116,6 +132,7 @@ exports.conventionsRouter.post("/prefill", (0, auth_1.requireRole)("GTC_POINT", 
         pointName,
         sectorName: parsed.data.sectorName,
         services: parsed.data.services,
+        signatureDataUrl: parsed.data.signature,
     });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="convention-prefill.pdf"`);
@@ -162,10 +179,10 @@ exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT
     }
     if (!file)
         return res.status(400).json({ error: "file is required (multipart/form-data)" });
-    if (conv.status === "APPROVED" || conv.status === "DECLINED") {
+    if (String(conv.status) === "APPROVED" || String(conv.status) === "DECLINED") {
         return res.status(409).json({ error: "Convention is finalized; uploads are locked" });
     }
-    const was = conv.status;
+    const was = String(conv.status);
     // PDF magic bytes: %PDF
     const b = file.buffer;
     const isPdfMagic = b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
@@ -221,6 +238,8 @@ exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT
         let changed = false;
         // Update status to UPLOADED if needed
         if (was !== "UPLOADED") {
+            // Some generated Prisma clients may not include all enum members in the runtime const object.
+            // Use a literal cast here to avoid blocking the sweep; this can be tightened once the generated client is confirmed.
             await tx.convention.update({ where: { id: conv.id }, data: { status: "UPLOADED" } });
             changed = true;
         }
@@ -240,7 +259,7 @@ exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT
                 for (const sid of validServiceIds) {
                     await tx.gtcPointService.upsert({
                         where: { id: `${conv.gtcPointId}-${sid}` },
-                        create: { gtcPointId: conv.gtcPointId, serviceId: sid, status: "ENABLED" },
+                        create: { gtcPointId: conv.gtcPointId, serviceId: sid, status: client_1.ServiceStatus.ENABLED },
                         update: {},
                     }).catch(() => { });
                 }

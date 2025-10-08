@@ -4,6 +4,7 @@ exports.onLeadCreated = onLeadCreated;
 const prisma_1 = require("../lib/prisma");
 const notifications_1 = require("./notifications");
 const mailer_1 = require("../lib/mailer");
+const client_1 = require("@prisma/client");
 /** Users with role SECTOR_OWNER for the sector.
  *
  * Owners can be assigned in two ways in this schema:
@@ -15,7 +16,7 @@ const mailer_1 = require("../lib/mailer");
 async function getSectorOwners(sectorId) {
     const owners = await prisma_1.prisma.user.findMany({
         where: {
-            role: "SECTOR_OWNER",
+            role: client_1.Role.SECTOR_OWNER,
             OR: [{ sectorId }, { userSectors: { some: { sectorId } } }],
         },
         select: { id: true },

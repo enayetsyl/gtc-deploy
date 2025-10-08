@@ -1,8 +1,9 @@
 import { prisma } from "../lib/prisma";
 import { notifyUser, notifyUsers } from "./notifications";
+import { Role } from "@prisma/client";
 
 export async function getAdmins() {
-  const admins = await prisma.user.findMany({ where: { role: "ADMIN" as any }, select: { id: true, email: true } });
+  const admins = await prisma.user.findMany({ where: { role: Role.ADMIN }, select: { id: true, email: true } });
   return admins.map((a: { id: string }) => a.id);
 }
 
@@ -15,7 +16,7 @@ export async function getPointUsers(gtcPointId: string) {
 export async function getSectorOwners(sectorId: string) {
   const owners = await prisma.user.findMany({
     where: {
-      role: "SECTOR_OWNER" as any,
+      role: Role.SECTOR_OWNER,
       OR: [{ sectorId }, { userSectors: { some: { sectorId } } }],
     },
     select: { id: true },

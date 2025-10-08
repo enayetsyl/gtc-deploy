@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.pointServices = void 0;
 const express_1 = require("express");
 const prisma_1 = require("../lib/prisma");
+const client_1 = require("@prisma/client");
 const zod_1 = require("zod");
 const auth_1 = require("../middleware/auth");
 const services_1 = require("../services/services");
@@ -68,8 +69,8 @@ exports.pointServices.post("/requests", async (req, res) => {
     }
     const link = await prisma_1.prisma.gtcPointService.upsert({
         where: { gtcPointId_serviceId: { gtcPointId: pointId, serviceId: svc.id } },
-        update: { status: "PENDING_REQUEST" },
-        create: { gtcPointId: pointId, serviceId: svc.id, status: "PENDING_REQUEST" },
+        update: { status: client_1.ServiceStatus.PENDING_REQUEST },
+        create: { gtcPointId: pointId, serviceId: svc.id, status: client_1.ServiceStatus.PENDING_REQUEST },
     });
     await (0, services_1.onServiceRequested)(pointId, svc.id);
     res.status(201).json(link);
