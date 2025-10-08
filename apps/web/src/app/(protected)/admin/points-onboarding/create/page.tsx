@@ -9,7 +9,6 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { api } from "@/lib/axios";
@@ -25,11 +24,6 @@ export default function CreateInvite() {
   const [sector, setSector] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
-  const [includeServices, setIncludeServices] = useState(false);
-  const [services, setServices] = useState<Array<{ id: string; name: string }>>(
-    []
-  );
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -44,28 +38,17 @@ export default function CreateInvite() {
   }, []);
 
   // Fetch services for the selected sector. Only load when a sector is chosen.
+  // no-op: services are no longer selected at invite creation time
   useEffect(() => {
     (async () => {
-      if (!sector) {
-        setServices([]);
-        setSelectedServices([]);
-        return;
-      }
       try {
-        const { data } = await api.get<{ id: string; name: string }[]>(
-          "/api/admin/services",
-          { params: { sectorId: sector } }
-        );
-        setServices(data || []);
-        // clear selected services when sector changes
-        setSelectedServices([]);
+        const { data } = await api.get<Sector[]>("/api/sectors/public");
+        setSectors(data);
       } catch {
-        // ignore — services list is optional
-        setServices([]);
-        setSelectedServices([]);
+        // ignore
       }
     })();
-  }, [sector]);
+  }, []);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -83,14 +66,12 @@ export default function CreateInvite() {
         sectorId: sector,
         email,
         name,
-        includeServices,
-        serviceIds: includeServices ? selectedServices : undefined,
       });
       // use a basic toast via browser alert (sonner Toaster can be mounted globally)
       toast.success(t("admin.onboarding.inviteCreated"));
       setEmail("");
       setName("");
-      setIncludeServices(false);
+      setSector("");
     } catch {
       toast.error(t("ui.createFailed"));
     } finally {
@@ -145,57 +126,7 @@ export default function CreateInvite() {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={includeServices}
-                  onCheckedChange={(c) => setIncludeServices(Boolean(c))}
-                />
-                <label className="text-sm">
-                  {t("admin.onboarding.includeServices")}
-                </label>
-              </div>
-
-              {includeServices && (
-                <div className="p-2 border rounded bg-background">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {t("admin.onboarding.selectServices")}
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {services.length ? (
-                      services.map((s) => {
-                        const checked = selectedServices.includes(s.id);
-                        return (
-                          <label
-                            key={s.id}
-                            className="flex items-center gap-2 p-2 border rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                if (e.target.checked)
-                                  setSelectedServices((prev) => [
-                                    ...prev,
-                                    s.id,
-                                  ]);
-                                else
-                                  setSelectedServices((prev) =>
-                                    prev.filter((id) => id !== s.id)
-                                  );
-                              }}
-                            />
-                            <span className="text-sm">{s.name}</span>
-                          </label>
-                        );
-                      })
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        {t("ui.noServices")}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
+              {/* services preselection removed — invites are sector-only now */}
 
               <div>
                 <Button
