@@ -84,15 +84,13 @@ export default function UploadSigned({
             </svg>
             <span className="text-sm">{t("upload.uploading")}</span>
           </div>
-        ) : (
-          // Only show the helper label when the upload widget is visible
-          // (i.e. there are no existing documents for this convention)
-          !(docsQ.data && docsQ.data.length > 0) ? (
-            <div className="text-sm text-muted-foreground">
-              {t("upload.uploadSigned")}
-            </div>
-          ) : null
-        )}
+        ) : // Only show the helper label when the upload widget is visible
+        // (i.e. there are no existing documents for this convention)
+        !(docsQ.data && docsQ.data.length > 0) ? (
+          <div className="text-sm text-muted-foreground">
+            {t("upload.uploadSigned")}
+          </div>
+        ) : null}
 
         {progress !== null && (
           <span className="text-sm text-muted-foreground hidden md:inline-block">
