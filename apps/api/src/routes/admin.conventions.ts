@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import { onConventionDecision } from "../services/conventions";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { Readable } from "node:stream";
 import archiver from "archiver";
 import sanitize from "sanitize-filename";
 
@@ -84,14 +85,52 @@ adminConventions.get("/:id/archive", async (req, res) => {
 
   // add each existing file by absolute path; name inside zip = timestamp_kind_filename
   for (const d of conv.documents) {
-    const absPath = path.resolve("uploads", "." + d.path); // mirrors your single-file download path
     try {
-      await fs.access(absPath);
       const ts = new Date(d.createdAt).toISOString().replace(/[:T]/g, "-").slice(0, 19);
       const entryName = `${ts}_${d.kind}_${sanitize(d.fileName)}`;
-      archive.file(absPath, { name: entryName });
-    } catch {
-      // skip missing file (keeps export resilient)
+
+      // If path looks like an HTTP(S) URL (UploadThing), fetch and append the stream
+      if (typeof d.path === "string" && d.path.startsWith("http")) {
+        try {
+          const resp = await fetch(d.path);
+          if (!resp.ok || !resp.body) {
+            // skip if fetch failed
+            continue;
+          }
+          // convert Web ReadableStream (resp.body) to Node Readable
+          // node:stream provides Readable.fromWeb for this purpose
+          let nodeStream: NodeJS.ReadableStream;
+          try {
+            // Use Readable.fromWeb if available
+            // @ts-ignore - fromWeb may not be in older type defs
+            nodeStream = (Readable as any).fromWeb
+              ? (Readable as any).fromWeb(resp.body as any)
+              : Readable.from(resp.body as any);
+          } catch (e) {
+            // fallback: attempt to use body as any (may work in some runtimes)
+            nodeStream = resp.body as any;
+          }
+
+          archive.append(nodeStream as any, { name: entryName });
+        } catch (e) {
+          // skip this file on fetch error
+          console.warn("Failed to fetch/append remote file for archive", d.path, e);
+          continue;
+        }
+      } else {
+        // legacy/local path: try to access local file and add it
+        const absPath = path.resolve("uploads", "." + d.path); // mirrors your single-file download path
+        try {
+          await fs.access(absPath);
+          archive.file(absPath, { name: entryName });
+        } catch {
+          // skip missing file (keeps export resilient)
+        }
+      }
+    } catch (err) {
+      // On unexpected errors for this document, skip and continue
+      console.warn("Skipping document in archive due to error", d.id, err);
+      continue;
     }
   }
 
