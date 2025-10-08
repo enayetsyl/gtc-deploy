@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useUploadSigned } from "../../hooks/useConventions";
 // Button removed — upload starts automatically on select
 import UploadWidget from "../files/UploadWidget";
+import { useListDocuments } from "@/hooks/useConventions";
 import { useI18n } from "@/providers/i18n-provider";
 import { AxiosProgressEvent } from "axios";
 import { useEffect } from "react";
@@ -16,6 +17,7 @@ export default function UploadSigned({
   const [progress, setProgress] = useState<number | null>(null);
   const mutation = useUploadSigned(conventionId);
   const { t } = useI18n();
+  const docsQ = useListDocuments(conventionId);
 
   async function onUpload() {
     if (!file) return;
@@ -44,15 +46,17 @@ export default function UploadSigned({
 
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center gap-3 w-full">
-      <UploadWidget
-        accept="application/pdf"
-        maxSizeMB={10}
-        value={file}
-        onSelect={setFile}
-        disabled={mutation.isPending}
-        hint={t("file.accepted", { types: "PDF", max: "10" })}
-        className="w-full md:min-w-[360px]"
-      />
+      {/* Hide the upload box while uploading to avoid selecting a new file mid-upload */}
+      {!(mutation.isPending || (docsQ.data && docsQ.data.length > 0)) && (
+        <UploadWidget
+          accept="application/pdf"
+          maxSizeMB={10}
+          value={file}
+          onSelect={setFile}
+          hint={t("file.accepted", { types: "PDF", max: "10" })}
+          className="w-full md:min-w-[360px]"
+        />
+      )}
 
       <div className="flex items-center gap-2 w-full md:w-auto">
         {/* Show a disabled uploading indicator while mutation is pending, otherwise a hint */}
@@ -81,9 +85,13 @@ export default function UploadSigned({
             <span className="text-sm">{t("upload.uploading")}</span>
           </div>
         ) : (
-          <div className="text-sm text-muted-foreground">
-            {t("upload.uploadSigned")}
-          </div>
+          // Only show the helper label when the upload widget is visible
+          // (i.e. there are no existing documents for this convention)
+          !(docsQ.data && docsQ.data.length > 0) ? (
+            <div className="text-sm text-muted-foreground">
+              {t("upload.uploadSigned")}
+            </div>
+          ) : null
         )}
 
         {progress !== null && (

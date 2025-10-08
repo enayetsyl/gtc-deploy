@@ -68,6 +68,8 @@ export function useUploadSigned(conventionId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["conventions"] });
       qc.invalidateQueries({ queryKey: ["admin-conventions"] });
+      // also refresh convention documents so UI components that list docs update
+      qc.invalidateQueries({ queryKey: ["convention-docs"] });
     },
   });
 }
