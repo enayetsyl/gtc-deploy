@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { notifyUsers } from "./notifications";
 import { sendEmail } from "../lib/mailer";
+import { Role } from "@prisma/client";
 
 /** Users with role SECTOR_OWNER for the sector.
  *
@@ -13,7 +14,7 @@ import { sendEmail } from "../lib/mailer";
 async function getSectorOwners(sectorId: string) {
   const owners = await prisma.user.findMany({
     where: {
-      role: "SECTOR_OWNER" as any,
+      role: Role.SECTOR_OWNER,
       OR: [{ sectorId }, { userSectors: { some: { sectorId } } }],
     },
     select: { id: true },

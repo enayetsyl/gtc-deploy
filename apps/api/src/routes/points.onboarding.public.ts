@@ -12,7 +12,7 @@ export const pointsOnboardingPublic = Router();
 pointsOnboardingPublic.get("/:token", async (req: Request, res: Response) => {
   const token = z.string().min(10).parse(req.params.token);
   // Include the linked services with their service relation so we can expose names safely
-  const ob = await (prisma as any).pointOnboarding.findUnique({ where: { onboardingToken: token }, include: { services: { include: { service: true } }, sector: true } });
+  const ob = await prisma.pointOnboarding.findUnique({ where: { onboardingToken: token }, include: { services: { include: { service: true } }, sector: true } });
   if (!ob || ob.status !== "DRAFT" || (ob.tokenExpiresAt && ob.tokenExpiresAt < new Date())) return res.status(404).json({ error: "Not found" });
   const serviceIds = ob.services.map((s: any) => s.serviceId);
   const services = ob.services.map((s: any) => ({ id: s.serviceId, name: s.service?.name }));
@@ -91,7 +91,7 @@ pointsOnboardingPublic.post("/:token/submit", flaggedUpload(), async (req: Reque
 // Registration page prefill
 pointsOnboardingPublic.get("/register/:regToken", async (req: Request, res: Response) => {
   const regToken = z.string().min(10).parse(req.params.regToken);
-  const ob = await (prisma as any).pointOnboarding.findFirst({ where: { registrationToken: regToken } });
+  const ob = await prisma.pointOnboarding.findFirst({ where: { registrationToken: regToken } });
   if (!ob || ob.status !== "APPROVED" || (ob.tokenExpiresAt && ob.tokenExpiresAt < new Date())) return res.status(404).json({ error: "Not found" });
   res.json({ email: ob.email, name: ob.name, role: "GTC_POINT" });
 });

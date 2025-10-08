@@ -12,7 +12,7 @@ adminPointsOnboarding.get("/", requireRole("ADMIN"), async (req, res) => {
   const status = (req.query.status as string | undefined) ?? undefined;
   const where: any = {};
   if (status) where.status = status;
-  const items = await (prisma as any).pointOnboarding.findMany({ where, orderBy: { createdAt: "desc" }, include: { services: true, sector: true } });
+  const items = await prisma.pointOnboarding.findMany({ where, orderBy: { createdAt: "desc" }, include: { services: true, sector: true } });
   res.json({ items });
 });
 

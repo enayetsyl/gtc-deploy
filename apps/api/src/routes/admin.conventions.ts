@@ -44,7 +44,7 @@ adminConventions.patch("/:id", async (req, res) => {
   const conv = await prisma.convention.update({
     where: { id },
     data: {
-      status: approved ? "APPROVED" : "DECLINED",
+      status: approved ? ("APPROVED" as any) : ("DECLINED" as any),
       internalSalesRep: body.data.internalSalesRep,
     },
   });

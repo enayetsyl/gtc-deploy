@@ -118,17 +118,29 @@ exports.adminSectors.post("/sector-owners", async (req, res) => {
         const { token } = await (0, jwt_1.signInviteToken)(user.id);
         const primarySector = found.find((s) => s.id === primarySectorId);
         const link = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/invite/accept?token=${encodeURIComponent(token)}`;
+        // Build a display string of all selected sector names and escape HTML
+        const sectorNames = (found || []).map((s) => String(s.name)).join(", ");
+        const escapeHtml = (str) => String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+        const displaySector = sectorNames.length ? sectorNames : primarySector?.name ?? "i tuoi settori";
+        const displaySectorEscaped = escapeHtml(displaySector);
+        const userNameEscaped = escapeHtml(user.name ?? "");
+        const linkEscaped = escapeHtml(link);
         await (0, mailer_1.sendEmail)({
             to: user.email,
             subject: "Sei stato invitato come Responsabile del Settore",
             html: `
-        <p>Ciao ${user.name},</p>
-        <p>Sei stato aggiunto come Responsabile del Settore per <strong>${primarySector?.name ?? "i tuoi settori"}</strong>.</p>
+        <p>Ciao ${userNameEscaped},</p>
+        <p>Sei stato aggiunto come Responsabile del Settore per <strong>${displaySectorEscaped}</strong>.</p>
         <p>
           <a href="${link}" style="display:inline-block;padding:12px 20px;background-color:#2563eb;color:#ffffff;border-radius:6px;text-decoration:none;font-weight:600;">Attiva l'account e imposta la password</a>
         </p>
         <p style="color:#6b7280;font-size:13px">Se il pulsante non funziona, copia e incolla questo link nel tuo browser:</p>
-        <p style="word-break:break-all;"><a href="${link}">${link}</a></p>
+        <p style="word-break:break-all;"><a href="${link}">${linkEscaped}</a></p>
       `,
         });
     }

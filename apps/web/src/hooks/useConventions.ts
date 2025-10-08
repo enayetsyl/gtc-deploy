@@ -33,8 +33,8 @@ export function useAdminConventions(status?: ConventionStatus) {
 export function useCreateConvention() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
-      const { data } = await api.post<Convention>(`/api/conventions`, {});
+    mutationFn: async (payload?: { sectorId?: string; serviceIds?: string[] }) => {
+      const { data } = await api.post<Convention>(`/api/conventions`, payload ?? {});
       return data;
     },
     onSuccess: () => {

@@ -8,8 +8,9 @@ exports.onConventionUploaded = onConventionUploaded;
 exports.onConventionDecision = onConventionDecision;
 const prisma_1 = require("../lib/prisma");
 const notifications_1 = require("./notifications");
+const client_1 = require("@prisma/client");
 async function getAdmins() {
-    const admins = await prisma_1.prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true, email: true } });
+    const admins = await prisma_1.prisma.user.findMany({ where: { role: client_1.Role.ADMIN }, select: { id: true, email: true } });
     return admins.map((a) => a.id);
 }
 async function getPointUsers(gtcPointId) {
@@ -20,7 +21,7 @@ async function getPointUsers(gtcPointId) {
 async function getSectorOwners(sectorId) {
     const owners = await prisma_1.prisma.user.findMany({
         where: {
-            role: "SECTOR_OWNER",
+            role: client_1.Role.SECTOR_OWNER,
             OR: [{ sectorId }, { userSectors: { some: { sectorId } } }],
         },
         select: { id: true },

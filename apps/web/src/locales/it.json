@@ -22,6 +22,7 @@
   "prefill.errors.missingSignature": "Firma il documento usando il riquadro sottostante",
   "prefill.errors.missingApplicant": "Inserisci il nome del richiedente",
   "convention.create": "Crea convenzione",
+  "convention.request": "Richiedi convenzione",
   "convention.step1": "Passo 1: Precompila e scarica",
   "convention.noDocuments": "Nessun documento",
   "convention.download": "Scarica",
@@ -61,6 +62,7 @@
   "convention.approve": "Approva",
   "status.all": "Tutte",
   "status.new": "Nuove",
+  "status.pending": "In attesa",
   "status.uploaded": "Caricate",
   "status.approved": "Approvate",
   "status.declined": "Rifiutate",
@@ -159,6 +161,7 @@
   "ui.saving": "Salvataggio…",
   "ui.sending": "Invio in corso…",
   "ui.cancel": "Annulla",
+  "ui.send": "Invia",
 
   "admin.sectors.createTitle": "Crea settore",
   "admin.sectors.examplePlaceholder": "es. Formazione",
@@ -190,6 +193,7 @@
   "form.errors.code.invalid": "Il codice deve contenere solo lettere maiuscole, numeri e underscore",
 
   "point.services.title": "I miei servizi",
+  "point.services.add": "Aggiungi servizi",
   "point.services.requestSent": "Richiesta inviata agli amministratori",
   "ui.requestFailed": "Impossibile richiedere il servizio",
   "table.service": "Servizio",

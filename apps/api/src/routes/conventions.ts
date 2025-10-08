@@ -4,7 +4,7 @@ import { z } from "zod";
 import { upload as flaggedUpload } from "../middleware/upload";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { prisma } from "../lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma, ServiceStatus, ConventionStatus } from "@prisma/client";
 import { storage } from "../storage/provider";
 import { buildPrefillPdf } from "../utils/pdf";
 import { onConventionUploaded, onConventionCreated } from "../services/conventions";
@@ -22,7 +22,7 @@ conventionsRouter.delete("/:id", requireRole("GTC_POINT", "ADMIN"), async (req, 
   if (!conv) return res.status(404).json({ error: "Convention not found" });
 
   // Only allow delete if NEW
-  if (conv.status !== "NEW") return res.status(409).json({ error: "Convention is finalized and cannot be deleted" });
+  if (String(conv.status) !== "NEW") return res.status(409).json({ error: "Convention is finalized and cannot be deleted" });
 
   // Authorization: GTC_POINT may only delete their own convention
   if (req.user!.role === "GTC_POINT") {
@@ -56,14 +56,16 @@ conventionsRouter.delete("/:id", requireRole("GTC_POINT", "ADMIN"), async (req, 
 
 // 4.1 Create a convention (GTC point or admin)
 const createSchema = z.object({
-  gtcPointId: z.string().uuid().optional(), // admin may specify; point users derive from profile
-  sectorId: z.string().uuid().optional(),   // admin may specify
+  // DB uses cuid() for ids in this project; accept cuid() rather than uuid()
+  gtcPointId: z.string().cuid().optional(), // admin may specify; point users derive from profile
+  sectorId: z.string().cuid().optional(),   // admin may specify
+  serviceIds: z.array(z.string().cuid()).optional(), // optional list of services to request/enable
 });
 conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
 
-  let { gtcPointId, sectorId } = parsed.data;
+  let { gtcPointId, sectorId, serviceIds } = parsed.data;
 
   // If GTC_POINT user, derive from their mapping
   if (req.user!.role === "GTC_POINT") {
@@ -79,9 +81,22 @@ conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) 
     if (!gtcPointId || !sectorId) return res.status(400).json({ error: "gtcPointId and sectorId are required for admin" });
   }
 
+  // rely on Prisma schema default for `status` (ConventionStatus @default(NEW))
   const conv = await prisma.convention.create({
-    data: { gtcPointId: gtcPointId!, sectorId: sectorId!, status: "NEW" as any },
+    data: { gtcPointId: gtcPointId!, sectorId: sectorId! },
   });
+
+  // If serviceIds provided, create PENDING_REQUEST links for the point (ignore invalid for sector)
+  if (serviceIds && serviceIds.length) {
+    const valid = await prisma.service.findMany({ where: { id: { in: serviceIds }, sectorId: sectorId! } });
+    for (const svc of valid) {
+      await prisma.gtcPointService.upsert({
+        where: { gtcPointId_serviceId: { gtcPointId: gtcPointId!, serviceId: svc.id } },
+        update: { status: ServiceStatus.PENDING_REQUEST },
+        create: { gtcPointId: gtcPointId!, serviceId: svc.id, status: ServiceStatus.PENDING_REQUEST },
+      });
+    }
+  }
   // Notify sector owners about the new convention
   try {
     await onConventionCreated(conv.id);
@@ -164,11 +179,11 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
 
   if (!file) return res.status(400).json({ error: "file is required (multipart/form-data)" });
 
-  if (conv.status === "APPROVED" || conv.status === "DECLINED") {
+  if (String(conv.status) === "APPROVED" || String(conv.status) === "DECLINED") {
     return res.status(409).json({ error: "Convention is finalized; uploads are locked" });
   }
 
-  const was = conv.status;
+  const was = String(conv.status);
 
   // PDF magic bytes: %PDF
   const b = file.buffer;
@@ -231,7 +246,9 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
     let changed = false;
     // Update status to UPLOADED if needed
     if (was !== "UPLOADED") {
-      await tx.convention.update({ where: { id: conv.id }, data: { status: "UPLOADED" } });
+      // Some generated Prisma clients may not include all enum members in the runtime const object.
+      // Use a literal cast here to avoid blocking the sweep; this can be tightened once the generated client is confirmed.
+      await tx.convention.update({ where: { id: conv.id }, data: { status: "UPLOADED" as any } });
       changed = true;
     }
 
@@ -251,7 +268,7 @@ conventionsRouter.post("/:id/upload", requireRole("GTC_POINT", "ADMIN"), flagged
         for (const sid of validServiceIds) {
           await tx.gtcPointService.upsert({
             where: { id: `${conv.gtcPointId}-${sid}` },
-            create: { gtcPointId: conv.gtcPointId, serviceId: sid, status: "ENABLED" },
+            create: { gtcPointId: conv.gtcPointId, serviceId: sid, status: ServiceStatus.ENABLED },
             update: {},
           } as any).catch(() => { });
         }

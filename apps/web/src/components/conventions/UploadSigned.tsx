@@ -49,9 +49,7 @@ export default function UploadSigned({
           disabled={!file || mutation.isPending}
           onClick={onUpload}
         >
-          {mutation.isPending
-            ? t("upload.uploading")
-            : t("upload.uploadSigned")}
+          {mutation.isPending ? t("upload.uploading") : t("ui.send")}
         </Button>
 
         {progress !== null && (

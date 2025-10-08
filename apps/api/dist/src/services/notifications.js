@@ -5,6 +5,7 @@ exports.notifyUsers = notifyUsers;
 const prisma_1 = require("../lib/prisma");
 const io_1 = require("../sockets/io");
 const mailer_1 = require("../lib/mailer");
+const client_1 = require("@prisma/client");
 /**
  * Creates a Notification row, emits socket events, and optionally enqueues an email.
  * Returns the created Notification.
@@ -13,7 +14,7 @@ async function notifyUser(input) {
     const notif = await prisma_1.prisma.notification.create({
         data: {
             userId: input.userId,
-            type: (input.type ?? "GENERIC"),
+            type: (input.type ? input.type : client_1.NotificationType.GENERIC),
             subject: input.subject,
             contentHtml: input.contentHtml,
         },

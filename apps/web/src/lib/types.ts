@@ -1,4 +1,4 @@
-export type ConventionStatus = "NEW" | "UPLOADED" | "APPROVED" | "DECLINED";
+export type ConventionStatus = "NEW" | "UPLOADED" | "APPROVED" | "DECLINED" | "PENDING";
 
 
 export type GtcPoint = { id: string; name: string; email: string; sectorId: string };

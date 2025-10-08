@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma";
+import { ServiceStatus } from "@prisma/client";
 import { z } from "zod";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { onServiceRequested } from "../services/services";
@@ -71,8 +72,8 @@ pointServices.post("/requests", async (req, res) => {
 
   const link = await prisma.gtcPointService.upsert({
     where: { gtcPointId_serviceId: { gtcPointId: pointId, serviceId: svc.id } },
-    update: { status: "PENDING_REQUEST" },
-    create: { gtcPointId: pointId, serviceId: svc.id, status: "PENDING_REQUEST" },
+    update: { status: ServiceStatus.PENDING_REQUEST },
+    create: { gtcPointId: pointId, serviceId: svc.id, status: ServiceStatus.PENDING_REQUEST },
   });
 
   await onServiceRequested(pointId, svc.id);

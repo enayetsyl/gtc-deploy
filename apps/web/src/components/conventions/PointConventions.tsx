@@ -7,25 +7,15 @@ import {
   downloadDocument,
   useDeleteConvention,
 } from "../../hooks/useConventions";
-import PrefillForm from "./PrefillForm";
 import UploadSigned from "./UploadSigned";
 import { useSectorsPublic } from "@/hooks/useSectors";
 import { listServices } from "@/lib/admin-api";
 import { api } from "@/lib/axios";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "../../components/ui/button";
 import { useI18n } from "@/providers/i18n-provider";
 
 export default function PointConventionsPage() {
   const [page] = useState(1);
-  const [sectorId, setSectorId] = useState<string>("");
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const { data, isLoading } = useMyConventions(page, 20);
@@ -33,25 +23,13 @@ export default function PointConventionsPage() {
   const deleteConvention = useDeleteConvention();
   const { t } = useI18n();
   const sectorsQ = useSectorsPublic();
-  const servicesQ = useQuery({
-    queryKey: ["admin", "services", sectorId || "none"],
-    queryFn: () => listServices(sectorId || undefined),
-    enabled: !!sectorId,
-  });
-
-  const sectorName = (
-    sectorsQ.data as Array<{ id: string; name: string }> | undefined
-  )?.find((s) => s.id === sectorId)?.name;
-  const serviceNames = (selectedServices || [])
-    .map(
-      (id) =>
-        (
-          servicesQ.data as Array<{ id: string; name: string }> | undefined
-        )?.find((s) => s.id === id)?.name
-    )
-    .filter(Boolean) as string[];
-  const externalLoading = sectorsQ.isLoading || servicesQ.isLoading;
   const [createOpen, setCreateOpen] = useState(false);
+
+  function displayStatusFor(status: unknown) {
+    const s = String(status || "").toUpperCase();
+    if (s === "NEW" || s === "UPLOADED" || s === "PENDING") return "PENDING";
+    return s;
+  }
 
   async function handleDownload(
     conventionId: string,
@@ -80,36 +58,18 @@ export default function PointConventionsPage() {
           >
             {createConvention.isPending
               ? t("ui.creating")
-              : t("convention.create")}
+              : t("convention.request")}
           </Button>
         </div>
       </div>
 
-      <section className="rounded-2xl border p-4 space-y-4">
-        <h2 className="font-medium">{t("convention.step1")}</h2>
-        {/* Sectors dropdown: fetch public sectors and allow selection */}
-        <SectorsDropdown selected={sectorId} onChange={setSectorId} />
-        {/* Services multi-select: shows services for selected sector */}
-        <ServicesMultiSelect
-          sectorId={sectorId}
-          value={selectedServices}
-          onChange={setSelectedServices}
+      {createOpen && (
+        <CreateConventionModal
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          sectors={sectorsQ.data as Array<{ id: string; name: string }>}
         />
-        <PrefillForm
-          sectorName={sectorName}
-          serviceNames={serviceNames}
-          disabled={externalLoading}
-          setSectorId={setSectorId}
-          setSelectedServices={setSelectedServices}
-        />
-        {createOpen && (
-          <CreateConventionModal
-            open={createOpen}
-            onClose={() => setCreateOpen(false)}
-            sectors={sectorsQ.data as Array<{ id: string; name: string }>}
-          />
-        )}
-      </section>
+      )}
 
       <section className="rounded-2xl border">
         {isLoading && <div className="p-4">{t("ui.loading")}</div>}
@@ -129,86 +89,95 @@ export default function PointConventionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data?.items?.map((c, idx) => (
-                  <tr key={c.id} className="border-t align-top">
-                    <td className="p-3 align-top">
-                      {(data.page - 1) * data.pageSize + idx + 1}
-                    </td>
-                    <td className="p-3 align-top">
-                      <span className="inline-flex items-center gap-2">
-                        <span className="font-medium">
-                          {t(`status.${c.status.toLowerCase()}`) || c.status}
+                {data?.items?.map((c, idx) => {
+                  const displayStatus = displayStatusFor(c.status);
+
+                  return (
+                    <tr key={c.id} className="border-t align-top">
+                      <td className="p-3 align-top">
+                        {(data.page - 1) * data.pageSize + idx + 1}
+                      </td>
+                      <td className="p-3 align-top">
+                        <span className="inline-flex items-center gap-2">
+                          <span className="font-medium">
+                            {t(`status.${displayStatus.toLowerCase()}`) ||
+                              displayStatus}
+                          </span>
+                          {c.internalSalesRep && (
+                            <span className="text-xs text-muted-foreground">
+                              / {c.internalSalesRep}
+                            </span>
+                          )}
                         </span>
-                        {c.internalSalesRep && (
-                          <span className="text-xs text-muted-foreground">
-                            / {c.internalSalesRep}
+                      </td>
+                      <td className="p-3 align-top">
+                        <div>{c.gtcPoint?.name ?? "—"}</div>
+                      </td>
+                      <td className="p-3 align-top break-words">
+                        {c.sector?.name ?? t("ui.none")}
+                      </td>
+                      <td className="p-3 align-top break-words">
+                        {c.documents?.length ? (
+                          <ul className="space-y-1">
+                            {c.documents.map((d) => (
+                              <li
+                                key={d.id}
+                                className="flex items-center gap-2"
+                              >
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDownload(c.id, d.id, d.fileName)
+                                  }
+                                >
+                                  {t("convention.download")}
+                                </Button>
+                                <span className="text-xs text-muted-foreground truncate max-w-[6rem]">
+                                  {d.fileName}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {" "}
+                                  · {d.mime || t("file.typeUnknown")} ·{" "}
+                                  {t("file.sizeKb", {
+                                    size: (d.size / 1024).toFixed(0),
+                                  })}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {t("convention.noDocuments")}
                           </span>
                         )}
-                      </span>
-                    </td>
-                    <td className="p-3 align-top">
-                      <div>{c.gtcPoint?.name ?? "—"}</div>
-                    </td>
-                    <td className="p-3 align-top break-words">
-                      {c.sector?.name ?? t("ui.none")}
-                    </td>
-                    <td className="p-3 align-top break-words">
-                      {c.documents?.length ? (
-                        <ul className="space-y-1">
-                          {c.documents.map((d) => (
-                            <li key={d.id} className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleDownload(c.id, d.id, d.fileName)
-                                }
-                              >
-                                {t("convention.download")}
-                              </Button>
-                              <span className="text-xs text-muted-foreground truncate max-w-[6rem]">
-                                {d.fileName}
-                              </span>
-                              <span className="text-muted-foreground">
-                                {" "}
-                                · {d.mime || t("file.typeUnknown")} ·{" "}
-                                {t("file.sizeKb", {
-                                  size: (d.size / 1024).toFixed(0),
-                                })}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span className="text-muted-foreground">
-                          {t("convention.noDocuments")}
-                        </span>
-                      )}
-                    </td>
-                    {/* <td className="p-3 align-top">
-                      <div className="flex items-center gap-2">
-                        {(c.status === "NEW" || c.status === "UPLOADED") && (
-                          <UploadSigned conventionId={c.id} />
-                        )}
+                      </td>
+                      <td className="p-3 align-top">
+                        <div className="flex items-center gap-2">
+                          {displayStatus === "PENDING" && (
+                            <UploadSigned conventionId={c.id} />
+                          )}
 
-                        {c.status === "NEW" && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => setConfirmingId(c.id)}
-                            disabled={
-                              deleteConvention.isPending || deletingId === c.id
-                            }
-                          >
-                            {deletingId === c.id
-                              ? t("convention.deleting")
-                              : t("convention.delete")}
-                          </Button>
-                        )}
-                      </div>
-                    </td> */}
-                  </tr>
-                ))}
+                          {c.status === "NEW" && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => setConfirmingId(c.id)}
+                              disabled={
+                                deleteConvention.isPending ||
+                                deletingId === c.id
+                              }
+                            >
+                              {deletingId === c.id
+                                ? t("convention.deleting")
+                                : t("convention.delete")}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -218,98 +187,110 @@ export default function PointConventionsPage() {
         {!isLoading && (
           <div className="md:hidden">
             <div className="space-y-3 p-3">
-              {data?.items?.map((c, idx) => (
-                <article
-                  key={c.id}
-                  className="border rounded-lg p-3 bg-white shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm text-muted-foreground">
-                        #{(data.page - 1) * data.pageSize + idx + 1}
+              {data?.items?.map((c, idx) => {
+                const displayStatus = ((): string => {
+                  const s = String(c.status).toUpperCase();
+                  if (s === "NEW" || s === "UPLOADED" || s === "PENDING")
+                    return "PENDING";
+                  return s;
+                })();
+
+                return (
+                  <article
+                    key={c.id}
+                    className="border rounded-lg p-3 bg-white shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm text-muted-foreground">
+                          #{(data.page - 1) * data.pageSize + idx + 1}
+                        </div>
+                        <div className="mt-1">
+                          <div className="font-medium text-sm truncate max-w-[14rem]">
+                            {c.gtcPoint?.name ?? t("ui.none")}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {c.sector?.name ?? t("ui.none")}
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-1">
-                        <div className="font-medium text-sm truncate max-w-[14rem]">
-                          {c.gtcPoint?.name ?? t("ui.none")}
+
+                      <div className="text-right">
+                        <div className="font-medium text-sm">
+                          {t(`status.${displayStatus.toLowerCase()}`) ||
+                            displayStatus}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {c.sector?.name ?? t("ui.none")}
-                        </div>
+                        {c.internalSalesRep && (
+                          <div className="text-xs text-muted-foreground">
+                            {c.internalSalesRep}
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="font-medium text-sm">{c.status}</div>
-                      {c.internalSalesRep && (
+                    <div className="mt-3">
+                      <div className="text-xs font-medium mb-1">
+                        {t("table.documents")}
+                      </div>
+                      {c.documents?.length ? (
+                        <ul className="space-y-2">
+                          {c.documents.map((d) => (
+                            <li
+                              key={d.id}
+                              className="flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleDownload(c.id, d.id, d.fileName)
+                                  }
+                                >
+                                  {t("convention.download")}
+                                </Button>
+                                <div className="text-xs text-muted-foreground truncate max-w-[10rem]">
+                                  {d.fileName}
+                                </div>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {t("file.sizeKb", {
+                                  size: (d.size / 1024).toFixed(0),
+                                })}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
                         <div className="text-xs text-muted-foreground">
-                          {c.internalSalesRep}
+                          {t("convention.noDocuments")}
                         </div>
                       )}
                     </div>
-                  </div>
 
-                  <div className="mt-3">
-                    <div className="text-xs font-medium mb-1">
-                      {t("table.documents")}
+                    <div className="mt-3 flex items-center justify-end gap-2">
+                      {displayStatus === "PENDING" && (
+                        <UploadSigned conventionId={c.id} />
+                      )}
+
+                      {c.status === "NEW" && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setConfirmingId(c.id)}
+                          disabled={
+                            deleteConvention.isPending || deletingId === c.id
+                          }
+                        >
+                          {deletingId === c.id
+                            ? t("convention.deleting")
+                            : t("convention.delete")}
+                        </Button>
+                      )}
                     </div>
-                    {c.documents?.length ? (
-                      <ul className="space-y-2">
-                        {c.documents.map((d) => (
-                          <li
-                            key={d.id}
-                            className="flex items-center justify-between gap-2"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleDownload(c.id, d.id, d.fileName)
-                                }
-                              >
-                                {t("convention.download")}
-                              </Button>
-                              <div className="text-xs text-muted-foreground truncate max-w-[10rem]">
-                                {d.fileName}
-                              </div>
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {t("file.sizeKb", {
-                                size: (d.size / 1024).toFixed(0),
-                              })}
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">
-                        {t("convention.noDocuments")}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-end gap-2">
-                    {(c.status === "NEW" || c.status === "UPLOADED") && (
-                      <UploadSigned conventionId={c.id} />
-                    )}
-
-                    {c.status === "NEW" && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setConfirmingId(c.id)}
-                        disabled={
-                          deleteConvention.isPending || deletingId === c.id
-                        }
-                      >
-                        {deletingId === c.id
-                          ? t("convention.deleting")
-                          : t("convention.delete")}
-                      </Button>
-                    )}
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           </div>
         )}
@@ -358,124 +339,6 @@ export default function PointConventionsPage() {
   );
 }
 
-function SectorsDropdown({
-  selected,
-  onChange,
-}: {
-  selected: string;
-  onChange: (v: string) => void;
-}) {
-  const sectorsQ = useSectorsPublic();
-  const { t } = useI18n();
-
-  const items = (sectorsQ.data || []) as Array<{ id: string; name: string }>;
-
-  return (
-    <div>
-      <label className="text-sm text-muted-foreground block mb-2">
-        {t("point.sectors.title")}
-      </label>
-      {sectorsQ.isLoading ? (
-        <p className="text-sm text-muted-foreground">{t("ui.loading")}</p>
-      ) : items.length ? (
-        <Select value={selected} onValueChange={(v) => onChange(v)}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={t("ui.selectSector")} />
-          </SelectTrigger>
-          <SelectContent>
-            {items.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <p className="text-sm text-muted-foreground">{t("ui.noSectors")}</p>
-      )}
-    </div>
-  );
-}
-
-function ServicesMultiSelect({
-  sectorId,
-  value,
-  onChange,
-}: {
-  sectorId: string;
-  value: string[];
-  onChange: (v: string[]) => void;
-}) {
-  const { t } = useI18n();
-  const q = useQuery({
-    queryKey: ["admin", "services", sectorId || "none"],
-    queryFn: () => listServices(sectorId || undefined),
-    enabled: !!sectorId,
-  });
-
-  // Fetch current point's services so we can exclude already-enabled services
-  const myServicesQ = useQuery({
-    queryKey: ["point", "services"],
-    queryFn: async () => {
-      const res = await api.get<{
-        items: Array<{ serviceId: string; status: string }>;
-      }>(`/api/point/services`);
-      return res.data;
-    },
-    // only enabled when sector is selected and user is a point; keep it passive otherwise
-    enabled: !!sectorId,
-  });
-
-  if (!sectorId) return null;
-
-  if (q.isLoading || myServicesQ.isLoading)
-    return <p className="text-sm text-muted-foreground">{t("ui.loading")}</p>;
-
-  const items: { id: string; name: string }[] = q.data || [];
-
-  const ownedEnabledIds = new Set<string>(
-    (myServicesQ.data?.items || [])
-      .filter((it) => it.status === "ENABLED")
-      .map((it) => it.serviceId)
-  );
-
-  // Only show services that are not already enabled for this point
-  const visibleItems = items.filter((svc) => !ownedEnabledIds.has(svc.id));
-
-  const toggle = (id: string) => {
-    if (value.includes(id)) onChange(value.filter((s) => s !== id));
-    else onChange([...value, id]);
-  };
-
-  return (
-    <div>
-      <label className="text-sm text-muted-foreground block mb-2">
-        {t("point.services.title")}
-      </label>
-      {visibleItems.length ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {visibleItems.map((svc) => (
-            <label
-              key={svc.id}
-              className="inline-flex items-center gap-2 text-sm"
-            >
-              <input
-                type="checkbox"
-                checked={value.includes(svc.id)}
-                onChange={() => toggle(svc.id)}
-                className="rounded border"
-              />
-              <span className="truncate">{svc.name}</span>
-            </label>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">{t("ui.noServices")}</p>
-      )}
-    </div>
-  );
-}
-
 function CreateConventionModal({
   open,
   onClose,
@@ -490,7 +353,6 @@ function CreateConventionModal({
     sectors?.[0]?.id ?? ""
   );
   const [serviceIds, setServiceIds] = useState<string[]>([]);
-  const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();
   const createConvention = useCreateConvention();
@@ -528,20 +390,20 @@ function CreateConventionModal({
     );
 
   async function handleSubmit() {
-    if (!file) return;
     setSubmitting(true);
     try {
-      // create convention first
-      const conv = await createConvention.mutateAsync();
+      // Create only — validate and pass selected sector/services so backend can attach requests
+      const isUuid = (s: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          s
+        );
+      const payload: { sectorId?: string; serviceIds?: string[] } = {};
+      if (selectedSector && isUuid(selectedSector))
+        payload.sectorId = selectedSector;
+      const validServiceIds = serviceIds.filter((id) => isUuid(id));
+      if (validServiceIds.length) payload.serviceIds = validServiceIds;
 
-      // build form data and upload to the convention's upload route
-      const fd = new FormData();
-      fd.append("file", file);
-      if (selectedSector) fd.append("sectorId", selectedSector);
-      if (serviceIds.length)
-        fd.append("serviceIds", JSON.stringify(serviceIds));
-
-      await api.post(`/api/conventions/${conv.id}/upload`, fd);
+      await createConvention.mutateAsync(payload);
 
       // refresh queries so UI updates
       qc.invalidateQueries({ queryKey: ["conventions"] });
@@ -549,7 +411,7 @@ function CreateConventionModal({
 
       onClose();
     } catch (err) {
-      console.error("Create+upload failed", err);
+      console.error("Create convention failed", err);
       throw err;
     } finally {
       setSubmitting(false);
@@ -562,7 +424,7 @@ function CreateConventionModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="bg-white rounded-lg p-6 z-10 w-[min(96%,40rem)]">
-        <h3 className="text-lg font-medium mb-2">{t("convention.create")}</h3>
+        <h3 className="text-lg font-medium mb-2">{t("convention.request")}</h3>
 
         <div className="grid gap-3 sm:grid-cols-2">
           {/* <div>
@@ -587,7 +449,7 @@ function CreateConventionModal({
 
           <div className="sm:col-span-2">
             <label className="block text-sm mb-1">
-              {t("point.services.title")}
+              {t("point.services.add")}
             </label>
             {servicesQ.isLoading || myServicesModalQ.isLoading ? (
               <div>{t("ui.loading")}</div>
@@ -615,25 +477,14 @@ function CreateConventionModal({
               </div>
             )}
           </div>
-
-          <div className="sm:col-span-2">
-            <label className="block text-sm mb-1">
-              {t("upload.uploadSigned")}
-            </label>
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          </div>
         </div>
 
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="ghost" onClick={onClose}>
             {t("ui.cancel")}
           </Button>
-          <Button disabled={!file || submitting} onClick={handleSubmit}>
-            {submitting ? t("upload.uploading") : t("upload.uploadSigned")}
+          <Button disabled={submitting} onClick={handleSubmit}>
+            {submitting ? t("ui.sending") : t("ui.send")}
           </Button>
         </div>
       </div>
