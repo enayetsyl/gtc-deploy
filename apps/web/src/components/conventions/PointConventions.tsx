@@ -392,16 +392,12 @@ function CreateConventionModal({
   async function handleSubmit() {
     setSubmitting(true);
     try {
-      // Create only — validate and pass selected sector/services so backend can attach requests
-      const isUuid = (s: string) =>
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-          s
-        );
+      // Create only — pass selected sector and services to the backend.
+      // This project uses custom non-UUID IDs (e.g. "cmghtf2kh0001..."),
+      // so don't filter by a UUID regex here — send values as provided.
       const payload: { sectorId?: string; serviceIds?: string[] } = {};
-      if (selectedSector && isUuid(selectedSector))
-        payload.sectorId = selectedSector;
-      const validServiceIds = serviceIds.filter((id) => isUuid(id));
-      if (validServiceIds.length) payload.serviceIds = validServiceIds;
+      if (selectedSector) payload.sectorId = selectedSector;
+      if (serviceIds.length) payload.serviceIds = serviceIds;
 
       await createConvention.mutateAsync(payload);
 

@@ -63,9 +63,12 @@ const createSchema = z.object({
 });
 conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
+  console.log('parsed', parsed)
   if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
 
   let { gtcPointId, sectorId, serviceIds } = parsed.data;
+
+  console.log('req.user', req.user)
 
   // If GTC_POINT user, derive from their mapping
   if (req.user!.role === "GTC_POINT") {
@@ -75,7 +78,7 @@ conventionsRouter.post("/", requireRole("GTC_POINT", "ADMIN"), async (req, res) 
     });
     if (!me?.gtcPoint) return res.status(409).json({ error: "User is not attached to a GTC Point" });
     gtcPointId = me.gtcPoint.id;
-    sectorId = me.gtcPoint.sectorId;
+    // sectorId = me.gtcPoint.sectorId;
   } else {
     // admin path: both ids required
     if (!gtcPointId || !sectorId) return res.status(400).json({ error: "gtcPointId and sectorId are required for admin" });

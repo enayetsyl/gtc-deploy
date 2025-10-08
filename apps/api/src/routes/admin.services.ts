@@ -10,9 +10,10 @@ adminServices.use(requireAuth);
 adminServices.get("/", async (req, res) => {
   // Optional filter: ?sectorId=...
   const sectorId = typeof req.query.sectorId === "string" ? req.query.sectorId : undefined;
-
+console.log('sector id', sectorId)
   // Non-admin users can only request services scoped to a sector they belong to.
   const user = req.user!;
+  console.log('user', user)
   if (user.role !== "ADMIN") {
     // GTC_POINT may read services across all sectors (broad read access)
     if (user.role === "GTC_POINT") {
@@ -31,7 +32,9 @@ adminServices.get("/", async (req, res) => {
   }
 
   const where = sectorId ? { sectorId } : undefined;
+  console.log('where', where)
   const items = await prisma.service.findMany({ where, orderBy: { createdAt: "desc" }, include: { sector: true } });
+  console.log('items', items)
   res.json(items);
 });
 
@@ -44,13 +47,17 @@ const createSchema = z.object({
 
 adminServices.post("/", async (req, res) => {
   if (req.user!.role !== 'ADMIN') return res.status(403).json({ error: 'Forbidden' });
+  console.log('req.body', req.body)
   const parsed = createSchema.safeParse(req.body);
+  console.log('parsed', parsed)
   if (!parsed.success) return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
   // Ensure provided sector exists
   const sector = await prisma.sector.findUnique({ where: { id: parsed.data.sectorId } });
+  console.log('sector', sector)
   if (!sector) return res.status(400).json({ error: "Invalid sectorId" });
   try {
     const service = await prisma.service.create({ data: parsed.data });
+    console.log('services', service)
     return res.status(201).json(service);
   } catch (err: any) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
