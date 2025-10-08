@@ -44,7 +44,8 @@ export function useCreateConvention() {
 }
 
 type UploadSignedVars = {
-  file: File;
+  // Accept a single File or array of Files
+  file: File | File[];
   onUploadProgress?: (e: AxiosProgressEvent) => void;
   sectorId?: string;
   serviceIds?: string[];
@@ -53,13 +54,16 @@ type UploadSignedVars = {
 export function useUploadSigned(conventionId: string) {
   const qc = useQueryClient();
   return useMutation<
-    { ok: boolean; document: ConventionDocument; downloadUrl: string },
+    { ok: boolean; documents: ConventionDocument[]; downloadUrl?: string },
     Error,
     UploadSignedVars
   >({
     mutationFn: async ({ file, onUploadProgress, sectorId, serviceIds }) => {
       const fd = new FormData();
-      fd.append("file", file);
+      const files = Array.isArray(file) ? file : [file];
+      for (const f of files) {
+        fd.append("files", f);
+      }
       if (sectorId) fd.append("sectorId", sectorId);
       if (serviceIds && serviceIds.length) fd.append("serviceIds", JSON.stringify(serviceIds));
       const r = await api.post(`/api/conventions/${conventionId}/upload`, fd, { onUploadProgress });

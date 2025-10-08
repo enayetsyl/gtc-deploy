@@ -13,7 +13,7 @@ export default function UploadSigned({
 }: {
   conventionId: string;
 }) {
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<File | File[] | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const mutation = useUploadSigned(conventionId);
   const { t } = useI18n();
@@ -23,8 +23,9 @@ export default function UploadSigned({
     if (!file) return;
     setProgress(0);
     await mutation.mutateAsync({
-      file,
+      file: file,
       onUploadProgress: (p: AxiosProgressEvent) => {
+        // When uploading multiple files as multipart, axios reports aggregate progress.
         if (!p.total) return;
         const pct = Math.round((p.loaded / p.total) * 100);
         setProgress(pct);
@@ -37,9 +38,7 @@ export default function UploadSigned({
   // Automatically start upload when a file is chosen
   useEffect(() => {
     if (!file) return;
-    // don't auto-trigger if mutation already running
     if (mutation.isPending) return;
-    // fire and forget; onUpload handles state
     void onUpload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file]);
@@ -55,6 +54,8 @@ export default function UploadSigned({
           onSelect={setFile}
           hint={t("file.accepted", { types: "PDF", max: "10" })}
           className="w-full md:min-w-[360px]"
+          multiple={true}
+          maxFiles={5}
         />
       )}
 

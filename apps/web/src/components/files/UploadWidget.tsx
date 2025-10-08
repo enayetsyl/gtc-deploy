@@ -7,8 +7,10 @@ import { Button } from "../../components/ui/button";
 type Props = {
   accept?: string | string[]; // e.g. "application/pdf" or [".pdf","image/*"]
   maxSizeMB?: number; // e.g. 10
-  value?: File | null;
-  onSelect: (file: File | null) => void;
+  value?: File | null | File[];
+  onSelect: (file: File | null | File[]) => void;
+  multiple?: boolean;
+  maxFiles?: number;
   disabled?: boolean;
   hint?: string;
   className?: string;
@@ -38,6 +40,8 @@ export default function UploadWidget({
   disabled,
   hint,
   className = "",
+  multiple = false,
+  maxFiles = 5,
 }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -45,26 +49,38 @@ export default function UploadWidget({
   const { t } = useI18n();
 
   const validateAndSet = useCallback(
-    (file: File) => {
-      if (maxSizeMB && file.size > maxSizeMB * 1024 * 1024) {
-        setError(t("file.errors.tooLarge", { max: String(maxSizeMB) }));
-        onSelect(null);
-        return;
+    (files: File[]) => {
+      if (maxSizeMB) {
+        const tooLarge = files.find((f) => f.size > maxSizeMB * 1024 * 1024);
+        if (tooLarge) {
+          setError(t("file.errors.tooLarge", { max: String(maxSizeMB) }));
+          onSelect(null);
+          return;
+        }
       }
-      if (!matchesAccept(file, accept)) {
-        setError(t("file.errors.typeNotAllowed"));
+      for (const f of files) {
+        if (!matchesAccept(f, accept)) {
+          setError(t("file.errors.typeNotAllowed"));
+          onSelect(null);
+          return;
+        }
+      }
+      if (files.length > maxFiles) {
+        setError(t("file.errors.tooMany", { max: String(maxFiles) }));
         onSelect(null);
         return;
       }
       setError(null);
-      onSelect(file);
+      onSelect(multiple ? files : files[0]);
     },
-    [accept, maxSizeMB, onSelect, t]
+    [accept, maxSizeMB, onSelect, t, multiple, maxFiles]
   );
 
   const handleFiles = (files: FileList | null) => {
-    const f = files?.[0];
-    if (f) validateAndSet(f);
+    if (!files) return;
+    const arr = Array.from(files);
+    if (!arr.length) return;
+    validateAndSet(arr);
   };
 
   return (
@@ -92,12 +108,25 @@ export default function UploadWidget({
       >
         <div className="flex-1">
           {value ? (
-            <div className="flex flex-col">
-              <span className="font-medium">{value.name}</span>
-              <span className="text-xs text-muted-foreground">
-                {t("file.sizeKb", { size: (value.size / 1024).toFixed(0) })}
-              </span>
-            </div>
+            Array.isArray(value) ? (
+              <div className="flex flex-col space-y-1">
+                {value.map((v, i) => (
+                  <div key={i} className="flex flex-col">
+                    <span className="font-medium">{v.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {t("file.sizeKb", { size: (v.size / 1024).toFixed(0) })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col">
+                <span className="font-medium">{value.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t("file.sizeKb", { size: (value.size / 1024).toFixed(0) })}
+                </span>
+              </div>
+            )
           ) : (
             <div className="text-muted-foreground">
               {t("file.dropOrBrowse", { browse: t("file.choose") })}
@@ -114,6 +143,7 @@ export default function UploadWidget({
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
           disabled={disabled}
+          multiple={multiple}
         />
       </div>
 
