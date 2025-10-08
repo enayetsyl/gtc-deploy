@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useUploadSigned } from "../../hooks/useConventions";
-import { Button } from "../../components/ui/button";
+// Button removed — upload starts automatically on select
 import UploadWidget from "../files/UploadWidget";
 import { useI18n } from "@/providers/i18n-provider";
 import { AxiosProgressEvent } from "axios";
@@ -55,13 +55,36 @@ export default function UploadSigned({
       />
 
       <div className="flex items-center gap-2 w-full md:w-auto">
-        <Button
-          className="w-full md:w-auto"
-          disabled={!file || mutation.isPending}
-          onClick={onUpload}
-        >
-          {mutation.isPending ? t("upload.uploading") : t("ui.send")}
-        </Button>
+        {/* Show a disabled uploading indicator while mutation is pending, otherwise a hint */}
+        {mutation.isPending ? (
+          <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-muted/10">
+            <svg
+              className="animate-spin h-4 w-4 text-current"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+              ></path>
+            </svg>
+            <span className="text-sm">{t("upload.uploading")}</span>
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground">
+            {t("upload.uploadSigned")}
+          </div>
+        )}
 
         {progress !== null && (
           <span className="text-sm text-muted-foreground hidden md:inline-block">
