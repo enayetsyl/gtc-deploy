@@ -83,7 +83,7 @@ export async function deleteService(id: string) {
 }
 
 // Onboarding
-export async function createPointOnboarding(payload: { sectorId: string; email: string; name: string; includeServices?: boolean; serviceIds?: string[] }) {
+export async function createPointOnboarding(payload: { sectorId: string; email: string; name: string }) {
   const { data } = await api.post(`/api/admin/points/onboarding`, payload);
   return data;
 }

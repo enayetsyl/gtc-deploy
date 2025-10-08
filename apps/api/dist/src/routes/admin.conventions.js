@@ -11,6 +11,7 @@ const prisma_1 = require("../lib/prisma");
 const conventions_1 = require("../services/conventions");
 const node_path_1 = __importDefault(require("node:path"));
 const promises_1 = __importDefault(require("node:fs/promises"));
+const node_stream_1 = require("node:stream");
 const archiver_1 = __importDefault(require("archiver"));
 const sanitize_filename_1 = __importDefault(require("sanitize-filename"));
 exports.adminConventions = (0, express_1.Router)();
@@ -72,15 +73,55 @@ exports.adminConventions.get("/:id/archive", async (req, res) => {
     archive.pipe(res);
     // add each existing file by absolute path; name inside zip = timestamp_kind_filename
     for (const d of conv.documents) {
-        const absPath = node_path_1.default.resolve("uploads", "." + d.path); // mirrors your single-file download path
         try {
-            await promises_1.default.access(absPath);
             const ts = new Date(d.createdAt).toISOString().replace(/[:T]/g, "-").slice(0, 19);
             const entryName = `${ts}_${d.kind}_${(0, sanitize_filename_1.default)(d.fileName)}`;
-            archive.file(absPath, { name: entryName });
+            // If path looks like an HTTP(S) URL (UploadThing), fetch and append the stream
+            if (typeof d.path === "string" && d.path.startsWith("http")) {
+                try {
+                    const resp = await fetch(d.path);
+                    if (!resp.ok || !resp.body) {
+                        // skip if fetch failed
+                        continue;
+                    }
+                    // convert Web ReadableStream (resp.body) to Node Readable
+                    // node:stream provides Readable.fromWeb for this purpose
+                    let nodeStream;
+                    try {
+                        // Use Readable.fromWeb if available
+                        // @ts-ignore - fromWeb may not be in older type defs
+                        nodeStream = node_stream_1.Readable.fromWeb
+                            ? node_stream_1.Readable.fromWeb(resp.body)
+                            : node_stream_1.Readable.from(resp.body);
+                    }
+                    catch (e) {
+                        // fallback: attempt to use body as any (may work in some runtimes)
+                        nodeStream = resp.body;
+                    }
+                    archive.append(nodeStream, { name: entryName });
+                }
+                catch (e) {
+                    // skip this file on fetch error
+                    console.warn("Failed to fetch/append remote file for archive", d.path, e);
+                    continue;
+                }
+            }
+            else {
+                // legacy/local path: try to access local file and add it
+                const absPath = node_path_1.default.resolve("uploads", "." + d.path); // mirrors your single-file download path
+                try {
+                    await promises_1.default.access(absPath);
+                    archive.file(absPath, { name: entryName });
+                }
+                catch {
+                    // skip missing file (keeps export resilient)
+                }
+            }
         }
-        catch {
-            // skip missing file (keeps export resilient)
+        catch (err) {
+            // On unexpected errors for this document, skip and continue
+            console.warn("Skipping document in archive due to error", d.id, err);
+            continue;
         }
     }
     // finalize stream

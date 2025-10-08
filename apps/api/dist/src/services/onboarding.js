@@ -23,22 +23,10 @@ async function createOnboardingLink(input) {
             sectorId: input.sectorId,
             email: input.email,
             name: input.name,
-            includeServices: input.includeServices ?? false,
+            includeServices: false,
             onboardingToken,
             tokenExpiresAt: expires,
-            // Validate serviceIds belong to the sector before creating onboarding service links
-            services: input.serviceIds && input.serviceIds.length
-                ? {
-                    create: await Promise.all(input.serviceIds.map(async (s) => {
-                        const svc = await prisma_1.prisma.service.findUnique({ where: { id: s } });
-                        if (!svc)
-                            throw new Error(`Invalid service id: ${s}`);
-                        if (svc.sectorId !== input.sectorId)
-                            throw new Error(`Service ${s} does not belong to sector ${input.sectorId}`);
-                        return { serviceId: s };
-                    }))
-                }
-                : undefined,
+            // services are not created at invite time anymore
         },
     });
     const link = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/onboarding/points/${ob.onboardingToken}`;

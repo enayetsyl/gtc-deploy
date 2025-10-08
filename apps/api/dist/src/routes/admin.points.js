@@ -29,8 +29,6 @@ const onboardingCreateSchema = zod_1.z.object({
     sectorId: zod_1.z.string().min(1),
     email: zod_1.z.string().email(),
     name: zod_1.z.string().min(2),
-    includeServices: zod_1.z.boolean().default(false),
-    serviceIds: zod_1.z.array(zod_1.z.string().min(1)).optional(),
 });
 // GET /api/admin/points/onboarding
 exports.adminPoints.get("/onboarding", (0, auth_1.requireRole)("ADMIN"), async (req, res) => {

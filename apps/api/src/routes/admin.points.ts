@@ -30,8 +30,6 @@ const onboardingCreateSchema = z.object({
   sectorId: z.string().min(1),
   email: z.string().email(),
   name: z.string().min(2),
-  includeServices: z.boolean().default(false),
-  serviceIds: z.array(z.string().min(1)).optional(),
 });
 
 // GET /api/admin/points/onboarding

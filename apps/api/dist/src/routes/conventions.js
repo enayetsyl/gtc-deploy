@@ -65,9 +65,11 @@ const createSchema = zod_1.z.object({
 });
 exports.conventionsRouter.post("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"), async (req, res) => {
     const parsed = createSchema.safeParse(req.body);
+    console.log('parsed', parsed);
     if (!parsed.success)
         return res.status(400).json({ error: "ValidationError", issues: parsed.error.issues });
     let { gtcPointId, sectorId, serviceIds } = parsed.data;
+    console.log('req.user', req.user);
     // If GTC_POINT user, derive from their mapping
     if (req.user.role === "GTC_POINT") {
         const me = await prisma_1.prisma.user.findUnique({
@@ -77,7 +79,7 @@ exports.conventionsRouter.post("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"
         if (!me?.gtcPoint)
             return res.status(409).json({ error: "User is not attached to a GTC Point" });
         gtcPointId = me.gtcPoint.id;
-        sectorId = me.gtcPoint.sectorId;
+        // sectorId = me.gtcPoint.sectorId;
     }
     else {
         // admin path: both ids required
@@ -171,31 +173,57 @@ exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT
             // ignore parse errors; leave undefined
         }
     }
-    // Handle file from multer.any() - files are in req.files array
-    let file;
+    // Handle files from multer.any() - files are in req.files array. Accept up to 5 files.
+    let files = [];
     if (req.files) {
-        const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
-        file = files.find((f) => f.fieldname === 'file');
+        const all = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+        // prefer field name 'files' (new) but accept legacy 'file'
+        files = all.filter((f) => f.fieldname === 'files' || f.fieldname === 'file');
     }
-    if (!file)
-        return res.status(400).json({ error: "file is required (multipart/form-data)" });
+    if (!files.length)
+        return res.status(400).json({ error: "file(s) are required (multipart/form-data)" });
+    if (files.length > 5)
+        return res.status(400).json({ error: "At most 5 files are allowed" });
     if (String(conv.status) === "APPROVED" || String(conv.status) === "DECLINED") {
         return res.status(409).json({ error: "Convention is finalized; uploads are locked" });
     }
     const was = String(conv.status);
     // PDF magic bytes: %PDF
-    const b = file.buffer;
-    const isPdfMagic = b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
-    if (!isPdfMagic)
-        return res.status(400).json({ error: "File does not look like a valid PDF" });
-    const mime = file.mimetype || (0, mime_types_1.lookup)(file.originalname) || "application/octet-stream";
-    if (!String(mime).startsWith("application/pdf")) {
-        return res.status(400).json({ error: "Only PDF uploads are allowed" });
+    // Validate each file and store them. We'll process within a transaction when creating DB records.
+    for (const f of files) {
+        const b = f.buffer;
+        const isPdfMagic = b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+        if (!isPdfMagic)
+            return res.status(400).json({ error: `File ${f.originalname} does not look like a valid PDF` });
+        const mime = f.mimetype || (0, mime_types_1.lookup)(f.originalname) || "application/octet-stream";
+        if (!String(mime).startsWith("application/pdf")) {
+            return res.status(400).json({ error: `Only PDF uploads are allowed (${f.originalname})` });
+        }
     }
-    const stored = await provider_1.storage.put({ buffer: file.buffer, mime: String(mime), originalName: file.originalname });
-    // Validate provided sector/service payload and persist changes where appropriate
-    // We'll update convention.sectorId if provided (and permitted) and create gtc point -> service links
-    const { doc, statusChanged } = await prisma_1.prisma.$transaction(async (tx) => {
+    // Store files first (outside the DB transaction) to avoid long network calls inside transactions
+    const storedResults = [];
+    try {
+        for (const f of files) {
+            const stored = await provider_1.storage.put({ buffer: f.buffer, mime: f.mimetype || (0, mime_types_1.lookup)(f.originalname) || "application/pdf", originalName: f.originalname });
+            storedResults.push({ stored, file: f });
+        }
+    }
+    catch (err) {
+        // If storage.put fails for any file, attempt to remove any previously stored files then fail
+        for (const r of storedResults) {
+            try {
+                if (r.stored && r.stored.path)
+                    await provider_1.storage.remove(r.stored.path);
+            }
+            catch (e) {
+                console.warn("Failed cleanup after storage error", e);
+            }
+        }
+        console.error("Error storing files before DB transaction", err);
+        return res.status(500).json({ error: "StorageError", message: "Failed to store uploaded files" });
+    }
+    // Now perform DB writes in a transaction using the stored results
+    const { statusChanged } = await prisma_1.prisma.$transaction(async (tx) => {
         // If a sectorId was provided, validate it exists. For both admins and point users
         // we'll allow applying the provided sectorId but we validate the sector record exists.
         // This change intentionally permits GTC_POINT users to change the convention sector via upload.
@@ -223,19 +251,23 @@ exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT
             }
             validServiceIds = foundIds.length ? foundIds : undefined;
         }
-        const createdDoc = await tx.conventionDocument.create({
-            data: {
-                conventionId: conv.id,
-                kind: "SIGNED",
-                fileName: stored.fileName,
-                path: stored.path,
-                mime: stored.mime,
-                size: stored.size,
-                checksum: stored.checksum,
-                uploadedById: req.user.id,
-            },
-        });
         let changed = false;
+        // create document records for each previously-stored file
+        for (const r of storedResults) {
+            const stored = r.stored;
+            await tx.conventionDocument.create({
+                data: {
+                    conventionId: conv.id,
+                    kind: "SIGNED",
+                    fileName: stored.fileName,
+                    path: stored.path,
+                    mime: stored.mime,
+                    size: stored.size,
+                    checksum: stored.checksum,
+                    uploadedById: req.user.id,
+                },
+            });
+        }
         // Update status to UPLOADED if needed
         if (was !== "UPLOADED") {
             // Some generated Prisma clients may not include all enum members in the runtime const object.
@@ -265,7 +297,7 @@ exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT
                 }
             }
         }
-        return { doc: createdDoc, statusChanged: changed };
+        return { statusChanged: changed };
     }, {
         maxWait: 10000, // 10 seconds
         timeout: 15000, // 15 seconds
@@ -273,7 +305,9 @@ exports.conventionsRouter.post("/:id/upload", (0, auth_1.requireRole)("GTC_POINT
     if (statusChanged) {
         await (0, conventions_1.onConventionUploaded)(conv.id);
     }
-    res.status(201).json({ ok: true, document: doc, downloadUrl: `/uploads${stored.path}` });
+    // respond with list of created documents (we didn't capture createdDoc objects above, re-query latest docs)
+    const createdDocs = await prisma_1.prisma.conventionDocument.findMany({ where: { conventionId: conv.id }, orderBy: { createdAt: "desc" }, take: storedResults.length });
+    res.status(201).json({ ok: true, documents: createdDocs, downloadUrl: storedResults.length ? `/uploads${storedResults[0].stored.path}` : undefined });
 });
 // 4.4 List my conventions (point sees own, admin sees all)
 exports.conventionsRouter.get("/", (0, auth_1.requireRole)("GTC_POINT", "ADMIN"), async (req, res) => {
@@ -359,22 +393,25 @@ exports.conventionsRouter.post("/with-upload", (0, auth_1.requireRole)("GTC_POIN
         if (!gtcPointId || !sectorId)
             return res.status(400).json({ error: "gtcPointId and sectorId are required for admin" });
     }
-    // file from multer
-    let file;
+    // files from multer - accept multiple
+    let files = [];
     if (req.files) {
-        const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
-        file = files.find((f) => f.fieldname === 'file');
+        const all = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
+        files = all.filter((f) => f.fieldname === 'files' || f.fieldname === 'file');
     }
-    if (!file)
-        return res.status(400).json({ error: "file is required (multipart/form-data)" });
-    // PDF magic bytes: %PDF
-    const b = file.buffer;
-    const isPdfMagic = b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
-    if (!isPdfMagic)
-        return res.status(400).json({ error: "File does not look like a valid PDF" });
-    const mime = file.mimetype || "application/pdf";
-    if (!String(mime).startsWith("application/pdf"))
-        return res.status(400).json({ error: "Only PDF uploads are allowed" });
+    if (!files.length)
+        return res.status(400).json({ error: "file(s) are required (multipart/form-data)" });
+    if (files.length > 5)
+        return res.status(400).json({ error: "At most 5 files are allowed" });
+    for (const file of files) {
+        const b = file.buffer;
+        const isPdfMagic = b.length >= 4 && b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+        if (!isPdfMagic)
+            return res.status(400).json({ error: `File ${file.originalname} does not look like a valid PDF` });
+        const mime = file.mimetype || "application/pdf";
+        if (!String(mime).startsWith("application/pdf"))
+            return res.status(400).json({ error: `Only PDF uploads are allowed (${file.originalname})` });
+    }
     // parse serviceIds if present (allow JSON string or repeated fields)
     let serviceIds;
     if (body.serviceIds) {
@@ -391,23 +428,46 @@ exports.conventionsRouter.post("/with-upload", (0, auth_1.requireRole)("GTC_POIN
             // ignore parse errors
         }
     }
-    // create convention and store file in a transaction
-    const stored = await provider_1.storage.put({ buffer: file.buffer, mime: String(mime), originalName: file.originalname });
-    const { doc, conv } = await prisma_1.prisma.$transaction(async (tx) => {
+    // store files first (avoid long network work in transaction)
+    const storedResults = [];
+    try {
+        for (const file of files) {
+            const stored = await provider_1.storage.put({ buffer: file.buffer, mime: file.mimetype || "application/pdf", originalName: file.originalname });
+            storedResults.push({ stored, file });
+        }
+    }
+    catch (err) {
+        for (const r of storedResults) {
+            try {
+                if (r.stored && r.stored.path)
+                    await provider_1.storage.remove(r.stored.path);
+            }
+            catch (e) {
+                console.warn("Failed cleanup after storage error", e);
+            }
+        }
+        console.error("Error storing files before DB transaction (with-upload)", err);
+        return res.status(500).json({ error: "StorageError", message: "Failed to store uploaded files" });
+    }
+    // create convention and documents in transaction
+    const { conv } = await prisma_1.prisma.$transaction(async (tx) => {
         const createdConv = await tx.convention.create({ data: { gtcPointId: gtcPointId, sectorId: sectorId, status: "UPLOADED" } });
-        const created = await tx.conventionDocument.create({
-            data: {
-                conventionId: createdConv.id,
-                kind: "SIGNED",
-                fileName: stored.fileName,
-                path: stored.path,
-                mime: stored.mime,
-                size: stored.size,
-                checksum: stored.checksum,
-                uploadedById: req.user.id,
-            },
-        });
-        return { doc: created, conv: createdConv };
+        for (const r of storedResults) {
+            const stored = r.stored;
+            await tx.conventionDocument.create({
+                data: {
+                    conventionId: createdConv.id,
+                    kind: "SIGNED",
+                    fileName: stored.fileName,
+                    path: stored.path,
+                    mime: stored.mime,
+                    size: stored.size,
+                    checksum: stored.checksum,
+                    uploadedById: req.user.id,
+                },
+            });
+        }
+        return { conv: createdConv };
     });
     try {
         await (0, conventions_1.onConventionCreated)(conv.id);
@@ -417,5 +477,6 @@ exports.conventionsRouter.post("/with-upload", (0, auth_1.requireRole)("GTC_POIN
         await (0, conventions_1.onConventionUploaded)(conv.id);
     }
     catch (e) { }
-    res.status(201).json({ ok: true, convention: conv, document: doc });
+    const createdDocs = await prisma_1.prisma.conventionDocument.findMany({ where: { conventionId: conv.id }, orderBy: { createdAt: "desc" }, take: storedResults.length });
+    res.status(201).json({ ok: true, convention: conv, documents: createdDocs });
 });
