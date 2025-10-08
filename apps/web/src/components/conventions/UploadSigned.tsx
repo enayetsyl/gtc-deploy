@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/button";
 import UploadWidget from "../files/UploadWidget";
 import { useI18n } from "@/providers/i18n-provider";
 import { AxiosProgressEvent } from "axios";
+import { useEffect } from "react";
 
 export default function UploadSigned({
   conventionId,
@@ -30,6 +31,16 @@ export default function UploadSigned({
     setProgress(null);
     setFile(null);
   }
+
+  // Automatically start upload when a file is chosen
+  useEffect(() => {
+    if (!file) return;
+    // don't auto-trigger if mutation already running
+    if (mutation.isPending) return;
+    // fire and forget; onUpload handles state
+    void onUpload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file]);
 
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center gap-3 w-full">
