@@ -256,6 +256,7 @@ model PointAgreement {
   contactRole             String?
   contactEmail            String?
   contactPhone            String?
+  pointEmail              String?
   protocolNo              String?
   conventionNo            String?
   placeSigned             String?

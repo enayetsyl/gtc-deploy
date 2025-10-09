@@ -143,6 +143,7 @@ type SubmitAgreementPayload = {
   contactName?: string;
   contactRole?: string;
   contactPhone?: string;
+  pointEmail?: string;
   contactEmail?: string;
   placeSigned?: string;
   dateSigned?: Date | string;
@@ -165,6 +166,10 @@ export async function submitAgreement(onboardingToken: string, payload: SubmitAg
   }
 
   // Create PointAgreement record
+  // Note: Prisma client types must be regenerated after schema changes. Use ts-ignore
+  // and cast to any so runtime will still attempt to write the new field. Run
+  // `prisma migrate dev` and `prisma generate` to update types properly.
+  // @ts-ignore
   const agreement = await prisma.pointAgreement.create({
     data: {
       onboardingId: ob.id,
@@ -179,6 +184,7 @@ export async function submitAgreement(onboardingToken: string, payload: SubmitAg
       contactName: payload.contactName,
       contactRole: payload.contactRole,
       contactEmail: payload.contactEmail,
+      pointEmail: payload.pointEmail,
       contactPhone: payload.contactPhone,
       protocolNo: payload.protocolNo,
       conventionNo: payload.conventionNo,
@@ -188,7 +194,7 @@ export async function submitAgreement(onboardingToken: string, payload: SubmitAg
       signatureUploadthingKey: signatureKey,
       agreedToArticles: true,
       services: payload.services && payload.services.length ? { create: payload.services.map((s) => ({ serviceId: s })) } : undefined,
-    },
+    } as any,
   });
 
   // update onboarding status

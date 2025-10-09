@@ -191,7 +191,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
     );
 
   // Client-side validation helper
-  function validate() {
+  async function validate() {
     // Require all fields to be filled
     if (!protocolNo.trim()) return "Please enter the protocol number.";
     if (!conventionNo.trim()) return "Please enter the convention number.";
@@ -220,31 +220,19 @@ export default function OnboardingFormClient({ token }: { token: string }) {
 
     // Signature check: ensure canvas is not blank
     const c = canvasRef.current;
-    if (!c) return "Signature canvas not available.";
-    // Heuristic: check if canvas has any non-transparent pixels
+    if (!c) return t("validation.signatureCanvasUnavailable");
     try {
-      const ctx = c.getContext("2d");
-      if (!ctx) return "Unable to read signature canvas.";
-      const rect = c.getBoundingClientRect();
-      // read a small sample area to avoid heavy operations
-      const w = Math.max(1, Math.round(rect.width));
-      const h = Math.max(1, Math.round(rect.height));
-      const data = ctx.getImageData(
-        0,
-        0,
-        Math.min(10, w),
-        Math.min(10, h)
-      ).data;
-      let nonTransparent = false;
-      for (let i = 3; i < data.length; i += 4) {
-        if (data[i] !== 0) {
-          nonTransparent = true;
-          break;
-        }
-      }
-      if (!nonTransparent) return "Please provide a signature.";
+      // toDataURL reflects the actual pixel content; compare with a freshly
+      // created blank canvas of the same pixel dimensions
+      const data = c.toDataURL();
+      const blank = document.createElement("canvas");
+      blank.width = c.width;
+      blank.height = c.height;
+      const blankData = blank.toDataURL();
+      if (data === blankData) return t("validation.signatureRequired");
     } catch {
-      // If getImageData is not allowed due to CORS or other, skip signature pixel check
+      // If toDataURL or canvas access is blocked for any reason, fall back to
+      // assuming a signature is present (don't block the user on uncertain CORS issues)
     }
 
     return null;
@@ -254,7 +242,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
     <form
       onSubmit={async (e) => {
         e.preventDefault();
-        const v = validate();
+        const v = await validate();
         if (v) {
           toast.error(v);
           return;
