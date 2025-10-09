@@ -10,7 +10,7 @@ type Props = {
 export default function PageCounter({ current, total }: Props) {
   const { t } = useI18n();
   return (
-    <div className="text-center mt-6 mb-2 text-base">
+    <div className="text-center my-6  text-base">
       {t("convention.pageCounter", { current, total })}
     </div>
   );

@@ -80,6 +80,13 @@ export default function FirstPage({
 
       <PremiseSection />
       <PageCounter current={1} total={7} />
+
+<TopLine
+        protocolNo={protocolNo}
+        onProtocolNoChange={onProtocolNoChange}
+        conventionNo={conventionNo}
+        onConventionNoChange={onConventionNoChange}
+      />
     </div>
   );
 }
