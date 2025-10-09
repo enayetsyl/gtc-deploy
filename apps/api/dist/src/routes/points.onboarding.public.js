@@ -45,72 +45,93 @@ exports.pointsOnboardingPublic = (0, express_1.Router)();
 // Preload for the form (name, email, includeServices, sectorId; DO NOT expose status)
 exports.pointsOnboardingPublic.get("/:token", async (req, res) => {
     const token = zod_1.z.string().min(10).parse(req.params.token);
-    // Include the linked services with their service relation so we can expose names safely
-    const ob = await prisma_1.prisma.pointOnboarding.findUnique({ where: { onboardingToken: token }, include: { services: { include: { service: true } }, sector: true } });
+    // Find onboarding and return prefill. Historically invites could preselect services,
+    // but invites are now sector-only. To support the frontend, return the sector's
+    // available services (id+name) and keep includeServices=false for compatibility.
+    const ob = await prisma_1.prisma.pointOnboarding.findUnique({ where: { onboardingToken: token }, include: { sector: true } });
     if (!ob || ob.status !== "DRAFT" || (ob.tokenExpiresAt && ob.tokenExpiresAt < new Date()))
         return res.status(404).json({ error: "Not found" });
-    const serviceIds = ob.services.map((s) => s.serviceId);
-    const services = ob.services.map((s) => ({ id: s.serviceId, name: s.service?.name }));
-    res.json({ name: ob.name, email: ob.email, includeServices: ob.includeServices, sector: { id: ob.sectorId, name: ob.sector?.name }, serviceIds, services });
+    const services = await prisma_1.prisma.service.findMany({ where: { sectorId: ob.sectorId, active: true }, orderBy: { createdAt: 'asc' }, select: { id: true, name: true } });
+    res.json({
+        name: ob.name,
+        email: ob.email,
+        includeServices: false,
+        sector: { id: ob.sectorId, name: ob.sector?.name },
+        serviceIds: [],
+        services: services.map((s) => ({ id: s.id, name: s.name })),
+    });
 });
 // Submit details + signature + optional services
 exports.pointsOnboardingPublic.post("/:token/submit", (0, upload_1.upload)(), async (req, res) => {
-    if (process.env.UPLOADS_ENABLED !== "true") {
-        // Still allow submission without signature when disabled
-        // or you could return 503 similar to conventions route.
-    }
     const token = zod_1.z.string().min(10).parse(req.params.token);
-    // Parse form fields for validation
-    const body = zod_1.z.object({
-        vatOrTaxNumber: zod_1.z.string().min(2).optional(),
-        phone: zod_1.z.string().min(5).optional(),
-        // Note: services comes as "services[]" array from FormData
-    }).safeParse(req.body);
+    // Validate agreement fields
+    const body = zod_1.z
+        .object({
+        protocolNo: zod_1.z.string().optional(),
+        conventionNo: zod_1.z.string().optional(),
+        companyName: zod_1.z.string().optional(),
+        taxCodeOrVat: zod_1.z.string().optional(),
+        registeredCity: zod_1.z.string().optional(),
+        registeredProvince: zod_1.z.string().optional(),
+        registeredAddress: zod_1.z.string().optional(),
+        legalRepresentative: zod_1.z.string().optional(),
+        contactSurname: zod_1.z.string().optional(),
+        contactName: zod_1.z.string().optional(),
+        contactRole: zod_1.z.string().optional(),
+        contactEmail: zod_1.z.string().email().optional(),
+        contactPhone: zod_1.z.string().optional(),
+        placeSigned: zod_1.z.string().optional(),
+        dateSigned: zod_1.z.string().optional(),
+        agreedToArticles: zod_1.z.string().optional(), // checkbox comes as "on"
+        // services[] will be parsed separately
+    })
+        .safeParse(req.body);
     if (!body.success)
         return res.status(400).json({ error: "ValidationError", issues: body.error.issues });
-    // Parse services array from form data (sent as "services[]")
+    // parse services[] from FormData
     let services = [];
     if (req.body["services[]"]) {
-        services = Array.isArray(req.body["services[]"])
-            ? req.body["services[]"]
-            : [req.body["services[]"]];
+        services = Array.isArray(req.body["services[]"]) ? req.body["services[]"] : [req.body["services[]"]];
     }
-    // Handle signature file from multipart upload
+    // Handle signature upload if present and uploads are enabled
     let signatureData;
     if (process.env.UPLOADS_ENABLED === "true" && req.files) {
-        // Find signature file in uploaded files
         const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
-        const signatureFile = files.find((f) => f.fieldname === 'file' && f.mimetype?.startsWith('image/'));
+        const signatureFile = files.find((f) => f.fieldname === "file" && f.mimetype?.startsWith("image/"));
         if (signatureFile) {
             try {
-                // Use the same storage provider pattern as leads route
                 const { storage } = await Promise.resolve().then(() => __importStar(require("../storage/provider")));
                 const mime = signatureFile.mimetype?.toLowerCase() || "image/png";
-                const stored = await storage.put({
-                    buffer: signatureFile.buffer,
-                    mime,
-                    originalName: signatureFile.originalname,
-                });
-                signatureData = {
-                    url: stored.path,
-                    key: stored.uploadthingKey || stored.fileName,
-                    originalName: signatureFile.originalname,
-                    mime: stored.mime,
-                };
+                const stored = await storage.put({ buffer: signatureFile.buffer, mime, originalName: signatureFile.originalname });
+                signatureData = { url: stored.path, key: stored.uploadthingKey || stored.fileName, originalName: signatureFile.originalname, mime: stored.mime };
             }
-            catch (error) {
-                console.error("Error uploading signature file:", error);
-                return res.status(500).json({
-                    message: "Signature upload failed",
-                    error: error instanceof Error ? error.message : "Unknown error"
-                });
+            catch (err) {
+                console.error("Error uploading signature file:", err);
+                return res.status(500).json({ error: "SignatureUploadFailed", details: err instanceof Error ? err.message : String(err) });
             }
         }
     }
-    await (0, onboarding_1.submitOnboardingForm)(token, {
-        vatOrTaxNumber: body.data.vatOrTaxNumber,
-        phone: body.data.phone,
-        services: services.length > 0 ? services : undefined,
+    // Ensure the user explicitly agreed to articles
+    const agreed = !!(body.data.agreedToArticles === "on" || body.data.agreedToArticles === "true" || body.data.agreedToArticles === "1");
+    if (!agreed)
+        return res.status(400).json({ error: "AgreementNotAccepted" });
+    await (0, onboarding_1.submitAgreement)(token, {
+        protocolNo: body.data.protocolNo,
+        conventionNo: body.data.conventionNo,
+        companyName: body.data.companyName,
+        taxCodeOrVat: body.data.taxCodeOrVat,
+        registeredCity: body.data.registeredCity,
+        registeredProvince: body.data.registeredProvince,
+        registeredAddress: body.data.registeredAddress,
+        legalRepresentative: body.data.legalRepresentative,
+        contactSurname: body.data.contactSurname,
+        contactName: body.data.contactName,
+        contactRole: body.data.contactRole,
+        contactEmail: body.data.contactEmail,
+        contactPhone: body.data.contactPhone,
+        placeSigned: body.data.placeSigned,
+        dateSigned: body.data.dateSigned,
+        services: services.length ? services : undefined,
         signature: signatureData,
     });
     res.json({ ok: true });

@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createOnboardingLink = createOnboardingLink;
 exports.submitOnboardingForm = submitOnboardingForm;
+exports.submitAgreement = submitAgreement;
 exports.approveOnboarding = approveOnboarding;
 exports.declineOnboarding = declineOnboarding;
 exports.resendOnboardingEmail = resendOnboardingEmail;
@@ -111,6 +112,85 @@ async function submitOnboardingForm(onboardingToken, payload) {
             },
         });
     }
+}
+async function submitAgreement(onboardingToken, payload) {
+    const ob = await prisma_1.prisma.pointOnboarding.findUnique({ where: { onboardingToken } });
+    if (!ob)
+        throw new Error("Invalid token");
+    if (ob.status !== "DRAFT")
+        throw new Error("Onboarding not in DRAFT");
+    if (ob.tokenExpiresAt && ob.tokenExpiresAt < new Date())
+        throw new Error("Token expired");
+    // store signature on onboarding for backward compatibility
+    let signaturePath = ob.signaturePath ?? undefined;
+    let signatureKey = undefined;
+    if (payload.signature) {
+        signaturePath = payload.signature.url;
+        signatureKey = payload.signature.key;
+    }
+    // Create PointAgreement record
+    const agreement = await prisma_1.prisma.pointAgreement.create({
+        data: {
+            onboardingId: ob.id,
+            sectorId: ob.sectorId,
+            companyName: payload.companyName ?? ob.name,
+            taxCodeOrVat: payload.taxCodeOrVat,
+            registeredCity: payload.registeredCity,
+            registeredProvince: payload.registeredProvince,
+            registeredAddress: payload.registeredAddress,
+            legalRepresentative: payload.legalRepresentative,
+            contactSurname: payload.contactSurname,
+            contactName: payload.contactName,
+            contactRole: payload.contactRole,
+            contactEmail: payload.contactEmail,
+            contactPhone: payload.contactPhone,
+            protocolNo: payload.protocolNo,
+            conventionNo: payload.conventionNo,
+            placeSigned: payload.placeSigned,
+            dateSigned: payload.dateSigned ? new Date(payload.dateSigned) : undefined,
+            signaturePath: signaturePath,
+            signatureUploadthingKey: signatureKey,
+            agreedToArticles: true,
+            services: payload.services && payload.services.length ? { create: payload.services.map((s) => ({ serviceId: s })) } : undefined,
+        },
+    });
+    // update onboarding status
+    await prisma_1.prisma.pointOnboarding.update({ where: { id: ob.id }, data: { status: client_1.PointOnboardingStatus.SUBMITTED, submittedAt: new Date(), signaturePath } });
+    // notify admins/owners similar to submitOnboardingForm behavior
+    const admins = await prisma_1.prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true, email: true } });
+    const owners = await prisma_1.prisma.user.findMany({ where: { role: "SECTOR_OWNER", sectorId: ob.sectorId }, select: { id: true, email: true } });
+    const adminIds = admins.map((a) => a.id);
+    const ownerIds = owners.map((o) => o.id);
+    const adminAndOwners = Array.from(new Set([...adminIds, ...ownerIds]));
+    const adminLink = `${env_1.env.webBaseUrl.replace(/\/$/, "")}/admin/points-onboarding/${ob.id}`;
+    if (adminAndOwners.length) {
+        await (0, notifications_1.notifyUsers)(adminAndOwners, {
+            type: "GENERIC",
+            subject: "Nuova richiesta di onboarding Punto GTC",
+            contentHtml: `
+        <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+          <p>Il Punto <strong>${ob.name}</strong> &lt;${ob.email}&gt; ha inviato i dettagli di onboarding (convenzione firmata).</p>
+          <p>
+            <a href="${adminLink}" style="display:inline-block;padding:10px 16px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">Rivedi onboarding</a>
+          </p>
+        </div>
+      `,
+            email: {
+                subject: "Nuova richiesta di onboarding Punto GTC",
+                html: `
+          <div style="font-family: Arial, Helvetica, sans-serif; font-size:16px; color:#111">
+            <p>Il Punto <strong>${ob.name}</strong> &lt;${ob.email}&gt; ha inviato i dettagli di onboarding (convenzione firmata).</p>
+            <p>
+              <a href="${adminLink}" style="display:inline-block;padding:8px 12px;background-color:#0052cc;color:#fff;text-decoration:none;border-radius:6px;">Rivedi onboarding</a>
+            </p>
+            <p style="font-size:13px;color:#666">Se il pulsante non funziona, copia e incolla il seguente URL nel tuo browser:</p>
+            <p style="word-break:break-all"><a href="${adminLink}">${adminLink}</a></p>
+          </div>
+        `,
+            },
+        });
+    }
+    return agreement;
 }
 async function approveOnboarding(id, adminUserId) {
     const ob = await prisma_1.prisma.pointOnboarding.findUnique({ where: { id }, include: { services: true } });

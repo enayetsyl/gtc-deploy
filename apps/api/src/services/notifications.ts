@@ -16,6 +16,10 @@ type NotifyInput = {
  * Returns the created Notification.
  */
 export async function notifyUser(input: NotifyInput) {
+  // Allow tests and smoke-scripts to disable notifications (sockets/emails)
+  if (process.env.SKIP_NOTIFICATIONS === "true") {
+    return null as any;
+  }
   const notif = await prisma.notification.create({
     data: {
       userId: input.userId,
