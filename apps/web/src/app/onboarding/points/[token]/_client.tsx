@@ -21,6 +21,13 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   const [protocolNo, setProtocolNo] = useState("");
   const [conventionNo, setConventionNo] = useState("");
 
+  // Inline prefill states (company, vat, city, address, representative)
+  const [companyName, setCompanyName] = useState("");
+  const [vat, setVat] = useState("");
+  const [city, setCity] = useState("");
+  const [address, setAddress] = useState("");
+  const [representative, setRepresentative] = useState("");
+
   // Setting token
   useEffect(() => {
     let mounted = true;
@@ -63,6 +70,16 @@ export default function OnboardingFormClient({ token }: { token: string }) {
         onProtocolNoChange={(v: string) => setProtocolNo(v)}
         conventionNo={conventionNo}
         onConventionNoChange={(v: string) => setConventionNo(v)}
+        companyName={companyName}
+        onCompanyNameChange={(v: string) => setCompanyName(v)}
+        vat={vat}
+        onVatChange={(v: string) => setVat(v)}
+        city={city}
+        onCityChange={(v: string) => setCity(v)}
+        address={address}
+        onAddressChange={(v: string) => setAddress(v)}
+        representative={representative}
+        onRepresentativeChange={(v: string) => setRepresentative(v)}
       />
     </div>
   );

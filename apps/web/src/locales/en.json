@@ -314,5 +314,18 @@
   "convention.section.list.aisf.title": "A.I.S.F",
   "convention.section.list.aisf.body": "(VAT: 91052710653) headquartered in Battipaglia, Via Fiorignano, 29, represented by the President Dott. Ing. Secondo Martino;",
   "convention.section.note": "(hereinafter briefly referred to as \"NETWORK\")",
-  "convention.section.bottomChar": "and"
+  "convention.section.bottomChar": "and",
+  "convention.inline.companyPlaceholder": "Company name",
+  "convention.inline.vatPlaceholder": "VAT / Tax",
+  "convention.inline.cityPlaceholder": "City",
+  "convention.inline.addressPlaceholder": "Address",
+  "convention.inline.repPlaceholder": "Representative",
+  "convention.inline.headquarters": "with registered office in",
+  "convention.inline.at": "at",
+  "convention.inline.allaVia": "at Via",
+  "convention.inline.representedBy": "represented by",
+  "convention.inline.cfLabel": "(C.F./P.IVA:",
+  "convention.inline.closeParen": ")",
+  "convention.inline.endingPunctuation": ";",
+  "convention.inline.shortName": "(hereinafter briefly referred to as \"POINT GTC\")"
 }

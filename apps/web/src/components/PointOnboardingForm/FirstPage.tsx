@@ -3,12 +3,23 @@ import React from "react";
 import Header from "./Header";
 import TopLine from "./TopLine";
 import ConventionSection from "./ConventionSection";
+import InlinePrefill from "./InlinePrefill";
 
 type Props = {
   protocolNo: string;
   onProtocolNoChange: (v: string) => void;
   conventionNo: string;
   onConventionNoChange: (v: string) => void;
+  companyName: string;
+  onCompanyNameChange: (v: string) => void;
+  vat: string;
+  onVatChange: (v: string) => void;
+  city: string;
+  onCityChange: (v: string) => void;
+  address: string;
+  onAddressChange: (v: string) => void;
+  representative: string;
+  onRepresentativeChange: (v: string) => void;
 };
 
 // Component: FirstPage
@@ -18,6 +29,16 @@ export default function FirstPage({
   onProtocolNoChange,
   conventionNo,
   onConventionNoChange,
+  companyName,
+  onCompanyNameChange,
+  vat,
+  onVatChange,
+  city,
+  onCityChange,
+  address,
+  onAddressChange,
+  representative,
+  onRepresentativeChange,
 }: Props) {
   // top-line uses its own i18n hook
   return (
@@ -42,6 +63,18 @@ export default function FirstPage({
 
       {/* Convention static section (moved from image attachment) */}
       <ConventionSection />
+      <InlinePrefill
+        companyName={companyName}
+        onCompanyNameChange={onCompanyNameChange}
+        vat={vat}
+        onVatChange={onVatChange}
+        city={city}
+        onCityChange={onCityChange}
+        address={address}
+        onAddressChange={onAddressChange}
+        representative={representative}
+        onRepresentativeChange={onRepresentativeChange}
+      />
     </div>
   );
 }

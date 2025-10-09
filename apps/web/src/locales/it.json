@@ -315,5 +315,18 @@
   "convention.section.list.aisf.title": "A.I.S.F",
   "convention.section.list.aisf.body": "(P.IVA 91052710653) con sede legale in Battipaglia, alla Via Fiorignano, n. 29 nella persona del Presidente Dott. Ing. Secondo Martino;",
   "convention.section.note": "(di seguito per brevità denominato \"NETWORK\")",
-  "convention.section.bottomChar": "e"
+  "convention.section.bottomChar": "e",
+  "convention.inline.companyPlaceholder": "Nome azienda",
+  "convention.inline.vatPlaceholder": "Partita IVA / Codice fiscale",
+  "convention.inline.cityPlaceholder": "Città",
+  "convention.inline.addressPlaceholder": "Indirizzo",
+  "convention.inline.repPlaceholder": "Rappresentante",
+  "convention.inline.headquarters": "con sede legale in",
+  "convention.inline.at": "in",
+  "convention.inline.allaVia": "alla Via",
+  "convention.inline.representedBy": "nella persona del legale rappresentante p.t.;",
+  "convention.inline.cfLabel": "(C.F./P.IVA:",
+  "convention.inline.closeParen": ")",
+  "convention.inline.endingPunctuation": ";",
+  "convention.inline.shortName": "(di seguito per brevità denominato \"POINT GTC\")"
 }
