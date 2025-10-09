@@ -318,6 +318,7 @@
   "convention.premise.title": "Premise",
   "convention.premise.paragraph1": "Network GTC is a network contract between professionals, companies, training centers, consultants and professional firms (referred to as GTC Convenzionati) and aims to implement this network of services, enabling the exchange of know-how and, through the interaction of the parties involved, to solve problems with appropriate solutions in terms of quality, professionalism and growth.",
   "convention.premise.paragraph2": "The founding members are:",
+  "convention.pageCounter": "Page {current} of {total}",
   "convention.inline.companyPlaceholder": "Company name",
   "convention.inline.vatPlaceholder": "VAT / Tax",
   "convention.inline.cityPlaceholder": "City",

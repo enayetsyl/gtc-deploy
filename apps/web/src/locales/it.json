@@ -325,6 +325,7 @@
   "convention.inline.addressPlaceholder": "Indirizzo",
   "convention.inline.repPlaceholder": "Rappresentante",
   "convention.inline.headquarters": "con sede legale in",
+  "convention.pageCounter": "Pag. {current} a {total}",
   "convention.inline.at": "in",
   "convention.inline.allaVia": "alla Via",
   "convention.inline.representedBy": "nella persona del legale rappresentante p.t.;",
