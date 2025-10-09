@@ -17,6 +17,9 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   );
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
+  // Top-line form states (kept here and passed to FirstPage)
+  const [protocolNo, setProtocolNo] = useState("");
+  const [conventionNo, setConventionNo] = useState("");
 
   // Setting token
   useEffect(() => {
@@ -53,12 +56,14 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       </div>
     );
 
-
-
-
   return (
     <div className="max-w-3xl mx-auto">
-    <FirstPage/>
+      <FirstPage
+        protocolNo={protocolNo}
+        onProtocolNoChange={(v: string) => setProtocolNo(v)}
+        conventionNo={conventionNo}
+        onConventionNoChange={(v: string) => setConventionNo(v)}
+      />
     </div>
   );
 }

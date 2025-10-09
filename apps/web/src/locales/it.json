@@ -78,6 +78,8 @@
   "onboarding.returnHome": "Torna alla home",
 
   "onboarding.invalidLink": "Link non valido o scaduto",
+  "onboarding.protocolShort": "PROT",
+  "onboarding.conventionShort": "N° Convenzionato",
   "onboarding.title": "Onboarding per {name}",
   "onboarding.email": "Email: {email}",
   "onboarding.vatLabel": "Partita IVA / Codice fiscale",

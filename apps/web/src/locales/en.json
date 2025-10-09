@@ -77,6 +77,8 @@
   "onboarding.returnHome": "Return to home",
 
   "onboarding.invalidLink": "Invalid or expired link",
+  "onboarding.protocolShort": "PROT",
+  "onboarding.conventionShort": "Convention No.",
   "onboarding.title": "Onboarding for {name}",
   "onboarding.email": "Email: {email}",
   "onboarding.vatLabel": "VAT / Tax number",
