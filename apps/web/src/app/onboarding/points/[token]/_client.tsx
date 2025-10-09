@@ -192,16 +192,61 @@ export default function OnboardingFormClient({ token }: { token: string }) {
 
   // Client-side validation helper
   function validate() {
+    // Require all fields to be filled
+    if (!protocolNo.trim()) return "Please enter the protocol number.";
+    if (!conventionNo.trim()) return "Please enter the convention number.";
     if (!companyName.trim()) return "Please enter the company name.";
-    if (!contactEmail.trim()) return "Please enter a valid contact email.";
-    // basic email format check
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail))
+    if (!taxCode.trim()) return "Please enter the tax code or VAT.";
+    if (!regCity.trim()) return "Please enter the registered city.";
+    if (!regProvince.trim()) return "Please enter the registered province.";
+    if (!regAddress.trim()) return "Please enter the registered address.";
+    if (!legalRep.trim()) return "Please enter the legal representative.";
+    if (!contactSurname.trim()) return "Please enter the contact surname.";
+    if (!contactName.trim()) return "Please enter the contact name.";
+    if (!contactRole.trim()) return "Please enter the contact role.";
+    if (!contactPhone.trim() && !contactEmail.trim())
+      return "Please enter contact phone or contact email.";
+    // basic email format check (if provided)
+    if (contactEmail.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail))
       return "Please enter a valid contact email.";
+    if (!pointEmail.trim()) return "Please enter the Point G.T.C. email.";
+    if (!services || services.length === 0)
+      return "Please select at least one service.";
     if (!placeSigned.trim())
       return "Please enter the place where the agreement was signed.";
     if (!dateSigned)
       return "Please select the date when the agreement was signed.";
     if (!agreeArticles) return "You must accept Articles 1–10 to proceed.";
+
+    // Signature check: ensure canvas is not blank
+    const c = canvasRef.current;
+    if (!c) return "Signature canvas not available.";
+    // Heuristic: check if canvas has any non-transparent pixels
+    try {
+      const ctx = c.getContext("2d");
+      if (!ctx) return "Unable to read signature canvas.";
+      const rect = c.getBoundingClientRect();
+      // read a small sample area to avoid heavy operations
+      const w = Math.max(1, Math.round(rect.width));
+      const h = Math.max(1, Math.round(rect.height));
+      const data = ctx.getImageData(
+        0,
+        0,
+        Math.min(10, w),
+        Math.min(10, h)
+      ).data;
+      let nonTransparent = false;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] !== 0) {
+          nonTransparent = true;
+          break;
+        }
+      }
+      if (!nonTransparent) return "Please provide a signature.";
+    } catch {
+      // If getImageData is not allowed due to CORS or other, skip signature pixel check
+    }
+
     return null;
   }
 
@@ -229,7 +274,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
         fd.append("contactRole", contactRole);
         fd.append("contactPhone", contactPhone);
         fd.append("contactEmail", contactEmail);
-  fd.append("pointEmail", pointEmail);
+        fd.append("pointEmail", pointEmail);
         fd.append("placeSigned", placeSigned);
         fd.append("dateSigned", dateSigned);
         services.forEach((s) => fd.append("services[]", s));
@@ -649,7 +694,9 @@ export default function OnboardingFormClient({ token }: { token: string }) {
           in separate annexes for each macro area.
         </p>
 
-        <h3 className="font-bold text-xl">Article 8 – Contractual Modifications</h3>
+        <h3 className="font-bold text-xl">
+          Article 8 – Contractual Modifications
+        </h3>
         <p>
           Any modification to this agreement must be in writing and signed by
           both parties.
@@ -661,14 +708,16 @@ export default function OnboardingFormClient({ token }: { token: string }) {
           </li>
           <li>
             <label className="block mt-2">
-          <div ><strong>Point G.T.C. Email</strong> </div>
-          <Input
-            placeholder="Point G.T.C. email"
-            value={pointEmail}
-            onChange={(e) => setPointEmail(e.target.value)}
-            className="w-full"
-          />
-        </label>
+              <div>
+                <strong>Point G.T.C. Email</strong>{" "}
+              </div>
+              <Input
+                placeholder="Point G.T.C. email"
+                value={pointEmail}
+                onChange={(e) => setPointEmail(e.target.value)}
+                className="w-full"
+              />
+            </label>
           </li>
         </ul>
         <p>
@@ -678,13 +727,17 @@ export default function OnboardingFormClient({ token }: { token: string }) {
 
         <h3 className="font-bold text-xl">Article 9 – Data Processing</h3>
         <p>
-    In accordance with EU Regulation 2016/679 (GDPR), data processing will only serve the purposes of this agreement.  
-
-
-
+          In accordance with EU Regulation 2016/679 (GDPR), data processing will
+          only serve the purposes of this agreement.
         </p>
-        <p>The POINT is the **Data Controller**, and the NETWORK will act as **Data Processor**.  </p>
-        <p>Both parties guarantee compliance with privacy laws and proper collection of consent from data subjects.</p>
+        <p>
+          The POINT is the **Data Controller**, and the NETWORK will act as
+          **Data Processor**.{" "}
+        </p>
+        <p>
+          Both parties guarantee compliance with privacy laws and proper
+          collection of consent from data subjects.
+        </p>
 
         <h3 className="font-bold text-xl">Article 10 – Jurisdiction</h3>
         <p>
@@ -739,12 +792,9 @@ export default function OnboardingFormClient({ token }: { token: string }) {
         <p>
           <strong>Point G.T.C.</strong>
           <br />
-          Legal Representative: 
+          Legal Representative:
         </p>
 
-      
-
-      
         <h3>Signature</h3>
         <div
           className="w-full"
@@ -766,7 +816,7 @@ export default function OnboardingFormClient({ token }: { token: string }) {
             }}
           />
         </div>
-       
+
         <div className="mt-2 flex gap-2">
           <Button type="button" variant="outline" onClick={clearCanvas}>
             {t("onboarding.clear")}
@@ -789,7 +839,10 @@ export default function OnboardingFormClient({ token }: { token: string }) {
         {/* Approval Clause (place + date) placed before submit */}
         <div className="mt-4 p-4 border rounded bg-muted">
           <h4 className="font-semibold">Approval Clause</h4>
-          <p className="text-sm">Pursuant to Articles 1341 and 1342 of the Civil Code, the parties expressly approve Articles 1–10.</p>
+          <p className="text-sm">
+            Pursuant to Articles 1341 and 1342 of the Civil Code, the parties
+            expressly approve Articles 1–10.
+          </p>
           <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
             <label className="block">
               <div className="text-xs text-muted-foreground mb-1">Place</div>
