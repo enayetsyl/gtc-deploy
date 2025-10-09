@@ -4,6 +4,7 @@ import Header from "./Header";
 import TopLine from "./TopLine";
 import ConventionSection from "./ConventionSection";
 import InlinePrefill from "./InlinePrefill";
+import PremiseSection from "./PremiseSection";
 
 type Props = {
   protocolNo: string;
@@ -53,6 +54,8 @@ export default function FirstPage({
     >
       <Header />
 
+    
+
       {/* Top-line: Protocol No. - Convenzionato N° */}
       <TopLine
         protocolNo={protocolNo}
@@ -75,6 +78,7 @@ export default function FirstPage({
         representative={representative}
         onRepresentativeChange={onRepresentativeChange}
       />
+        <PremiseSection />
     </div>
   );
 }
