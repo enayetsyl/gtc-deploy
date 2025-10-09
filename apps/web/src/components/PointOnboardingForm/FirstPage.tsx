@@ -2,6 +2,7 @@
 import React from "react";
 import Header from "./Header";
 import TopLine from "./TopLine";
+import ConventionSection from "./ConventionSection";
 
 type Props = {
   protocolNo: string;
@@ -38,6 +39,9 @@ export default function FirstPage({
         conventionNo={conventionNo}
         onConventionNoChange={onConventionNoChange}
       />
+
+      {/* Convention static section (moved from image attachment) */}
+      <ConventionSection />
     </div>
   );
 }

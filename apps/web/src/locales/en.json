@@ -300,5 +300,19 @@
   "nav.primary": "Primary",
   "nav.languageSwitcher": "Language",
   "nav.lang.en": "EN",
-  "nav.lang.it": "IT"
+  "nav.lang.it": "IT",
+
+  "convention.section.title": "Convention",
+  "convention.section.between": "Between",
+  "convention.section.intro": "The Network GTC, tax code 12358991003, headquartered in Salerno (SA) at Via Terre delle Risaie snc, represented by the President, Dott. Ing. Secondo Martino, through the founding companies:",
+  "convention.section.list.globalform.title": "Globalform s.r.l.",
+  "convention.section.list.globalform.body": "(VAT: 03902160658), registered office in Salerno (SA), Via Terre delle Risaie, represented by the legal representative p.t.;",
+  "convention.section.list.infotel.title": "Infotel Sistemi s.r.l.",
+  "convention.section.list.infotel.body": "(VAT: 09905391000) headquartered in Milan C.so Buenos Aires 45, represented by the legal representative p.t.;",
+  "convention.section.list.formasec.title": "Formasec s.r.l.",
+  "convention.section.list.formasec.body": "(VAT: 01212120867) headquartered in Enna (EN) at Via Unità d'Italia snc, represented by the legal representative p.t.;",
+  "convention.section.list.aisf.title": "A.I.S.F",
+  "convention.section.list.aisf.body": "(VAT: 91052710653) headquartered in Battipaglia, Via Fiorignano, 29, represented by the President Dott. Ing. Secondo Martino;",
+  "convention.section.note": "(hereinafter briefly referred to as \"NETWORK\")",
+  "convention.section.bottomChar": "and"
 }

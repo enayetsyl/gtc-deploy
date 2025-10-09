@@ -301,5 +301,19 @@
   "nav.primary": "Principale",
   "nav.languageSwitcher": "Lingua",
   "nav.lang.en": "EN",
-  "nav.lang.it": "IT"
+  "nav.lang.it": "IT",
+
+  "convention.section.title": "Convenzione",
+  "convention.section.between": "Tra",
+  "convention.section.intro": "Il Network GTC, C.F. 12358991003, con sede legale in Salerno (SA), alla Via Terre delle Risaie snc nella persona del Presidente, Dott. Ing. Secondo Martino, attraverso le societ\u00e0 fondatrici:",
+  "convention.section.list.globalform.title": "Globalform s.r.l.",
+  "convention.section.list.globalform.body": "(P.IVA: 03902160658), sede legale in Salerno (SA), Via Terre delle Risaie, nella persona del legale rappresentante p.t.;",
+  "convention.section.list.infotel.title": "Infotel Sistemi s.r.l.",
+  "convention.section.list.infotel.body": "(P.IVA: 09905391000) con sede legale in Milano C.so Buenos Aires 45, nella persona del legale rappresentante p.t.;",
+  "convention.section.list.formasec.title": "Formasec s.r.l.",
+  "convention.section.list.formasec.body": "(P. IVA: 01212120867) con sede legale in Enna (EN) alla via Unit\u00e0 d'Italia snc, nella persona del legale rappresentante p.t.;",
+  "convention.section.list.aisf.title": "A.I.S.F",
+  "convention.section.list.aisf.body": "(P.IVA 91052710653) con sede legale in Battipaglia, alla Via Fiorignano, n. 29 nella persona del Presidente Dott. Ing. Secondo Martino;",
+  "convention.section.note": "(di seguito per brevità denominato \"NETWORK\")",
+  "convention.section.bottomChar": "e"
 }
