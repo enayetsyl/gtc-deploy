@@ -31,7 +31,7 @@ const NetworkProductsSection: React.FC<Props> = ({
         {t("convention.articles.art1.body4")}
       </p>
 
-      <div className="mt-2 space-y-2">
+      <div className="ml-5 mt-2 space-y-2">
         {services.length === 0 && (
           <p className="text-sm text-gray-500">
             {t("convention.articles.noServices") || "No services available"}
@@ -51,6 +51,12 @@ const NetworkProductsSection: React.FC<Props> = ({
           </label>
         ))}
       </div>
+      <p className="leading-relaxed pt-6">
+        {t("convention.articles.art1.body5")}
+      </p>
+      <p className="leading-relaxed pt-2">
+        {t("convention.articles.art1.body6")}
+      </p>
     </div>
   );
 };
