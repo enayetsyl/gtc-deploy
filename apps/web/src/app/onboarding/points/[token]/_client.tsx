@@ -27,6 +27,11 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
   const [representative, setRepresentative] = useState("");
+  // services returned by prefill (from onboarding GET)
+  const [services, setServices] = useState<Array<{ id: string; name: string }>>(
+    []
+  );
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
 
   // Setting token
   useEffect(() => {
@@ -35,7 +40,14 @@ export default function OnboardingFormClient({ token }: { token: string }) {
       try {
         const r = await api.get(`/api/public/onboarding/points/${token}`);
         if (!mounted) return;
-        setPrefill(r.data as OnboardingPrefill);
+        // typed response may include services array
+        const data = r.data as OnboardingPrefill & {
+          services?: Array<{ id: string; name: string }>;
+        };
+        setPrefill(data);
+        if (Array.isArray(data.services)) {
+          setServices(data.services);
+        }
       } catch (err: unknown) {
         if (!mounted) return;
         setPrefill(null);
@@ -80,6 +92,11 @@ export default function OnboardingFormClient({ token }: { token: string }) {
         onAddressChange={(v: string) => setAddress(v)}
         representative={representative}
         onRepresentativeChange={(v: string) => setRepresentative(v)}
+        services={services}
+        selectedServiceIds={selectedServiceIds}
+        onSelectedServiceIdsChange={(ids: string[]) =>
+          setSelectedServiceIds(ids)
+        }
       />
     </div>
   );

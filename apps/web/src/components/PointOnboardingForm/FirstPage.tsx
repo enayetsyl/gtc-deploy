@@ -27,6 +27,9 @@ type Props = {
   onAddressChange: (v: string) => void;
   representative: string;
   onRepresentativeChange: (v: string) => void;
+  services?: Array<{ id: string; name: string }>;
+  selectedServiceIds?: string[];
+  onSelectedServiceIdsChange?: (ids: string[]) => void;
 };
 
 // Component: FirstPage
@@ -46,6 +49,9 @@ export default function FirstPage({
   onAddressChange,
   representative,
   onRepresentativeChange,
+  services = [],
+  selectedServiceIds = [],
+  onSelectedServiceIdsChange,
 }: Props) {
   // top-line uses its own i18n hook
   return (
@@ -98,13 +104,17 @@ export default function FirstPage({
       <AgreementArticles />
       <PageCounter current={2} total={7} />
       <PageHeader />
-       <TopLine
+      <TopLine
         protocolNo={protocolNo}
         onProtocolNoChange={onProtocolNoChange}
         conventionNo={conventionNo}
         onConventionNoChange={onConventionNoChange}
       />
-      <NetworkProductsSection />
+      <NetworkProductsSection
+        services={services}
+        selectedServiceIds={selectedServiceIds}
+        onSelectedServiceIdsChange={onSelectedServiceIdsChange}
+      />
     </div>
   );
 }
