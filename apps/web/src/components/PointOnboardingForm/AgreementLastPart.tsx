@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { Input } from "@/components/ui/input";
+import SignaturePad from "./SignaturePad";
 import { useI18n } from "@/providers/i18n-provider";
 
 type Props = {
@@ -9,6 +10,11 @@ type Props = {
   onTopPlaceChange?: (v: string) => void;
   topDate?: string;
   onTopDateChange?: (v: string) => void;
+  // top signature images (dataURL)
+  topPresidentSignature?: string | null;
+  onTopPresidentSignatureChange?: (dataUrl: string | null) => void;
+  topLegalSignature?: string | null;
+  onTopLegalSignatureChange?: (dataUrl: string | null) => void;
   // bottom signature row
   bottomPlace?: string;
   onBottomPlaceChange?: (v: string) => void;
@@ -23,6 +29,10 @@ const AgreementLastPart = ({
   onTopPlaceChange = () => {},
   topDate = "",
   onTopDateChange = () => {},
+  topPresidentSignature = null,
+  onTopPresidentSignatureChange = () => {},
+  topLegalSignature = null,
+  onTopLegalSignatureChange = () => {},
 
   bottomPlace = "",
   onBottomPlaceChange = () => {},
@@ -69,11 +79,9 @@ const AgreementLastPart = ({
                 name="topPlace"
                 value={topPlace}
                 onChange={(e) => onTopPlaceChange(e.target.value)}
-                // placeholder={t("agreement.signature.placePlaceholder")}
-                className={`${fieldBase} w-24`}
+                className={`${fieldBase} w-40`}
               />
-              <span>Li,</span>
-             
+              <span className="mx-2">Li,</span>
               <Input
                 name="topDate"
                 value={topDate}
@@ -82,19 +90,25 @@ const AgreementLastPart = ({
                 className={`${fieldBase} w-40`}
               />
             </div>
-            <div className="text-sm text-gray-700 pt-2">
-              {t("agreement.signature.presidentLabel1")}
-            </div>
-            <div className="text-sm text-gray-700 pt-2">
-              {t("agreement.signature.presidentLabel2")}
+            <div className="mt-2 text-sm text-gray-700">
+              {t("agreement.signature.presidentLabel")}
             </div>
           </div>
-          <div className="flex-1 text-center"></div>
 
-          <div className="w-64 text-right">
-            <div
-              className={`${fieldBg} inline-block border-black border-dotted border-b-2 h-6 mt-4 w-48`}
-            />
+         
+
+          <div className="w-72 text-right">
+            
+            <div className="mx-auto my-2 inline-block">
+              <SignaturePad
+                width={300}
+                height={80}
+                value={topLegalSignature || undefined}
+                onChange={(dataUrl) =>
+                  onTopLegalSignatureChange(dataUrl || null)
+                }
+              />
+            </div>
             <div className="text-sm text-gray-700">
               {t("agreement.signature.legalRepresentativeLabel")}
             </div>
@@ -102,7 +116,7 @@ const AgreementLastPart = ({
         </div>
       </article>
 
-      {/* Express approval clause and repeat of signature row */}
+      {/* Express approval clause */}
       <article className="mt-6">
         <h4 className="font-semibold">
           {t("agreement.expressApproval.title")}
@@ -111,7 +125,7 @@ const AgreementLastPart = ({
       </article>
 
       {/* Bottom signature row */}
-          <article className="mt-6">
+      <article className="mt-6">
         <div className="flex items-start justify-between gap-6">
           <div className="flex flex-col justify-center items-center">
             <div className="flex items-center gap-2">
@@ -119,11 +133,9 @@ const AgreementLastPart = ({
                 name="topPlace"
                 value={topPlace}
                 onChange={(e) => onTopPlaceChange(e.target.value)}
-                // placeholder={t("agreement.signature.placePlaceholder")}
-                className={`${fieldBase} w-24`}
+                className={`${fieldBase} w-40`}
               />
-              <span>Li,</span>
-             
+              <span className="mx-2">Li,</span>
               <Input
                 name="topDate"
                 value={topDate}
@@ -132,19 +144,25 @@ const AgreementLastPart = ({
                 className={`${fieldBase} w-40`}
               />
             </div>
-            <div className="text-sm text-gray-700 pt-2">
-              {t("agreement.signature.presidentLabel1")}
-            </div>
-            <div className="text-sm text-gray-700 pt-2">
-              {t("agreement.signature.presidentLabel2")}
+            <div className="mt-2 text-sm text-gray-700">
+              {t("agreement.signature.presidentLabel")}
             </div>
           </div>
-          <div className="flex-1 text-center"></div>
 
-          <div className="w-64 text-right">
-            <div
-              className={`${fieldBg} inline-block border-black border-dotted border-b-2 h-6 mt-4 w-48`}
-            />
+         
+
+          <div className="w-72 text-right">
+            
+            <div className="mx-auto my-2 inline-block">
+              <SignaturePad
+                width={300}
+                height={80}
+                value={topLegalSignature || undefined}
+                onChange={(dataUrl) =>
+                  onTopLegalSignatureChange(dataUrl || null)
+                }
+              />
+            </div>
             <div className="text-sm text-gray-700">
               {t("agreement.signature.legalRepresentativeLabel")}
             </div>

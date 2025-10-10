@@ -54,6 +54,11 @@ type Props = {
   onBottomDateChange?: (v: string) => void;
   bottomLegalRepName?: string;
   onBottomLegalRepNameChange?: (v: string) => void;
+  // top signature images (dataURL)
+  topPresidentSignature?: string | null;
+  onTopPresidentSignatureChange?: (dataUrl: string | null) => void;
+  topLegalSignature?: string | null;
+  onTopLegalSignatureChange?: (dataUrl: string | null) => void;
 };
 
 // Component: FirstPage
@@ -96,6 +101,10 @@ export default function FirstPage({
   onBottomDateChange = () => {},
   bottomLegalRepName = "",
   onBottomLegalRepNameChange = () => {},
+  topPresidentSignature = null,
+  onTopPresidentSignatureChange = () => {},
+  topLegalSignature = null,
+  onTopLegalSignatureChange = () => {},
 }: Props) {
   // top-line uses its own i18n hook
   return (
@@ -218,6 +227,10 @@ export default function FirstPage({
         onBottomDateChange={onBottomDateChange}
         bottomLegalRepName={bottomLegalRepName}
         onBottomLegalRepNameChange={onBottomLegalRepNameChange}
+        topPresidentSignature={topPresidentSignature}
+        onTopPresidentSignatureChange={onTopPresidentSignatureChange}
+        topLegalSignature={topLegalSignature}
+        onTopLegalSignatureChange={onTopLegalSignatureChange}
       />
     </div>
   );

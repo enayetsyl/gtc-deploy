@@ -38,6 +38,13 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   // Top signature row
   const [topPlace, setTopPlace] = useState("");
   const [topDate, setTopDate] = useState("");
+  // top signatures as dataURLs
+  const [topPresidentSignature, setTopPresidentSignature] = useState<
+    string | null
+  >(null);
+  const [topLegalSignature, setTopLegalSignature] = useState<string | null>(
+    null
+  );
   // Bottom (express approval) signature row
   const [bottomPlace, setBottomPlace] = useState("");
   const [bottomDate, setBottomDate] = useState("");
@@ -136,10 +143,12 @@ export default function OnboardingFormClient({ token }: { token: string }) {
         onBottomDateChange={(v: string) => setBottomDate(v)}
         bottomLegalRepName={bottomLegalRepName}
         onBottomLegalRepNameChange={(v: string) => setBottomLegalRepName(v)}
+        topPresidentSignature={topPresidentSignature}
+        onTopPresidentSignatureChange={(d) => setTopPresidentSignature(d)}
+        topLegalSignature={topLegalSignature}
+        onTopLegalSignatureChange={(d) => setTopLegalSignature(d)}
       />
       <div className="p-6">
-      
-
         {submitError ? (
           <div className="text-red-600 mb-2">{submitError}</div>
         ) : null}
@@ -179,6 +188,21 @@ export default function OnboardingFormClient({ token }: { token: string }) {
               formData.append("pointGtcContact", pointGtcContact || "");
               formData.append("topPlace", topPlace || "");
               formData.append("topDate", topDate || "");
+              // append signatures as blobs if provided
+              if (topPresidentSignature) {
+                const res = await fetch(topPresidentSignature);
+                const blob = await res.blob();
+                formData.append(
+                  "topPresidentSignature",
+                  blob,
+                  "top-president.png"
+                );
+              }
+              if (topLegalSignature) {
+                const res2 = await fetch(topLegalSignature);
+                const blob2 = await res2.blob();
+                formData.append("topLegalSignature", blob2, "top-legal.png");
+              }
               formData.append("bottomPlace", bottomPlace || "");
               formData.append("bottomDate", bottomDate || "");
               formData.append("bottomLegalRepName", bottomLegalRepName || "");
