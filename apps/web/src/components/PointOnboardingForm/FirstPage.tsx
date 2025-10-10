@@ -12,6 +12,7 @@ import AgreementIntro from "./AgreementIntro";
 import AgreementArticles from "./AgreementArticles";
 import NetworkProductsSection from "./NetworkProductsSection";
 import AgreementPart2 from "./AgreementPart2";
+import AgreementPart3 from "./AgreementPart3";
 
 type Props = {
   protocolNo: string;
@@ -31,6 +32,14 @@ type Props = {
   services?: Array<{ id: string; name: string }>;
   selectedServiceIds?: string[];
   onSelectedServiceIdsChange?: (ids: string[]) => void;
+  contactSurname?: string;
+  onContactSurnameChange?: (v: string) => void;
+  contactName?: string;
+  onContactNameChange?: (v: string) => void;
+  contactRole?: string;
+  onContactRoleChange?: (v: string) => void;
+  contactPhone?: string;
+  onContactPhoneChange?: (v: string) => void;
 };
 
 // Component: FirstPage
@@ -53,6 +62,14 @@ export default function FirstPage({
   services = [],
   selectedServiceIds = [],
   onSelectedServiceIdsChange,
+  contactSurname = "",
+  onContactSurnameChange,
+  contactName = "",
+  onContactNameChange,
+  contactRole = "",
+  onContactRoleChange,
+  contactPhone = "",
+  onContactPhoneChange,
 }: Props) {
   // top-line uses its own i18n hook
   return (
@@ -124,7 +141,25 @@ export default function FirstPage({
         conventionNo={conventionNo}
         onConventionNoChange={onConventionNoChange}
       />
-      <AgreementPart2/>
+      <AgreementPart2 />
+      <PageCounter current={4} total={7} />
+      <PageHeader />
+      <TopLine
+        protocolNo={protocolNo}
+        onProtocolNoChange={onProtocolNoChange}
+        conventionNo={conventionNo}
+        onConventionNoChange={onConventionNoChange}
+      />
+      <AgreementPart3
+        contactSurname={contactSurname}
+        onContactSurnameChange={onContactSurnameChange!}
+        contactName={contactName}
+        onContactNameChange={onContactNameChange!}
+        contactRole={contactRole}
+        onContactRoleChange={onContactRoleChange!}
+        contactPhone={contactPhone}
+        onContactPhoneChange={onContactPhoneChange!}
+      />
     </div>
   );
 }

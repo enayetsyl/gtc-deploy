@@ -339,6 +339,10 @@
   "convention.articles.art1.body": "The parties intend to cooperate in synergy to expand the realities they represent, acquiring clients across the national territory, public and private companies interested in the services/products offered by the Network. By signing this agreement, the POINT, depending on the specific service offered, will have access to a reserved price list or to recognition of a fee, for which an appropriate annex will be stipulated that defines operational and economic modalities. The products and services that the NETWORK can provide are present in the catalog/price list visible at: www.networkgtc.it.",
   "convention.articles.art1.body2": "The POINT GTC has declared interest in the following services and products of the Network GTC, marked with an X.",
   "convention.articles.art1.body3": "The NETWORK, through its founding companies and member associations, will make available its products and services across various domains in order to offer them to its clients.",
+  "convention.articles.art1.body4": "The POINT GTC has declared interest in the following services and products of the Network GTC, marked with an X:",
+  "convention.articles.art1.body5": "The NETWORK will provide the POINT GTC with all commercial information necessary for offering and promoting its information services, which will be delivered according to the modalities agreed between the Parties.",
+  "convention.articles.art1.body6": "Furthermore, upon specific request and considering the expertise of the NETWORK and its founding companies, it will be possible to develop and deliver additional bespoke services and/or products not already present in the catalog/price list; the terms of delivery and compensation will be agreed in separate addenda.",
+  "convention.articles.noServices": "No services available",
   "convention.pageCounter": "Page {current} of {total}",
   "convention.inline.companyPlaceholder": "Company name",
   "convention.inline.vatPlaceholder": "VAT / Tax",
@@ -352,5 +356,10 @@
   "convention.inline.cfLabel": "(C.F./P.IVA:",
   "convention.inline.closeParen": ")",
   "convention.inline.endingPunctuation": ";",
-  "convention.inline.shortName": "(hereinafter briefly referred to as \"POINT GTC\")"
+  "convention.inline.shortName": "(hereinafter briefly referred to as \"POINT GTC\")",
+
+  "agreement.contact.surname": "Surname",
+  "agreement.contact.name": "Name",
+  "agreement.contact.role": "Role",
+  "agreement.contact.phoneOrEmail": "Phone / Email"
 }

@@ -355,6 +355,8 @@
   "convention.articles.art4.body3": "Il POINT GTC, al di fuori della previsione di cui al precedente punto, non potrà fare utilizzo alcuno di marchi, loghi, nomi od altri segni distintivi del NETWORK se non da questi espressamente autorizzato.",
   "convention.articles.art4.body4": "Il POINT GTC si obbliga, altresì, in caso di autorizzazione all’utilizzo di segni distintivi, loghi, marchi o cataloghi da parte del NETWORK a non effettuare sugli stessi nessuna modifica o variazione.",
   "convention.articles.art4.body5": "È fatto obbligo al POINT GTC di rispettare le normative vigenti in materia di sicurezza nei luoghi di lavoro,",
+  "convention.articles.art4.body6": "regolarità contributiva e retributiva e di agire in buona fede per le finalità oggetto della presente convenzione.",
+  "convention.articles.art4.body7": "Il POINT GTC indica quale Responsabile della presente Convenzione con cui il NETWORK potrà interfacciarsi per qualsiasi motivo, il seguente referente:",
 
   "convention.inline.companyPlaceholder": "Nome azienda",
   "convention.inline.vatPlaceholder": "Partita IVA / Codice fiscale",
@@ -369,5 +371,10 @@
   "convention.inline.cfLabel": "(C.F./P.IVA:",
   "convention.inline.closeParen": ")",
   "convention.inline.endingPunctuation": ";",
-  "convention.inline.shortName": "(di seguito per brevità denominato \"POINT GTC\")"
+  "convention.inline.shortName": "(di seguito per brevità denominato \"POINT GTC\")",
+  "agreement.contact.surname": "Cognome",
+  "agreement.contact.name": "Nome",
+  "agreement.contact.role": "Qualifica",
+  "agreement.contact.phoneOrEmail": "Telefono / Email",
+  "convention.articles.noServices": "Nessun servizio disponibile"
 }

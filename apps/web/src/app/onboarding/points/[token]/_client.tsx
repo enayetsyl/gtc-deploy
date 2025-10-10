@@ -27,6 +27,11 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   const [city, setCity] = useState("");
   const [address, setAddress] = useState("");
   const [representative, setRepresentative] = useState("");
+  // contact fields for agreement part 3
+  const [contactSurname, setContactSurname] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactRole, setContactRole] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   // services returned by prefill (from onboarding GET)
   const [services, setServices] = useState<Array<{ id: string; name: string }>>(
     []
@@ -97,6 +102,14 @@ export default function OnboardingFormClient({ token }: { token: string }) {
         onSelectedServiceIdsChange={(ids: string[]) =>
           setSelectedServiceIds(ids)
         }
+        contactSurname={contactSurname}
+        onContactSurnameChange={(v: string) => setContactSurname(v)}
+        contactName={contactName}
+        onContactNameChange={(v: string) => setContactName(v)}
+        contactRole={contactRole}
+        onContactRoleChange={(v: string) => setContactRole(v)}
+        contactPhone={contactPhone}
+        onContactPhoneChange={(v: string) => setContactPhone(v)}
       />
     </div>
   );
