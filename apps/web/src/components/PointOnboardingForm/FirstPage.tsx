@@ -59,6 +59,7 @@ type Props = {
   onTopPresidentSignatureChange?: (dataUrl: string | null) => void;
   topLegalSignature?: string | null;
   onTopLegalSignatureChange?: (dataUrl: string | null) => void;
+ 
 };
 
 // Component: FirstPage
@@ -105,6 +106,7 @@ export default function FirstPage({
   onTopPresidentSignatureChange = () => {},
   topLegalSignature = null,
   onTopLegalSignatureChange = () => {},
+  
 }: Props) {
   // top-line uses its own i18n hook
   return (
@@ -231,6 +233,8 @@ export default function FirstPage({
         onTopPresidentSignatureChange={onTopPresidentSignatureChange}
         topLegalSignature={topLegalSignature}
         onTopLegalSignatureChange={onTopLegalSignatureChange}
+        
+        
       />
     </div>
   );

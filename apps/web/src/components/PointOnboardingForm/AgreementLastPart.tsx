@@ -44,6 +44,22 @@ const AgreementLastPart = ({
   const { t } = useI18n();
   const fieldBg = "bg-[#e9f0ff]";
   const fieldBase = `${fieldBg} text-base border-b-2 border-black px-2 py-1 rounded-sm`;
+  const [topDateError, setTopDateError] = React.useState<string | null>(null);
+  const [bottomDateError, setBottomDateError] = React.useState<string | null>(
+    null
+  );
+
+  function validateDateInput(value?: string) {
+    if (!value) return ""; // empty allowed here; higher-level validation can require it
+    // Expect YYYY-MM-DD (HTML date input) and valid date
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!isoDateRegex.test(value))
+      return t("form.errors.invalidDate") ?? "Invalid date";
+    const d = new Date(value);
+    return isNaN(d.getTime())
+      ? t("form.errors.invalidDate") ?? "Invalid date"
+      : "";
+  }
 
   return (
     <section className="agreement-articles my-6 space-y-4 text-lg">
@@ -84,21 +100,29 @@ const AgreementLastPart = ({
               <span className="mx-2">Li,</span>
               <Input
                 name="topDate"
+                type="date"
                 value={topDate}
-                onChange={(e) => onTopDateChange(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  onTopDateChange(v);
+                  const err = validateDateInput(v);
+                  setTopDateError(err || null);
+                }}
                 placeholder={t("agreement.signature.datePlaceholder")}
-                className={`${fieldBase} w-40`}
+                className={`${fieldBase} w-40 ${
+                  topDateError ? "border-red-600" : ""
+                }`}
               />
             </div>
             <div className="mt-2 text-sm text-gray-700">
               {t("agreement.signature.presidentLabel")}
             </div>
+            {topDateError ? (
+              <div className="text-sm text-red-600 mt-1">{topDateError}</div>
+            ) : null}
           </div>
 
-         
-
           <div className="w-72 text-right">
-            
             <div className="mx-auto my-2 inline-block">
               <SignaturePad
                 width={300}
@@ -138,21 +162,29 @@ const AgreementLastPart = ({
               <span className="mx-2">Li,</span>
               <Input
                 name="topDate"
+                type="date"
                 value={topDate}
-                onChange={(e) => onTopDateChange(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  onTopDateChange(v);
+                  const err = validateDateInput(v);
+                  setBottomDateError(err || null);
+                }}
                 placeholder={t("agreement.signature.datePlaceholder")}
-                className={`${fieldBase} w-40`}
+                className={`${fieldBase} w-40 ${
+                  bottomDateError ? "border-red-600" : ""
+                }`}
               />
             </div>
             <div className="mt-2 text-sm text-gray-700">
               {t("agreement.signature.presidentLabel")}
             </div>
+            {bottomDateError ? (
+              <div className="text-sm text-red-600 mt-1">{bottomDateError}</div>
+            ) : null}
           </div>
 
-         
-
           <div className="w-72 text-right">
-            
             <div className="mx-auto my-2 inline-block">
               <SignaturePad
                 width={300}

@@ -50,8 +50,13 @@ pointsOnboardingPublic.post("/:token/submit", flaggedUpload(), async (req: Reque
       contactEmail: z.string().email().optional(),
       pointEmail: z.string().email().optional(),
       contactPhone: z.string().optional(),
+      // fields the frontend currently sends as top/bottom place/date; accept them as optional aliases
       placeSigned: z.string().optional(),
       dateSigned: z.string().optional(),
+      topPlace: z.string().optional(),
+      topDate: z.string().optional(),
+      bottomPlace: z.string().optional(),
+      bottomDate: z.string().optional(),
       agreedToArticles: z.string().optional(), // checkbox comes as "on"
       // services[] will be parsed separately
     })
@@ -69,7 +74,8 @@ pointsOnboardingPublic.post("/:token/submit", flaggedUpload(), async (req: Reque
   let signatureData: { url: string; key: string; originalName: string; mime: string } | undefined;
   if (process.env.UPLOADS_ENABLED === "true" && req.files) {
     const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
-    const signatureFile = files.find((f: any) => f.fieldname === "file" && f.mimetype?.startsWith("image/"));
+    // Accept any uploaded image file as the signature (frontend may use different field names)
+    const signatureFile = files.find((f: any) => f.mimetype?.startsWith("image/"));
     if (signatureFile) {
       try {
         const { storage } = await import("../storage/provider");
@@ -87,6 +93,11 @@ pointsOnboardingPublic.post("/:token/submit", flaggedUpload(), async (req: Reque
   const agreed = !!(body.data.agreedToArticles === "on" || body.data.agreedToArticles === "true" || body.data.agreedToArticles === "1");
   if (!agreed) return res.status(400).json({ error: "AgreementNotAccepted" });
 
+  // Determine which place/date to use for the agreement signing moment. Prefer explicit placeSigned/dateSigned,
+  // then topPlace/topDate (the frontend uses these names), then bottomPlace/bottomDate.
+  const placeSigned = body.data.placeSigned ?? body.data.topPlace ?? body.data.bottomPlace ?? undefined;
+  const dateSigned = body.data.dateSigned ?? body.data.topDate ?? body.data.bottomDate ?? undefined;
+
   await submitAgreement(token, {
     protocolNo: body.data.protocolNo,
     conventionNo: body.data.conventionNo,
@@ -102,8 +113,8 @@ pointsOnboardingPublic.post("/:token/submit", flaggedUpload(), async (req: Reque
     pointEmail: body.data.pointEmail,
     contactEmail: body.data.contactEmail,
     contactPhone: body.data.contactPhone,
-    placeSigned: body.data.placeSigned,
-    dateSigned: body.data.dateSigned,
+    placeSigned,
+    dateSigned,
     services: services.length ? services : undefined,
     signature: signatureData,
   });
