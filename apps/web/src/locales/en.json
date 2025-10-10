@@ -361,5 +361,19 @@
   "agreement.contact.surname": "Surname",
   "agreement.contact.name": "Name",
   "agreement.contact.role": "Role",
-  "agreement.contact.phoneOrEmail": "Phone / Email"
+  "agreement.contact.phoneOrEmail": "Phone / Email",
+  "agreement.signature.placeLabel": "Place",
+  "agreement.signature.placePlaceholder": "City, Province",
+  "agreement.signature.dateLabel": "Date",
+  "agreement.signature.datePlaceholder": "DD / MM / YYYY",
+  "agreement.signature.presidentLabel": "For NETWORK GTC - The President",
+  "agreement.signature.legalRepresentativeLabel": "For POINT GTC - Legal Representative",
+  "agreement.signature.legalRepresentativePlaceholder": "Name and role",
+  "agreement.attachments.title": "Attachments:",
+  "agreement.attachments.itemA": "Liability waiver - Attachment A;",
+  "agreement.attachments.itemB": "Point GTC identification plaque and affixing procedure - Attachment B;",
+  "agreement.attachments.itemC": "Data processing responsible appointment - Attachment C;",
+  "agreement.attachments.itemD": "Attachments for each macro-area.",
+  "agreement.expressApproval.title": "Clause of express approval",
+  "agreement.expressApproval.text": "The parties expressly declare for the purposes and effects of arts. 1341 and 1342 of the Civil Code that they accept the content of arts. 1, 2, 3, 4, 5, 6, 7, 8, 9, 10."
 }

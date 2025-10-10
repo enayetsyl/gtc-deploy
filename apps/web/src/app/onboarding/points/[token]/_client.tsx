@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/axios";
 import { useI18n } from "@/providers/i18n-provider";
 import FirstPage from "@/components/PointOnboardingForm/FirstPage";
+import { submitPublicOnboarding } from "@/lib/admin-api";
 
 type OnboardingPrefill = {
   name?: string | null;
@@ -34,11 +35,22 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   const [contactPhone, setContactPhone] = useState("");
   // Point GTC contact/PEC line (Art.8)
   const [pointGtcContact, setPointGtcContact] = useState("");
+  // Top signature row
+  const [topPlace, setTopPlace] = useState("");
+  const [topDate, setTopDate] = useState("");
+  // Bottom (express approval) signature row
+  const [bottomPlace, setBottomPlace] = useState("");
+  const [bottomDate, setBottomDate] = useState("");
+  const [bottomLegalRepName, setBottomLegalRepName] = useState("");
   // services returned by prefill (from onboarding GET)
   const [services, setServices] = useState<Array<{ id: string; name: string }>>(
     []
   );
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [agreedToArticles, setAgreedToArticles] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
   // Setting token
   useEffect(() => {
@@ -114,7 +126,87 @@ export default function OnboardingFormClient({ token }: { token: string }) {
         onContactPhoneChange={(v: string) => setContactPhone(v)}
         pointGtcContact={pointGtcContact}
         onPointGtcContactChange={(v: string) => setPointGtcContact(v)}
+        topPlace={topPlace}
+        onTopPlaceChange={(v: string) => setTopPlace(v)}
+        topDate={topDate}
+        onTopDateChange={(v: string) => setTopDate(v)}
+        bottomPlace={bottomPlace}
+        onBottomPlaceChange={(v: string) => setBottomPlace(v)}
+        bottomDate={bottomDate}
+        onBottomDateChange={(v: string) => setBottomDate(v)}
+        bottomLegalRepName={bottomLegalRepName}
+        onBottomLegalRepNameChange={(v: string) => setBottomLegalRepName(v)}
       />
+      <div className="p-6">
+      
+
+        {submitError ? (
+          <div className="text-red-600 mb-2">{submitError}</div>
+        ) : null}
+        {submitSuccess ? (
+          <div className="text-green-700 mb-2">
+            {t("onboarding.thanksTitle")}
+          </div>
+        ) : null}
+
+        <button
+          onClick={async () => {
+            setSubmitError(null);
+            setSubmitSuccess(false);
+            if (!agreedToArticles) {
+              setSubmitError(t("onboarding.mustAgree"));
+              return;
+            }
+            setSubmitting(true);
+            try {
+              const formData = new FormData();
+              formData.append("protocolNo", protocolNo || "");
+              formData.append("conventionNo", conventionNo || "");
+              formData.append("companyName", companyName || "");
+              formData.append("taxCodeOrVat", vat || "");
+              formData.append("registeredCity", city || "");
+              formData.append("registeredProvince", "");
+              formData.append("registeredAddress", address || "");
+              formData.append("legalRepresentative", representative || "");
+              formData.append("contactSurname", contactSurname || "");
+              formData.append("contactName", contactName || "");
+              formData.append("contactRole", contactRole || "");
+              formData.append("contactPhone", contactPhone || "");
+              if (prefill?.email) {
+                formData.append("pointEmail", prefill.email);
+                formData.append("contactEmail", prefill.email);
+              }
+              formData.append("pointGtcContact", pointGtcContact || "");
+              formData.append("topPlace", topPlace || "");
+              formData.append("topDate", topDate || "");
+              formData.append("bottomPlace", bottomPlace || "");
+              formData.append("bottomDate", bottomDate || "");
+              formData.append("bottomLegalRepName", bottomLegalRepName || "");
+              if (selectedServiceIds && selectedServiceIds.length) {
+                selectedServiceIds.forEach((id) =>
+                  formData.append("services[]", id)
+                );
+              }
+              formData.append("agreedToArticles", "on");
+
+              await submitPublicOnboarding(token, formData);
+              setSubmitSuccess(true);
+            } catch (err: unknown) {
+              let msg = t("onboarding.submitFailed");
+              if (typeof err === "string") msg = err;
+              else if (err instanceof Error) msg = err.message;
+              else msg = String(err);
+              setSubmitError(msg);
+            } finally {
+              setSubmitting(false);
+            }
+          }}
+          disabled={submitting}
+          className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
+        >
+          {submitting ? t("onboarding.submitting") : t("onboarding.submit")}
+        </button>
+      </div>
     </div>
   );
 }

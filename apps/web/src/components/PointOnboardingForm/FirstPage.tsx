@@ -14,6 +14,7 @@ import NetworkProductsSection from "./NetworkProductsSection";
 import AgreementPart2 from "./AgreementPart2";
 import AgreementPart3 from "./AgreementPart3";
 import AgreementArticlePart4 from "./AgreementArticlePart4";
+import AgreementLastPart from "./AgreementLastPart";
 
 type Props = {
   protocolNo: string;
@@ -43,6 +44,16 @@ type Props = {
   onContactPhoneChange?: (v: string) => void;
   pointGtcContact?: string;
   onPointGtcContactChange?: (v: string) => void;
+  topPlace?: string;
+  onTopPlaceChange?: (v: string) => void;
+  topDate?: string;
+  onTopDateChange?: (v: string) => void;
+  bottomPlace?: string;
+  onBottomPlaceChange?: (v: string) => void;
+  bottomDate?: string;
+  onBottomDateChange?: (v: string) => void;
+  bottomLegalRepName?: string;
+  onBottomLegalRepNameChange?: (v: string) => void;
 };
 
 // Component: FirstPage
@@ -75,6 +86,16 @@ export default function FirstPage({
   onContactPhoneChange,
   pointGtcContact = "",
   onPointGtcContactChange = () => {},
+  topPlace = "",
+  onTopPlaceChange = () => {},
+  topDate = "",
+  onTopDateChange = () => {},
+  bottomPlace = "",
+  onBottomPlaceChange = () => {},
+  bottomDate = "",
+  onBottomDateChange = () => {},
+  bottomLegalRepName = "",
+  onBottomLegalRepNameChange = () => {},
 }: Props) {
   // top-line uses its own i18n hook
   return (
@@ -173,10 +194,30 @@ export default function FirstPage({
         conventionNo={conventionNo}
         onConventionNoChange={onConventionNoChange}
       />
-      <AgreementArticlePart4 />
+
       <AgreementArticlePart4
         pointGtcContact={pointGtcContact}
         onPointGtcContactChange={onPointGtcContactChange}
+      />
+      <PageCounter current={6} total={7} />
+      <PageHeader />
+      <TopLine
+        protocolNo={protocolNo}
+        onProtocolNoChange={onProtocolNoChange}
+        conventionNo={conventionNo}
+        onConventionNoChange={onConventionNoChange}
+      />
+      <AgreementLastPart
+        topPlace={topPlace}
+        onTopPlaceChange={onTopPlaceChange}
+        topDate={topDate}
+        onTopDateChange={onTopDateChange}
+        bottomPlace={bottomPlace}
+        onBottomPlaceChange={onBottomPlaceChange}
+        bottomDate={bottomDate}
+        onBottomDateChange={onBottomDateChange}
+        bottomLegalRepName={bottomLegalRepName}
+        onBottomLegalRepNameChange={onBottomLegalRepNameChange}
       />
     </div>
   );
