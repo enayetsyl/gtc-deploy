@@ -32,6 +32,8 @@ export default function OnboardingFormClient({ token }: { token: string }) {
   const [contactName, setContactName] = useState("");
   const [contactRole, setContactRole] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  // Point GTC contact/PEC line (Art.8)
+  const [pointGtcContact, setPointGtcContact] = useState("");
   // services returned by prefill (from onboarding GET)
   const [services, setServices] = useState<Array<{ id: string; name: string }>>(
     []
@@ -110,6 +112,8 @@ export default function OnboardingFormClient({ token }: { token: string }) {
         onContactRoleChange={(v: string) => setContactRole(v)}
         contactPhone={contactPhone}
         onContactPhoneChange={(v: string) => setContactPhone(v)}
+        pointGtcContact={pointGtcContact}
+        onPointGtcContactChange={(v: string) => setPointGtcContact(v)}
       />
     </div>
   );

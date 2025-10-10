@@ -13,6 +13,7 @@ import AgreementArticles from "./AgreementArticles";
 import NetworkProductsSection from "./NetworkProductsSection";
 import AgreementPart2 from "./AgreementPart2";
 import AgreementPart3 from "./AgreementPart3";
+import AgreementArticlePart4 from "./AgreementArticlePart4";
 
 type Props = {
   protocolNo: string;
@@ -40,6 +41,8 @@ type Props = {
   onContactRoleChange?: (v: string) => void;
   contactPhone?: string;
   onContactPhoneChange?: (v: string) => void;
+  pointGtcContact?: string;
+  onPointGtcContactChange?: (v: string) => void;
 };
 
 // Component: FirstPage
@@ -70,6 +73,8 @@ export default function FirstPage({
   onContactRoleChange,
   contactPhone = "",
   onContactPhoneChange,
+  pointGtcContact = "",
+  onPointGtcContactChange = () => {},
 }: Props) {
   // top-line uses its own i18n hook
   return (
@@ -159,6 +164,19 @@ export default function FirstPage({
         onContactRoleChange={onContactRoleChange!}
         contactPhone={contactPhone}
         onContactPhoneChange={onContactPhoneChange!}
+      />
+      <PageCounter current={5} total={7} />
+      <PageHeader />
+      <TopLine
+        protocolNo={protocolNo}
+        onProtocolNoChange={onProtocolNoChange}
+        conventionNo={conventionNo}
+        onConventionNoChange={onConventionNoChange}
+      />
+      <AgreementArticlePart4 />
+      <AgreementArticlePart4
+        pointGtcContact={pointGtcContact}
+        onPointGtcContactChange={onPointGtcContactChange}
       />
     </div>
   );
