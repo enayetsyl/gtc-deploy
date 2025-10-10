@@ -23,8 +23,8 @@ const AgreementPart2 = () => {
         <h4 className="font-semibold">{t("convention.articles.art4.title")}</h4>
         <p className="leading-relaxed">{t("convention.articles.art4.body1")}</p>
         <p className="leading-relaxed">{t("convention.articles.art4.body2")}</p>
-        <p className="leading-relaxed">{t("convention.articles.art4.body3")}</p>
-        <p className="leading-relaxed">{t("convention.articles.art4.body4")}</p>
+        <p className="leading-relaxed pt-3">{t("convention.articles.art4.body3")}</p>
+        <p className="leading-relaxed py-3">{t("convention.articles.art4.body4")}</p>
         <p className="leading-relaxed">{t("convention.articles.art4.body5")}</p>
       </article>
     </section>
