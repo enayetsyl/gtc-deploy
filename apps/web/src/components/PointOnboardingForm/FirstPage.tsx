@@ -6,6 +6,8 @@ import ConventionSection from "./ConventionSection";
 import InlinePrefill from "./InlinePrefill";
 import PremiseSection from "./PremiseSection";
 import PageCounter from "./PageCounter";
+import FoundingMembers from "./FoundingMembers";
+import PageHeader from "./PageHeader";
 
 type Props = {
   protocolNo: string;
@@ -81,12 +83,14 @@ export default function FirstPage({
       <PremiseSection />
       <PageCounter current={1} total={7} />
 
-<TopLine
+      <PageHeader />
+      <TopLine
         protocolNo={protocolNo}
         onProtocolNoChange={onProtocolNoChange}
         conventionNo={conventionNo}
         onConventionNoChange={onConventionNoChange}
       />
+      <FoundingMembers />
     </div>
   );
 }

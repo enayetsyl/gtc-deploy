@@ -23,14 +23,20 @@ type I18nCtx = {
 const I18nContext = createContext<I18nCtx | null>(null);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
+  const normalizeLocale = (l?: string | null): Locale => {
+    if (!l) return "it";
+    const code = String(l).slice(0, 2).toLowerCase();
+    return code === "it" ? "it" : "en";
+  };
+
   const [locale, setLocaleState] = useState<Locale>(() => {
     if (typeof window === "undefined") return "it";
-    const stored = (localStorage.getItem(LOCALE_KEY) as Locale) || null;
-    if (stored) return stored;
+    const storedRaw = localStorage.getItem(LOCALE_KEY);
+    if (storedRaw) return normalizeLocale(storedRaw);
     // Try to infer from browser settings
-    const nav = navigator?.language?.slice(0, 2);
-    if (nav === "it") return "it";
-    return "it";
+    const nav =
+      typeof navigator !== "undefined" ? navigator.language : undefined;
+    return normalizeLocale(nav);
   });
 
   const setLocale = (l: Locale) => {
@@ -46,7 +52,10 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     key: string,
     vars?: Record<string, string | number | undefined>
   ) => {
-    const txt = map[locale][key] ?? map["en"][key] ?? key;
+    // Guard access: if map doesn't contain the current locale (e.g. stored value was 'en-US'),
+    // fall back to English translations.
+    const translations = map[locale] ?? map["en"];
+    const txt = translations[key] ?? map["en"][key] ?? key;
     if (!vars) return txt;
     return Object.keys(vars).reduce((s, k) => {
       const value = vars[k];
