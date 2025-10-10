@@ -10,6 +10,7 @@ import FoundingMembers from "./FoundingMembers";
 import PageHeader from "./PageHeader";
 import AgreementIntro from "./AgreementIntro";
 import AgreementArticles from "./AgreementArticles";
+import NetworkProductsSection from "./NetworkProductsSection";
 
 type Props = {
   protocolNo: string;
@@ -93,9 +94,17 @@ export default function FirstPage({
         onConventionNoChange={onConventionNoChange}
       />
       <FoundingMembers />
-      <AgreementIntro/>
-      <AgreementArticles/>
+      <AgreementIntro />
+      <AgreementArticles />
       <PageCounter current={2} total={7} />
+      <PageHeader />
+       <TopLine
+        protocolNo={protocolNo}
+        onProtocolNoChange={onProtocolNoChange}
+        conventionNo={conventionNo}
+        onConventionNoChange={onConventionNoChange}
+      />
+      <NetworkProductsSection />
     </div>
   );
 }
