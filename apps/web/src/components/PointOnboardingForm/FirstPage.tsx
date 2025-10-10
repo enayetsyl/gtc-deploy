@@ -9,6 +9,7 @@ import PageCounter from "./PageCounter";
 import FoundingMembers from "./FoundingMembers";
 import PageHeader from "./PageHeader";
 import AgreementIntro from "./AgreementIntro";
+import AgreementArticles from "./AgreementArticles";
 
 type Props = {
   protocolNo: string;
@@ -93,6 +94,8 @@ export default function FirstPage({
       />
       <FoundingMembers />
       <AgreementIntro/>
+      <AgreementArticles/>
+      <PageCounter current={2} total={7} />
     </div>
   );
 }
