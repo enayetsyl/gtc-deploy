@@ -79,9 +79,15 @@ exports.pointsOnboardingPublic.post("/:token/submit", (0, upload_1.upload)(), as
         contactName: zod_1.z.string().optional(),
         contactRole: zod_1.z.string().optional(),
         contactEmail: zod_1.z.string().email().optional(),
+        pointEmail: zod_1.z.string().email().optional(),
         contactPhone: zod_1.z.string().optional(),
+        // fields the frontend currently sends as top/bottom place/date; accept them as optional aliases
         placeSigned: zod_1.z.string().optional(),
         dateSigned: zod_1.z.string().optional(),
+        topPlace: zod_1.z.string().optional(),
+        topDate: zod_1.z.string().optional(),
+        bottomPlace: zod_1.z.string().optional(),
+        bottomDate: zod_1.z.string().optional(),
         agreedToArticles: zod_1.z.string().optional(), // checkbox comes as "on"
         // services[] will be parsed separately
     })
@@ -97,7 +103,8 @@ exports.pointsOnboardingPublic.post("/:token/submit", (0, upload_1.upload)(), as
     let signatureData;
     if (process.env.UPLOADS_ENABLED === "true" && req.files) {
         const files = Array.isArray(req.files) ? req.files : Object.values(req.files).flat();
-        const signatureFile = files.find((f) => f.fieldname === "file" && f.mimetype?.startsWith("image/"));
+        // Accept any uploaded image file as the signature (frontend may use different field names)
+        const signatureFile = files.find((f) => f.mimetype?.startsWith("image/"));
         if (signatureFile) {
             try {
                 const { storage } = await Promise.resolve().then(() => __importStar(require("../storage/provider")));
@@ -115,6 +122,10 @@ exports.pointsOnboardingPublic.post("/:token/submit", (0, upload_1.upload)(), as
     const agreed = !!(body.data.agreedToArticles === "on" || body.data.agreedToArticles === "true" || body.data.agreedToArticles === "1");
     if (!agreed)
         return res.status(400).json({ error: "AgreementNotAccepted" });
+    // Determine which place/date to use for the agreement signing moment. Prefer explicit placeSigned/dateSigned,
+    // then topPlace/topDate (the frontend uses these names), then bottomPlace/bottomDate.
+    const placeSigned = body.data.placeSigned ?? body.data.topPlace ?? body.data.bottomPlace ?? undefined;
+    const dateSigned = body.data.dateSigned ?? body.data.topDate ?? body.data.bottomDate ?? undefined;
     await (0, onboarding_1.submitAgreement)(token, {
         protocolNo: body.data.protocolNo,
         conventionNo: body.data.conventionNo,
@@ -127,10 +138,11 @@ exports.pointsOnboardingPublic.post("/:token/submit", (0, upload_1.upload)(), as
         contactSurname: body.data.contactSurname,
         contactName: body.data.contactName,
         contactRole: body.data.contactRole,
+        pointEmail: body.data.pointEmail,
         contactEmail: body.data.contactEmail,
         contactPhone: body.data.contactPhone,
-        placeSigned: body.data.placeSigned,
-        dateSigned: body.data.dateSigned,
+        placeSigned,
+        dateSigned,
         services: services.length ? services : undefined,
         signature: signatureData,
     });

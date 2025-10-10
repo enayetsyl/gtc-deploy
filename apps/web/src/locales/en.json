@@ -176,6 +176,11 @@
   "detail.approving": "Approving…",
   "detail.declining": "Declining…",
 
+  "detail.downloadPdf": "Download PDF",
+  "detail.generatingPdf": "Generating PDF…",
+  "detail.pdfGenerated": "PDF generated",
+  "detail.pdfFailed": "Failed to generate PDF",
+
   "ui.create": "Create",
   "ui.creating": "Creating…",
   "ui.view": "View",

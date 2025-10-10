@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import Spinner from "@/components/ui/Spinner";
 import { useI18n } from "@/providers/i18n-provider";
 import { toast } from "sonner";
+import PrintableAgreement, {
+  PrintableAgreementData,
+} from "@/components/PrintableAgreement";
+import usePrintPdf from "@/hooks/usePrintPdf";
+import { useRef } from "react";
 
 type OnboardDetail = {
   id: string;
@@ -30,6 +35,9 @@ export default function Client({ id }: { id: string }) {
   const router = useRouter();
   const [approving, setApproving] = useState(false);
   const [declining, setDeclining] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const { downloadPdf } = usePrintPdf();
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   useEffect(() => {
     (async () => {
       try {
@@ -186,6 +194,69 @@ export default function Client({ id }: { id: string }) {
               {t("detail.noSignature")}
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <h3 className="text-lg font-medium mb-2">Agreement preview</h3>
+        <div className="mb-3 flex gap-2">
+          <button
+            className="px-4 py-2 bg-blue-600 text-white rounded"
+            onClick={async () => {
+              setDownloadingPdf(true);
+              try {
+                await downloadPdf(containerRef.current, {
+                  filename: `${item.name || "agreement"}.pdf`,
+                });
+                toast.success(t("detail.pdfGenerated"));
+              } catch (e) {
+                console.error(e);
+                toast.error(t("detail.pdfFailed") || "Failed to generate PDF");
+              } finally {
+                setDownloadingPdf(false);
+              }
+            }}
+            disabled={downloadingPdf}
+          >
+            {downloadingPdf
+              ? t("detail.generatingPdf")
+              : t("detail.downloadPdf")}
+          </button>
+          <button
+            className="px-4 py-2 bg-emerald-600 text-white rounded"
+            onClick={approve}
+            disabled={!isSubmitted || approving}
+          >
+            {approving ? t("detail.approving") : t("detail.approve")}
+          </button>
+          <button
+            className="px-4 py-2 bg-red-600 text-white rounded"
+            onClick={decline}
+            disabled={!isSubmitted || declining}
+          >
+            {declining ? t("detail.declining") : t("detail.decline")}
+          </button>
+        </div>
+        <div>
+          <PrintableAgreement
+            ref={containerRef}
+            data={
+              {
+                protocolNo: item.id || "",
+                conventionNo: "",
+                companyName: item.name,
+                vat: item.vatOrTaxNumber || "",
+                pointGtcContact: item.phone || "",
+                topLegalSignature: item.signaturePath
+                  ? item.signaturePath.startsWith("/")
+                    ? item.signaturePath
+                    : `/api/image-proxy?url=${encodeURIComponent(
+                        item.signaturePath
+                      )}`
+                  : null,
+              } as PrintableAgreementData
+            }
+          />
         </div>
       </div>
 

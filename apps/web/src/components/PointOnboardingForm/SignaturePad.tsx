@@ -50,14 +50,31 @@ export default function SignaturePad({
       ctx.strokeStyle = "#111827";
       ctx.lineTo(e.offsetX, e.offsetY);
       ctx.stroke();
-      onChange(canvas.toDataURL("image/png"));
+      try {
+        onChange(canvas.toDataURL("image/png"));
+      } catch (err) {
+        // Canvas may be tainted if it contains cross-origin images. Report null and warn.
+        console.warn(
+          "SignaturePad: unable to export canvas to dataURL (tainted)",
+          err
+        );
+        onChange(null);
+      }
     };
     const pointerUp = (e: PointerEvent) => {
       drawing.current = false;
       try {
         canvas.releasePointerCapture(e.pointerId);
       } catch {}
-      onChange(canvas.toDataURL("image/png"));
+      try {
+        onChange(canvas.toDataURL("image/png"));
+      } catch (err) {
+        console.warn(
+          "SignaturePad: unable to export canvas to dataURL on pointerUp (tainted)",
+          err
+        );
+        onChange(null);
+      }
     };
     canvas.addEventListener("pointerdown", pointerDown);
     canvas.addEventListener("pointermove", pointerMove);

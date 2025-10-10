@@ -11,6 +11,10 @@ const client_1 = require("@prisma/client");
  * Returns the created Notification.
  */
 async function notifyUser(input) {
+    // Allow tests and smoke-scripts to disable notifications (sockets/emails)
+    if (process.env.SKIP_NOTIFICATIONS === "true") {
+        return null;
+    }
     const notif = await prisma_1.prisma.notification.create({
         data: {
             userId: input.userId,

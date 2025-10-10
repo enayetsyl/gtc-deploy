@@ -26,6 +26,7 @@ import { sectorsPublic } from "./routes/sectors.public";
 import { pointsOnboardingPublic } from "./routes/points.onboarding.public";
 import { uploadthingRouter } from "./routes/uploadthing";
 import { debugRouter } from "./routes/debug";
+import { imageProxy } from "./routes/image.proxy";
 import { httpLogger } from "./middleware/logger";
 
 // Debug - remove in production
@@ -69,6 +70,7 @@ app.use("/api/sectors/public", sectorsPublic);
 app.use("/api/public/onboarding/points", pointsOnboardingPublic);
 app.use("/api/uploadthing", uploadthingRouter);
 app.use("/api/debug", debugRouter);
+app.use("/api", imageProxy);
 
 // Serve test file (remove in production)
 app.get("/test-upload", (req, res) => {

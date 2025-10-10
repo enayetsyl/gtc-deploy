@@ -129,6 +129,20 @@ async function submitAgreement(onboardingToken, payload) {
         signatureKey = payload.signature.key;
     }
     // Create PointAgreement record
+    // Note: Prisma client types must be regenerated after schema changes. Use ts-ignore
+    // and cast to any so runtime will still attempt to write the new field. Run
+    // `prisma migrate dev` and `prisma generate` to update types properly.
+    // Helper: safely parse a date string or Date object; return undefined if invalid
+    function parseDateSafe(d) {
+        if (!d)
+            return undefined;
+        if (d instanceof Date) {
+            return isNaN(d.getTime()) ? undefined : d;
+        }
+        const parsed = new Date(String(d));
+        return isNaN(parsed.getTime()) ? undefined : parsed;
+    }
+    // @ts-ignore
     const agreement = await prisma_1.prisma.pointAgreement.create({
         data: {
             onboardingId: ob.id,
@@ -143,11 +157,12 @@ async function submitAgreement(onboardingToken, payload) {
             contactName: payload.contactName,
             contactRole: payload.contactRole,
             contactEmail: payload.contactEmail,
+            pointEmail: payload.pointEmail,
             contactPhone: payload.contactPhone,
             protocolNo: payload.protocolNo,
             conventionNo: payload.conventionNo,
             placeSigned: payload.placeSigned,
-            dateSigned: payload.dateSigned ? new Date(payload.dateSigned) : undefined,
+            dateSigned: parseDateSafe(payload.dateSigned),
             signaturePath: signaturePath,
             signatureUploadthingKey: signatureKey,
             agreedToArticles: true,

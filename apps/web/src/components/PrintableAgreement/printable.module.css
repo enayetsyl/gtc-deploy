@@ -1,0 +1,22 @@
+.printContainer {
+  max-width: 210mm;
+  width: 100%;
+  margin: 0 auto;
+  padding: 8px;
+  background: white;
+  color: #111;
+}
+
+/* Print friendly styles */
+@media print {
+  .printContainer,
+  .printContainer * {
+    visibility: visible !important;
+  }
+  .printContainer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}
