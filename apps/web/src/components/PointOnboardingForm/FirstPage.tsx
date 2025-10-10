@@ -11,6 +11,7 @@ import PageHeader from "./PageHeader";
 import AgreementIntro from "./AgreementIntro";
 import AgreementArticles from "./AgreementArticles";
 import NetworkProductsSection from "./NetworkProductsSection";
+import AgreementPart2 from "./AgreementPart2";
 
 type Props = {
   protocolNo: string;
@@ -115,6 +116,15 @@ export default function FirstPage({
         selectedServiceIds={selectedServiceIds}
         onSelectedServiceIdsChange={onSelectedServiceIdsChange}
       />
+      <PageCounter current={3} total={7} />
+      <PageHeader />
+      <TopLine
+        protocolNo={protocolNo}
+        onProtocolNoChange={onProtocolNoChange}
+        conventionNo={conventionNo}
+        onConventionNoChange={onConventionNoChange}
+      />
+      <AgreementPart2/>
     </div>
   );
 }
