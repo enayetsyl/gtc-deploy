@@ -332,6 +332,7 @@
   "convention.founders.pointName": "THE POINT",
   "convention.founders.pointBody": "is an entity/professional intending to offer services and products to its clients, equipped with technical and professional infrastructures capable of ensuring know-how exchange among GTC network members;",
   "convention.founders.closing": "The parties mutually acknowledge that this agreement is characterized by trust and the personal reliability of their respective representatives.",
+  "convention.agreementIntro": "Having said that, the parties agree and stipulate as follows",
   "convention.pageCounter": "Page {current} of {total}",
   "convention.inline.companyPlaceholder": "Company name",
   "convention.inline.vatPlaceholder": "VAT / Tax",

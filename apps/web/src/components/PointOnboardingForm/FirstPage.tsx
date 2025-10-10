@@ -8,6 +8,7 @@ import PremiseSection from "./PremiseSection";
 import PageCounter from "./PageCounter";
 import FoundingMembers from "./FoundingMembers";
 import PageHeader from "./PageHeader";
+import AgreementIntro from "./AgreementIntro";
 
 type Props = {
   protocolNo: string;
@@ -91,6 +92,7 @@ export default function FirstPage({
         onConventionNoChange={onConventionNoChange}
       />
       <FoundingMembers />
+      <AgreementIntro/>
     </div>
   );
 }
