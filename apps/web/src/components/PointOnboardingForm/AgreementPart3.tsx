@@ -81,6 +81,18 @@ const AgreementPart3: React.FC<Props> = ({
           />
         </div>
       </div>
+       <article>
+        <h4 className="font-semibold">{t("convention.articles.art5.title")}</h4>
+       
+        <p className="pt-3">{t("convention.articles.art4.body1")}</p>
+        <p className="pt-3">{t("convention.articles.art4.body2")}</p>
+        <p className="pt-3">{t("convention.articles.art4.body3")}</p>
+      </article>
+       <article>
+        <h4 className="font-semibold">{t("convention.articles.art6.title")}</h4>
+        <p>{t("convention.articles.art6.body1")}</p>
+       
+      </article>
     </section>
   );
 };
